@@ -6,6 +6,9 @@
 
 package com.kenvix.natpoked.utils.network;
 
+import com.kenvix.natpoked.contacts.NATType;
+import com.kenvix.natpoked.utils.AppEnv;
+
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -13,31 +16,33 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-class StunKit {
-    private static final String STUN_SERVER_ADDRESS = "stun.meizu.com";
-    private static final int STUN_SERVER_PORT = 3478;
-    private static final int RECEIVE_TIMEOUT = 3000;
+final class StunKit {
+    private static final int RECEIVE_TIMEOUT = AppEnv.INSTANCE.getStunQueryTimeout();
+    private final InetAddress stunServerAddr;
+    private final int stunServerPort;
 
-    public enum NatType {
-        BLOCKED, OPEN_INTERNET, FULL_CONE, SYMMETRIC_FIREWALL, RESTRICTED_CONE_NAT, RESTRICTED_PORT_NAT, SYMMETRIC_NAT, UNKNOWN;
+    public StunKit(InetAddress stunServerAddr, int stunServerPort) {
+        this.stunServerAddr = stunServerAddr;
+        this.stunServerPort = stunServerPort;
     }
 
+
     public static class StunResult {
-        public NatType natType;
+        public NATType natType;
         public String publicIp;
         public int publicPort;
+
         @Override
         public String toString() {
-            String sb = "natType:\t" + natType +
+            return "natType:\t" + natType +
                     "\npublicIp:\t" + publicIp +
                     "\npublicPort:\t" + publicPort;
-            return sb;
         }
     }
 
-    public static StunResult makeStun(DatagramSocket socket) {
-        if(!socket.isBound()) throw new RuntimeException("can not process a unbound datagram socket");
-        StunResult result= null;
+    public StunResult makeStun(DatagramSocket socket) {
+        if (!socket.isBound()) throw new RuntimeException("can not process a unbound datagram socket");
+        StunResult result = null;
         int oldReceiveTimeout = 0;
         try {
             oldReceiveTimeout = socket.getSoTimeout();
@@ -56,13 +61,13 @@ class StunKit {
 
         try {
             socket.setSoTimeout(oldReceiveTimeout);
-        } catch( SocketException e) {
+        } catch (SocketException e) {
             e.printStackTrace();
         }
 
-        if(stunResponse != null && stunResponse.responsed) {
+        if (stunResponse != null && stunResponse.responsed) {
             result = new StunResult();
-            result.natType = NatType.UNKNOWN;
+            result.natType = NATType.UNKNOWN;
             result.publicIp = stunResponse.externalIp;
             result.publicPort = stunResponse.externalPort;
         }
@@ -78,22 +83,22 @@ class StunKit {
         public int sourcePort;
         public String changedIp;
         public int changedPort;
+
         @Override
         public String toString() {
-            String sb = "responsed:\t" + responsed +
+            return "responsed:\t" + responsed +
                     "\nexternalIp:\t" + externalIp +
                     "\nexternalPort:\t" + externalPort +
                     "\nsourceIp:\t" + sourceIp +
                     "\nsourcePort:\t" + sourcePort +
                     "\nchangedIp:\t" + changedIp +
                     "\nchangedPort:\t" + changedPort;
-            return sb;
         }
     }
 
-    private static ResponseResult stunTest(DatagramSocket socket, byte[] msgData) {
+    private ResponseResult stunTest(DatagramSocket socket, byte[] msgData) {
         ResponseResult result = new ResponseResult();
-        int msgLength = msgData==null? 0:msgData.length;
+        int msgLength = msgData == null ? 0 : msgData.length;
         MessageHeader bindRequestHeader = new MessageHeader();
         bindRequestHeader.generateTransactionID();
         bindRequestHeader.setMessageLength(msgLength);
@@ -101,31 +106,30 @@ class StunKit {
         byte[] headerData = bindRequestHeader.encode();
         byte[] sendData = new byte[headerData.length + msgLength];
         System.arraycopy(headerData, 0, sendData, 0, headerData.length);
-        if(msgLength > 0) System.arraycopy(msgData, 0, sendData, headerData.length, msgLength);
+        if (msgLength > 0) System.arraycopy(msgData, 0, sendData, headerData.length, msgLength);
 
         int tryForGettingCorrectPacketCount = 3;
-        while(tryForGettingCorrectPacketCount > 0) {
+        while (tryForGettingCorrectPacketCount > 0) {
             int tryForGettingDataCount = 3;
             byte[] receivedData = null;
             //System.out.println("###############################################################");
-            while(receivedData == null) {
-                try{
-                    DatagramPacket  sendPacket = new DatagramPacket(
+            while (receivedData == null) {
+                try {
+                    DatagramPacket sendPacket = new DatagramPacket(
                             sendData,
                             sendData.length,
-                            InetAddress.getByName(STUN_SERVER_ADDRESS),
-                            STUN_SERVER_PORT);
+                            stunServerAddr, stunServerPort);
                     socket.send(sendPacket);
 
                     DatagramPacket receivePacket = new DatagramPacket(new byte[1024], 1024);
                     socket.receive(receivePacket);
 
-                    receivedData = Arrays.copyOfRange(receivePacket.getData(), 0,  receivePacket.getLength());
+                    receivedData = Arrays.copyOfRange(receivePacket.getData(), 0, receivePacket.getLength());
                     //System.out.println("got data! -------------------------------------------------------##" + receivedData.length);
                 } catch (Exception e) {
                     e.printStackTrace();
                     //System.out.println("tryForGettingDataCount is : " + tryForGettingDataCount);
-                    if(tryForGettingDataCount > 0) {
+                    if (tryForGettingDataCount > 0) {
                         tryForGettingDataCount--;
                     } else {
                         result.responsed = false;
@@ -135,24 +139,24 @@ class StunKit {
             }
 
             Message receivedMessage = Message.parseData(receivedData);
-            if(     receivedMessage != null &&
+            if (receivedMessage != null &&
                     receivedMessage.getStunType() == MessageHeader.StunType.BIND_RESPONSE_MSG &&
-                    Arrays.equals(receivedMessage.getTransactionId(), bindRequestHeader.getTransactionId()) ) {
+                    Arrays.equals(receivedMessage.getTransactionId(), bindRequestHeader.getTransactionId())) {
                 MessageAttribute[] attributes = receivedMessage.getAttributes();
                 //System.out.println("message data was received , attributes list below:");
                 result.responsed = true;
-                for(MessageAttribute attr : attributes) {
+                for (MessageAttribute attr : attributes) {
                     //System.out.println(attr.toString());
-                    if(attr instanceof MappedAddress) {
-                        MappedAddress ma = (MappedAddress)attr;
+                    if (attr instanceof MappedAddress) {
+                        MappedAddress ma = (MappedAddress) attr;
                         result.externalIp = ma.getAddress();
                         result.externalPort = ma.getPort();
-                    } else if(attr instanceof SourceAddress) {
-                        SourceAddress sa = (SourceAddress)attr;
+                    } else if (attr instanceof SourceAddress) {
+                        SourceAddress sa = (SourceAddress) attr;
                         result.sourceIp = sa.getAddress();
                         result.sourcePort = sa.getPort();
-                    } else if(attr instanceof ChangedAddress) {
-                        ChangedAddress ca = (ChangedAddress)attr;
+                    } else if (attr instanceof ChangedAddress) {
+                        ChangedAddress ca = (ChangedAddress) attr;
                         result.changedIp = ca.getAddress();
                         result.changedPort = ca.getPort();
                     }
@@ -167,7 +171,9 @@ class StunKit {
 
     private static class UtilityException extends Exception {
         //private static final long serialVersionUID = 3545800974716581680L;
-        UtilityException(String mesg) { super(mesg); }
+        UtilityException(String mesg) {
+            super(mesg);
+        }
     }
 
     private static class Message {
@@ -178,16 +184,19 @@ class StunKit {
         }
         */
         private MessageAttribute[] attributes;
-        public MessageAttribute[] getAttributes() {return attributes;}
+
+        public MessageAttribute[] getAttributes() {
+            return attributes;
+        }
 
 
         public MessageHeader.StunType getStunType() {
-            if(header == null) return null;
+            if (header == null) return null;
             return header.getStunType();
         }
 
         public byte[] getTransactionId() {
-            if(header == null) return null;
+            if (header == null) return null;
             return header.getTransactionId();
         }
 
@@ -197,18 +206,18 @@ class StunKit {
                 MessageHeader header = new MessageHeader();
 
                 int msgLength = Utility.twoBytesToInteger(messageData, 2);
-                if(messageData.length != msgLength +MessageHeader.HEAD_LENGTH) return null;
+                if (messageData.length != msgLength + MessageHeader.HEAD_LENGTH) return null;
                 header.setMessageLength(msgLength);
 
                 int stunType = Utility.twoBytesToInteger(messageData, 0);
                 MessageHeader.StunType[] types = MessageHeader.StunType.values();
-                for(MessageHeader.StunType type : types) {
-                    if(type.getValue() == stunType) {
+                for (MessageHeader.StunType type : types) {
+                    if (type.getValue() == stunType) {
                         header.setStunType(type);
                         break;
                     }
                 }
-                if(header.getStunType() == null) return null;
+                if (header.getStunType() == null) return null;
 
                 byte[] tranId = new byte[16];
                 System.arraycopy(messageData, 4, tranId, 0, 16);
@@ -216,14 +225,14 @@ class StunKit {
 
                 //MessageHead parsing is finished
                 MessageAttribute[] attributes = MessageAttribute.parseData(messageData);
-                if(attributes != null && attributes.length > 0) {
+                if (attributes != null && attributes.length > 0) {
                     Message msg = new Message();
                     msg.header = header;
                     msg.attributes = attributes;
                     return msg;
                 }
 
-            } catch(Exception e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
             return null;
@@ -252,12 +261,12 @@ class StunKit {
                 int offset = MessageHeader.HEAD_LENGTH;
                 //int lengthRemain =  Utility.twoBytesToInteger(messageData, 2);
 
-                while( offset < messageData.length ) {
+                while (offset < messageData.length) {
                     int attrType = Utility.twoBytesToInteger(messageData, offset);
                     int attrLength = Utility.twoBytesToInteger(messageData, offset + 2);
 
                     MessageAttribute attr = null;
-                    switch(attrType) {
+                    switch (attrType) {
                         case MAPPED_ADDRESS:
                             attr = new MappedAddress();
                             break;
@@ -270,7 +279,7 @@ class StunKit {
                         default:
                             attr = new UnknownAttribute(attrType, attrLength);
                     }
-                    if(messageData.length >= attr.getLength() + offset + 4) {
+                    if (messageData.length >= attr.getLength() + offset + 4) {
                         attr.parse(messageData, offset + 4);
                         attributeList.add(attr);
                     } else {
@@ -281,19 +290,22 @@ class StunKit {
                 }
 
                 int size = attributeList.size();
-                if(size > 0) {
+                if (size > 0) {
                     MessageAttribute[] attrs = new MessageAttribute[size];
                     return attributeList.toArray(attrs);
                 }
-            } catch (Exception e ) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
             return null;
         }
 
         public abstract int getTypeCode();
+
         public abstract int getLength();
+
         public abstract void parse(byte[] messageData, int offset);
+
         public abstract String toString();
     }
 
@@ -306,10 +318,12 @@ class StunKit {
      *|                             Address                           |
      * +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
-    private static abstract class AddressAttribute extends  MessageAttribute {
+    private static abstract class AddressAttribute extends MessageAttribute {
 
         @Override
-        public int getLength() { return 8; }
+        public int getLength() {
+            return 8;
+        }
 
         @Override
         public String toString() {
@@ -332,20 +346,29 @@ class StunKit {
                         append(".").
                         append(Utility.oneByteToInteger(messageData, offset + 7));
                 mAddress = sb.toString();
-            } catch (Exception e ) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
 
         private int mPort;
-        public int getPort() { return mPort; }
+
+        public int getPort() {
+            return mPort;
+        }
+
         private String mAddress;
-        public String getAddress() { return mAddress; }
+
+        public String getAddress() {
+            return mAddress;
+        }
     }
 
     private static class MappedAddress extends AddressAttribute {
         @Override
-        public int getTypeCode() { return 0x0001; }
+        public int getTypeCode() {
+            return 0x0001;
+        }
     }
 
     /* ignore all attributes present in request
@@ -357,12 +380,16 @@ class StunKit {
 
     private static class SourceAddress extends AddressAttribute {
         @Override
-        public int getTypeCode() { return 0x0004; }
+        public int getTypeCode() {
+            return 0x0004;
+        }
     }
 
     private static class ChangedAddress extends AddressAttribute {
         @Override
-        public int getTypeCode() { return 0x0005; }
+        public int getTypeCode() {
+            return 0x0005;
+        }
     }
 
     /*
@@ -400,10 +427,14 @@ class StunKit {
         }
 
         @Override
-        public int getTypeCode() {return mTypeCode; }
+        public int getTypeCode() {
+            return mTypeCode;
+        }
 
         @Override
-        public int getLength() { return mLength; }
+        public int getLength() {
+            return mLength;
+        }
 
         @Override
         public void parse(byte[] messageData, int offset) {
@@ -448,18 +479,27 @@ class StunKit {
             SHARED_SECRET_RESPONSE_MSG(0X0102),
             SHARED_SECRETERROR_RESPONSE_MSG(0x0112);
             private final int value;
-            private StunType(int value) {this.value = value;}
-            public String toString() {return super.toString() + "value:" + value;}
-            public int getValue() {return value;}
+
+            private StunType(int value) {
+                this.value = value;
+            }
+
+            public String toString() {
+                return super.toString() + "value:" + value;
+            }
+
+            public int getValue() {
+                return value;
+            }
         }
 
-        public  StunType getStunType(){
-            if(mStunType == null) return null;
+        public StunType getStunType() {
+            if (mStunType == null) return null;
             try {
                 int intType = Utility.twoBytesToInteger(mStunType);
                 StunType[] types = StunType.values();
-                for(StunType type : types) {
-                    if(type.getValue() == intType) {
+                for (StunType type : types) {
+                    if (type.getValue() == intType) {
                         return type;
                     }
                 }
@@ -480,7 +520,7 @@ class StunKit {
         public int getMessageLength() {
             try {
                 return Utility.twoBytesToInteger(mMessageLength);
-            } catch(UtilityException e) {
+            } catch (UtilityException e) {
                 e.printStackTrace();
             }
             return -1;
@@ -489,22 +529,22 @@ class StunKit {
         public void setMessageLength(int length) {
             try {
                 mMessageLength = Utility.integerToTwoBytes(length);
-            } catch(UtilityException e) {
+            } catch (UtilityException e) {
                 e.printStackTrace();
             }
         }
 
         public void generateTransactionID() {
             mTranId = new byte[16];
-            try  {
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 0, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 2, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 4, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 6, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 8, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 10, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 12, 2);
-                System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, mTranId, 14, 2);
+            try {
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 0, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 2, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 4, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 6, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 8, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 10, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 12, 2);
+                System.arraycopy(Utility.integerToTwoBytes((int) (Math.random() * 65536)), 0, mTranId, 14, 2);
             } catch (UtilityException e) {
                 e.printStackTrace();
             }
@@ -515,15 +555,16 @@ class StunKit {
         }
 
         public boolean setTransactionId(byte[] tranId) {
-            if(tranId.length != 16) return false;
+            if (tranId.length != 16) return false;
             mTranId = tranId;
             return true;
         }
 
         public byte[] encode() {
-            if(mStunType==null || mStunType.length!=2) throw new RuntimeException("Stuntype is not correct");
-            if(mMessageLength ==null || mMessageLength.length!=2) throw new RuntimeException("mMessageLength is not correct");
-            if(mTranId==null || mTranId.length!=16) throw new RuntimeException(" mTranId is not correct");
+            if (mStunType == null || mStunType.length != 2) throw new RuntimeException("Stuntype is not correct");
+            if (mMessageLength == null || mMessageLength.length != 2)
+                throw new RuntimeException("mMessageLength is not correct");
+            if (mTranId == null || mTranId.length != 16) throw new RuntimeException(" mTranId is not correct");
 
             byte[] result = new byte[HEAD_LENGTH];
             System.arraycopy(mStunType, 0, result, 0, 2);
@@ -535,46 +576,46 @@ class StunKit {
 
     private static class Utility {
         public static final byte integerToOneByte(int value) throws UtilityException {
-            if ((value > Math.pow(2,15)) || (value < 0)) {
+            if ((value > Math.pow(2, 15)) || (value < 0)) {
                 throw new UtilityException("Integer value " + value + " is larger than 2^15");
             }
-            return (byte)(value & 0xFF);
+            return (byte) (value & 0xFF);
         }
 
         public static final byte[] integerToTwoBytes(int value) throws UtilityException {
             byte[] result = new byte[2];
-            if ((value > Math.pow(2,31)) || (value < 0)) {
+            if ((value > Math.pow(2, 31)) || (value < 0)) {
                 throw new UtilityException("Integer value " + value + " is larger than 2^31");
             }
-            result[0] = (byte)((value >>> 8) & 0xFF);
-            result[1] = (byte)(value & 0xFF);
+            result[0] = (byte) ((value >>> 8) & 0xFF);
+            result[1] = (byte) (value & 0xFF);
             return result;
         }
 
         public static final byte[] integerToFourBytes(int value) throws UtilityException {
             byte[] result = new byte[4];
-            if ((value > Math.pow(2,63)) || (value < 0)) {
+            if ((value > Math.pow(2, 63)) || (value < 0)) {
                 throw new UtilityException("Integer value " + value + " is larger than 2^63");
             }
-            result[0] = (byte)((value >>> 24) & 0xFF);
-            result[1] = (byte)((value >>> 16) & 0xFF);
-            result[2] = (byte)((value >>> 8) & 0xFF);
-            result[3] = (byte)(value & 0xFF);
+            result[0] = (byte) ((value >>> 24) & 0xFF);
+            result[1] = (byte) ((value >>> 16) & 0xFF);
+            result[2] = (byte) ((value >>> 8) & 0xFF);
+            result[3] = (byte) (value & 0xFF);
             return result;
         }
 
         public static final int oneByteToInteger(byte value) throws UtilityException {
-            byte[] val  = new byte[1];
+            byte[] val = new byte[1];
             val[0] = value;
             return oneByteToInteger(val, 0);
         }
 
         public static final int oneByteToInteger(byte[] value, int offset) throws UtilityException {
-            if (value.length < 1+offset) {
+            if (value.length < 1 + offset) {
                 throw new UtilityException("Byte array too short!");
             }
 
-            return (int)value[offset] & 0xFF;
+            return (int) value[offset] & 0xFF;
         }
 
         public static final int twoBytesToInteger(byte[] value) throws UtilityException {
@@ -582,11 +623,11 @@ class StunKit {
         }
 
         public static final int twoBytesToInteger(byte[] value, int offset) throws UtilityException {
-            if (value.length < 2+offset) {
+            if (value.length < 2 + offset) {
                 throw new UtilityException("Byte array too short!");
             }
             int temp0 = value[offset] & 0xFF;
-            int temp1 = value[1+offset] & 0xFF;
+            int temp1 = value[1 + offset] & 0xFF;
             return ((temp0 << 8) + temp1);
         }
 
@@ -595,14 +636,14 @@ class StunKit {
         }
 
         public static final long fourBytesToLong(byte[] value, int offset) throws UtilityException {
-            if (value.length < 4+offset) {
+            if (value.length < 4 + offset) {
                 throw new UtilityException("Byte array too short!");
             }
             int temp0 = value[offset] & 0xFF;
             int temp1 = value[1 + offset] & 0xFF;
             int temp2 = value[2 + offset] & 0xFF;
             int temp3 = value[3 + offset] & 0xFF;
-            return (((long)temp0 << 24) + (temp1 << 16) + (temp2 << 8) + temp3);
+            return (((long) temp0 << 24) + (temp1 << 16) + (temp2 << 8) + temp3);
         }
     }
 

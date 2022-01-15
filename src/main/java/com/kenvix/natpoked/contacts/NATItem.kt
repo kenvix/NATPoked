@@ -44,7 +44,7 @@ enum class NATType {
     RESTRICTED_CONE,
     PORT_RESTRICTED_CONE,
     SYMMETRIC,
-    UDP_BLOCKED,
+    BLOCKED,
     UNKNOWN
 }
 
