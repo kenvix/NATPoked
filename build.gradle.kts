@@ -69,6 +69,16 @@ dependencies {
     implementation("io.ktor:ktor-server-host-common:$ktorVersion")
     implementation("io.ktor:ktor-locations:$ktorVersion")
     implementation("io.ktor:ktor-server-sessions:$ktorVersion")
+
+    // https://mvnrepository.com/artifact/chat.dim/STUN
+    // implementation("chat.dim:STUN:0.1.5")
+
+    // https://mvnrepository.com/artifact/de.javawi.jstun/jstun
+    // implementation("de.javawi.jstun:jstun:0.7.4")
+
+
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
+    implementation("org.slf4j:slf4j-api:1.7.32")
 }
 
 tasks.getByName<Test>("test") {

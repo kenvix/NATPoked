@@ -38,14 +38,14 @@ data class PeerCommunicationPacket(
 }
 
 @Serializable
-enum class NATType {
-    PUBLIC,
-    FULL_CONE,
-    RESTRICTED_CONE,
-    PORT_RESTRICTED_CONE,
-    SYMMETRIC,
-    BLOCKED,
-    UNKNOWN
+enum class NATType(levelId: Int) : Comparable<NATType> {
+    BLOCKED(0),
+    UNKNOWN(10),
+    SYMMETRIC(60),
+    PORT_RESTRICTED_CONE(70),
+    RESTRICTED_CONE(80),
+    FULL_CONE(90),
+    PUBLIC(100),
 }
 
 @Serializable

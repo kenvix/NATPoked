@@ -15,12 +15,12 @@ object AppEnv : ManagedEnvFile() {
     val StunQueryTimeout: Int by envOf(3000)
 
 
-    val StunServerList: List<Pair<InetAddress, Int>> = StunServers.split(' ').map {
+    val StunServerList: List<Pair<String, Int>> = StunServers.split(' ').map {
         if (":" in it) {
             val s = it.split(':')
-            Pair(InetAddress.getByName(s[0]), s[1].toInt())
+            Pair(s[0], s[1].toInt())
         } else {
-            Pair(InetAddress.getByName(it), 3478)
+            Pair(it, 3478)
         }
     }
 }
