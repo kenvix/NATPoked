@@ -46,7 +46,15 @@ public class DiscoveryTest {
 	boolean nodeNatted = true;
 	DatagramSocket socketTest1 = null;
 	DiscoveryInfo di = null;
-	
+
+	public int getTimeoutInitValue() {
+		return timeoutInitValue;
+	}
+
+	public void setTimeoutInitValue(int timeoutInitValue) {
+		this.timeoutInitValue = timeoutInitValue;
+	}
+
 	public DiscoveryTest(InetAddress iaddress , String stunServer, int port) {
 		super();
 		this.iaddress = iaddress;

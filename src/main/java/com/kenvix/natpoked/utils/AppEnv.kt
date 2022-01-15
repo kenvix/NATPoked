@@ -5,6 +5,9 @@ import com.kenvix.utils.preferences.ManagedEnvFile
 import java.net.InetAddress
 
 object AppEnv : ManagedEnvFile() {
+    @Description("是否启用调试模式，生成环境务必为 false")
+    val DebugMode: Boolean by envOf(false)
+
     @Description("STUN 服务器列表，每个服务器之间用空格 分隔。可以用冒号:指明端口号，默认端口号为3478")
     val StunServers: String by envOf("stun.qq.com stun.miwifi.com stun.syncthing.net stun.bige0.com")
 
@@ -13,6 +16,9 @@ object AppEnv : ManagedEnvFile() {
 
     @Description("STUN 查询超时时间（毫秒）")
     val StunQueryTimeout: Int by envOf(3000)
+
+    val StunWaitNum: Int by envOf(2)
+    val StunEachServerTestNum: Int by envOf(1)
 
 
     val StunServerList: List<Pair<String, Int>> = StunServers.split(' ').map {
@@ -23,4 +29,6 @@ object AppEnv : ManagedEnvFile() {
             Pair(it, 3478)
         }
     }
+
+    val CacheCleanUpCheckIntervalSeconds: Long by envOf(1000 * 10)
 }

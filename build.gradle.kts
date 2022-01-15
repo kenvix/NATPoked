@@ -79,6 +79,16 @@ dependencies {
 
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
     implementation("org.slf4j:slf4j-api:1.7.32")
+
+    // https://mvnrepository.com/artifact/io.github.cdimascio/java-dotenv
+    implementation("io.github.cdimascio:java-dotenv:5.2.2")
+
+
+    /* Apache commons */
+    implementation("org.apache.commons:commons-lang3:3.12.0")
+    implementation(group = "commons-cli", name = "commons-cli", version = "1.4")
+    implementation("commons-io:commons-io:2.11.0")
+    implementation("org.apache.commons:commons-text:1.9")
 }
 
 tasks.getByName<Test>("test") {
