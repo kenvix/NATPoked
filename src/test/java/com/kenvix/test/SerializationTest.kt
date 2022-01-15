@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -40,5 +41,11 @@ class SerializationTest {
 
         println(Json.encodeToString(testItem))
         println(ProtoBuf.encodeToHexString(testItem))
+    }
+
+    @Test
+    fun bindTest() {
+        val socket = DatagramSocket(12666, Inet4Address.getByName("127.0.0.2"))
+
     }
 }

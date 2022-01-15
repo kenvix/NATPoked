@@ -14,6 +14,7 @@ val protobufVersion: String by project
 val grpcVersion: String by project
 val kotlinxCoroutinesVersion: String by project
 val logbackVersion: String by project
+val ktorVersion: String by project
 
 group = "com.kenvix"
 version = "0.1"
@@ -35,6 +36,7 @@ repositories {
 }
 
 dependencies {
+    implementation(fileTree("libs"))
     implementation(kotlin("stdlib"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
@@ -58,6 +60,15 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
     // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-serialization-protobuf
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.3.2")
+
+
+    /* Ktor server things */
+    implementation("io.ktor:ktor-server-cio:$ktorVersion")
+    implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-websockets:$ktorVersion")
+    implementation("io.ktor:ktor-server-host-common:$ktorVersion")
+    implementation("io.ktor:ktor-locations:$ktorVersion")
+    implementation("io.ktor:ktor-server-sessions:$ktorVersion")
 }
 
 tasks.getByName<Test>("test") {
