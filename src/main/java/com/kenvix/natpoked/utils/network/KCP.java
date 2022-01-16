@@ -929,6 +929,7 @@ public abstract class KCP {
         return 0;
     }
 
+    // int ikcp_nodelay(ikcpcb *kcp, int nodelay, int interval, int resend, int nc)
     // fastest: ikcp_nodelay(kcp, 1, 20, 2, 1)
     // nodelay: 0:disable(default), 1:enable
     // interval: internal update timer interval in millisec, default is 100ms
@@ -965,6 +966,7 @@ public abstract class KCP {
         return 0;
     }
 
+    // int ikcp_wndsize(ikcpcb *kcp, int sndwnd, int rcvwnd);
     // set maximum window size: sndwnd=32, rcvwnd=32 by default
     public int WndSize(int sndwnd, int rcvwnd) {
         if (sndwnd > 0) {

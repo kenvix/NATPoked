@@ -4,19 +4,18 @@
 // Written by Kenvix <i@kenvix.com>
 //--------------------------------------------------
 
-package com.kenvix.test
+package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.testNatTypeParallel
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.Test
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.*
 
 
-class StunTest {
-    @Test
-    fun test() {
+object STUNTest {
+    @JvmStatic
+    fun main(args: Array<String>) {
         val ifaces: Enumeration<NetworkInterface> = NetworkInterface.getNetworkInterfaces()
         while (ifaces.hasMoreElements()) {
             val iface = ifaces.nextElement()

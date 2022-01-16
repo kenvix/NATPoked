@@ -89,6 +89,18 @@ dependencies {
     implementation(group = "commons-cli", name = "commons-cli", version = "1.4")
     implementation("commons-io:commons-io:2.11.0")
     implementation("org.apache.commons:commons-text:1.9")
+
+
+    // https://mvnrepository.com/artifact/io.netty/netty-all
+    implementation("io.netty:netty-all:4.1.73.Final") {
+        exclude("org.slf4j:slf4j-simple")
+    }
+
+    // https://mvnrepository.com/artifact/com.github.l42111996/kcp-base
+    implementation("com.github.l42111996:kcp-base:1.6") {
+        exclude("io.netty:netty-all")
+        exclude("org.slf4j:slf4j-simple")
+    }
 }
 
 tasks.getByName<Test>("test") {

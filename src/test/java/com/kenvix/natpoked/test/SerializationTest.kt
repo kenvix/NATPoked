@@ -4,7 +4,7 @@
 // Written by Kenvix <i@kenvix.com>
 //--------------------------------------------------
 
-package com.kenvix.test
+package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType

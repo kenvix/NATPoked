@@ -28,24 +28,32 @@ object AppEnv : ManagedEnvFile() {
 
     @Description("可靠传输的底层传输协议，默认 kcp")
     val StreamProtocol: String by envOf("kcp")
+
     /**
      * KCP 协议配置
-     * @see https://github.com/skywind3000/kcp/wiki/KCP-Basic-Usage
+     * @see [KCP Basic Usage](https://github.com/skywind3000/kcp/wiki/KCP-Basic-Usage)
      */
     @Description("KCP协议配置：是否启用 nodelay模式，0不启用；1启用。")
     val KcpNoDelay: Int by envOf(0)
+
     @Description("KCP协议配置：协议内部工作的 interval，单位毫秒，比如 10ms或者 20ms")
-    val KcpInterval: Int by envOf(64)
+    val KcpInterval: Int by envOf(50)
+
     @Description("KCP协议配置：快速重传模式，默认0关闭，可以设置2（2次ACK跨越将会直接重传）")
     val KcpResend: Int by envOf(0)
+
     @Description("KCP协议配置：是否关闭流控，默认是0代表不关闭，1代表关闭。")
     val KcpNC: Int by envOf(0)
+
     @Description("KCP协议配置：最大发送窗口大小 单位是包")
-    val KcpSndWnd: Int by envOf(32)
+    val KcpSndWnd: Int by envOf(2048)
+
     @Description("KCP协议配置：最大接收窗口大小 单位是包")
-    val KcpRcvWnd: Int by envOf(32)
+    val KcpRcvWnd: Int by envOf(2048)
+
     @Description("KCP协议配置：最大传输单元MTU")
     val KcpMtu: Int by envOf(1300)
+
     @Description("KCP协议配置：最小RTO")
     val KcpMinRto: Int by envOf(100)
 
