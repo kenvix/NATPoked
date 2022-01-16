@@ -4,15 +4,18 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.InetAddress
 
-enum class PeerCommunicationClass(val typeId: Byte) {
-    CONTROL(0b100_0000),
-    DATA(0b000_0000),
-}
-
 enum class PeerCommunicationType(val typeId: Byte) {
-    TYPE_DATA_STREAM(0b000_0001),
-    TYPE_DATA_DGRAM(0b000_0010),
-    TYPE_CONTROL_KEEPALIVE(0b100_0001),
+    TYPE_DATA_DGRAM           (0b000_0000),
+    TYPE_DATA_DGRAM_RAW       (0b000_0000),
+
+    TYPE_DATA_STREAM          (0b010_0000),
+    TYPE_DATA_STREAM_RAW      (0b010_0000),
+    TYPE_DATA_QUIC            (0b010_0001),
+
+    TYPE_DATA_L3              (0b100_0000),
+    TYPE_DATA_L3_WIREGUARD    (0b100_0001),
+
+    TYPE_CONTROL_KEEPALIVE    (0b110_0001),
 }
 
 @Serializable
@@ -48,9 +51,11 @@ enum class NATType(levelId: Int) : Comparable<NATType> {
     PUBLIC(100),
 }
 
+typealias PeerId = Long
+
 @Serializable
 data class NATClientItem(
-    val clientId: Long,
+    val clientId: PeerId,
     val clientPublicIpAddress: ByteArray?,
     val clientPort: Int = 0,
     val clientLastContactTime: Long = 0,
