@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import java.net.URI
 import java.time.Duration
+import javax.crypto.AEADBadTagException
+import javax.crypto.BadPaddingException
 
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
 fun Application.module() {
@@ -116,9 +118,8 @@ fun Application.module() {
         exception<NumberFormatException> { respondError(HttpStatusCode.BadRequest, it) }
         exception<com.kenvix.utils.exception.BadRequestException> { respondError(HttpStatusCode.BadRequest, it) }
 
-        exception<InvalidAuthorizationException> {
-            respondError(HttpStatusCode.Unauthorized, it, URI("/user/login"))
-        }
+        exception<InvalidAuthorizationException> { respondError(HttpStatusCode.Unauthorized, it) }
+        exception<BadPaddingException> { respondError(HttpStatusCode.Unauthorized, it) }
 
         exception<ForbiddenOperationException> { respondError(HttpStatusCode.Forbidden, it) }
         exception<CommonBusinessException> { respondError(HttpStatusCode.NotAcceptable, it) }

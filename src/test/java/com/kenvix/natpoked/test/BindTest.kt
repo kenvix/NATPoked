@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.test
 
+import com.dosse.upnp.UPnP
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -26,6 +27,10 @@ object BindTest {
         s2.reuseAddress = true
         s2.bind(InetSocketAddress("0.0.0.0", s.localPort))
         println("Bind again. Actual source port is ${s2.localPort}")
+        s2.close()
 
+        /* uPnPTest */
+        println("UPNP STATUS: " + UPnP.isUPnPAvailable())
+        UPnP.openPortUDP(s.localPort)
     }
 }

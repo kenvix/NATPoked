@@ -10,6 +10,7 @@ import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.sha256Of
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
+import java.nio.ByteBuffer
 import java.util.*
 
 class EncryptionTest {
@@ -21,9 +22,14 @@ class EncryptionTest {
 
         val aes = AES256GCM(key)
         val cip = aes.encrypt(plain)
-        println(base64.encodeToString(cip))
+        //println(base64.encodeToString(cip))
         val pla = aes.decryptToString(cip)
-        println(pla)
+        //println(pla)
         Assertions.assertEquals(plain, pla)
+
+        val b = ByteBuffer.allocate(8)
+        b.putLong(System.currentTimeMillis())
+        val cip2 = aes.encrypt(b.array())
+        Assertions.assertArrayEquals(b.array(), aes.decrypt(cip2))
     }
 }

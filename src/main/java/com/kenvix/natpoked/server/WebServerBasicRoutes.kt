@@ -2,6 +2,7 @@
 
 package com.kenvix.natpoked.server
 
+import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.lang.toUnit
 import com.kenvix.web.server.KtorModule
@@ -19,6 +20,7 @@ import org.slf4j.LoggerFactory
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
 internal object WebServerBasicRoutes : KtorModule {
     val logger = LoggerFactory.getLogger(javaClass)!!
+    val encryptor = AES256GCM(AppEnv.ServerPSK)
 
     @OptIn(KtorExperimentalLocationsAPI::class)
     override fun module(application: Application, testing: Boolean) = application.apply {
@@ -45,11 +47,11 @@ internal object WebServerBasicRoutes : KtorModule {
                 route("/peers") {
                     /**
                      * 添加或更新 Peer 信息
-                     * 请求信息使用 AES-256-GCM 加密。
+                     * 请求信息使用 AES-256-GCM 加密的 Protobuf
                      * Content-Type: application/octet-stream
                      */
                     post("/") {
-
+                        val proto = encryptor.decrypt(call.receive())
                     }
 
                     //

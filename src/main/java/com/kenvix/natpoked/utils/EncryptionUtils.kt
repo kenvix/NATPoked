@@ -8,9 +8,10 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.jvm.Throws
 
+@Suppress("MemberVisibilityCanBePrivate", "unused")
 class AES256GCM(keyBytes: ByteArray) {
     private val secretKey = keyBytes.run {
-        SecretKeySpec(this, 0, this.size, "AES");
+        SecretKeySpec(this, 0, this.size, "AES")
     }
 
     /**
@@ -30,6 +31,10 @@ class AES256GCM(keyBytes: ByteArray) {
 
     fun encrypt(plain: String): ByteArray = encrypt(plain.encodeToByteArray())
 
+    /**
+     * 进行 AES-256-GCM 解密。IV 从头部提取
+     * @throws AEADBadTagException 密钥不正确
+     */
     @Throws(AEADBadTagException::class)
     fun decrypt(cipherBytes: ByteArray, inputOffset: Int = 0, inputLen: Int = cipherBytes.size): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")  // Get Cipher Instance
@@ -52,7 +57,7 @@ class AES256GCM(keyBytes: ByteArray) {
 
         private val random = SecureRandom()
 
-        fun generateKey() = keyGenerator.generateKey()
+        fun generateKey() = keyGenerator.generateKey()!!
 
         fun generateIV(): ByteArray {
             val iv = ByteArray(GCM_IV_LENGTH)

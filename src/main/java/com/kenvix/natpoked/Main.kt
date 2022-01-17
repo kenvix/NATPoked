@@ -87,6 +87,8 @@ object Main : CoroutineScope {
 
         ops.addOption("d", "dump-settings", false, "导出设置参数到文件 ${AppConstants.workingFolder}.env")
 
+        ops.addOption("n", "nat-type", true, "指明当前本机所在网络的NAT类型，可为 （不区分大小写），如果指定了该参数，则跳过NAT类型探测。若未指定或为auto，则自动进行NAT类型探测")
+
         ops.addOption("v", "verbose", false, "Verbose logging mode.")
         ops.addOption("vv", "very-verbose", false, "Very Verbose logging mode.")
         ops.addOption("h", "help", false, "Print help messages and exit")
