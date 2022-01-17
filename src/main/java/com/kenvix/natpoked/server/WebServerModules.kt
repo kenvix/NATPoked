@@ -12,8 +12,9 @@ import io.ktor.http.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.http.content.*
 import io.ktor.locations.*
+import io.ktor.serialization.*
 import io.ktor.util.date.*
-import io.ktor.util.pipeline.*
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import java.net.URI
@@ -100,6 +101,13 @@ fun Application.module() {
             level = Level.DEBUG
             logger = LoggerFactory.getLogger("CallLogging")
         }
+    }
+
+    install(ContentNegotiation) {
+        json(Json {
+            prettyPrint = true
+            isLenient = true
+        })
     }
 
     install(StatusPages) {

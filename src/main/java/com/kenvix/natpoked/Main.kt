@@ -98,6 +98,8 @@ object Main : CoroutineScope {
         if (cmd.hasOption("nogui"))
             System.setProperty("nogui", "1")
 
+        AppConstants.appMode = if (cmd.hasOption('s')) AppConstants.AppMode.SERVER else AppConstants.AppMode.CLIENT
+
         //TODO: Log Level
         if (cmd.hasOption('v')) {
             AppConstants.rootLogger.level = Level.toLevel("debug")

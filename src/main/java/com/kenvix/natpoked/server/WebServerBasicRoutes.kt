@@ -2,14 +2,14 @@
 
 package com.kenvix.natpoked.server
 
-import com.kenvix.natpoked.server.controller.api.PeerController
-import com.kenvix.natpoked.server.controller.api.ToolsController
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.lang.toUnit
 import com.kenvix.web.server.KtorModule
-import com.kenvix.web.utils.controller
 import io.ktor.application.*
+import io.ktor.features.*
 import io.ktor.http.content.*
+import io.ktor.request.*
+import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.sessions.*
 import org.slf4j.LoggerFactory
@@ -30,8 +30,14 @@ internal object WebServerBasicRoutes : KtorModule {
             }
 
             route("/api") {
-                controller("/tools", ToolsController)
-                controller("/peer", PeerController)
+                route("/tools") {
+                    get("/ip") { call.respondText(call.request.origin.remoteHost) }
+
+                    post("/test") {
+                        val params = call.receiveParameters()
+                        call.respondText("Input: " + params["test_in"])
+                    }
+                }
             }
         }
     }.toUnit()

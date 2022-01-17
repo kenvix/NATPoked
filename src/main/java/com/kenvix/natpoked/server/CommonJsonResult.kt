@@ -1,8 +1,11 @@
 package com.kenvix.natpoked.server
 
-data class CommonJsonResult(
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CommonJsonResult<T>(
         val status: Int,
         val code: Int = status,
         val info: String = "",
-        val data: Any? = null
+        val data: T? = null
 )

@@ -69,6 +69,8 @@ dependencies {
     implementation("io.ktor:ktor-server-host-common:$ktorVersion")
     implementation("io.ktor:ktor-locations:$ktorVersion")
     implementation("io.ktor:ktor-server-sessions:$ktorVersion")
+    implementation("io.ktor:ktor-serialization:$ktorVersion")
+
 
     // https://mvnrepository.com/artifact/chat.dim/STUN
     // implementation("chat.dim:STUN:0.1.5")

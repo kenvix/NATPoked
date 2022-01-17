@@ -13,7 +13,7 @@ object AppConstants {
     val shutdownHandler: EventSet<Unit> = eventSetOf()
     val workingFolder = File("").absolutePath + File.separatorChar
     val workingPath = Path.of(workingFolder)
-    val appMode: AppMode = AppMode.CLIENT
+    var appMode: AppMode = AppMode.CLIENT
     val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
 
     enum class AppMode {
