@@ -8,9 +8,11 @@ import com.kenvix.web.server.KtorModule
 import io.ktor.application.*
 import io.ktor.features.*
 import io.ktor.http.content.*
+import io.ktor.locations.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
+import io.ktor.routing.get
 import io.ktor.sessions.*
 import org.slf4j.LoggerFactory
 
@@ -18,6 +20,7 @@ import org.slf4j.LoggerFactory
 internal object WebServerBasicRoutes : KtorModule {
     val logger = LoggerFactory.getLogger(javaClass)!!
 
+    @OptIn(KtorExperimentalLocationsAPI::class)
     override fun module(application: Application, testing: Boolean) = application.apply {
         install(Sessions) {
 
@@ -29,13 +32,33 @@ internal object WebServerBasicRoutes : KtorModule {
                 resources("public")
             }
 
-            route("/api") {
+            route("/api/v1") {
                 route("/tools") {
                     get("/ip") { call.respondText(call.request.origin.remoteHost) }
 
                     post("/test") {
                         val params = call.receiveParameters()
                         call.respondText("Input: " + params["test_in"])
+                    }
+                }
+
+                route("/peers") {
+                    /**
+                     * 添加或更新 Peer 信息
+                     * 请求信息使用 AES-256-GCM 加密。
+                     * Content-Type: application/octet-stream
+                     */
+                    post("/") {
+
+                    }
+
+                    //
+                    get<PeerIDLocation> {
+
+                    }
+
+                    delete<PeerIDLocation> {
+
                     }
                 }
             }

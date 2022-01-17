@@ -10,8 +10,11 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("是否启用调试模式，生成环境务必为 false")
     val DebugMode: Boolean by envOf(false)
 
-    @Description("与对等端的通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是验证服务端证书")
-    val PeerKey: String by envOf("1145141919810aaaaaa")
+    @Description("与对等端的通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey")
+    val PeerKey: String by envOf("114514aaaaaa")
+
+    @Description("对等端和服务端通信的密钥，两端密钥必须相同才能实现和服务器的沟通。请注意与对等端的通信不使用此密钥，而是使用 PeerKey")
+    val ServerKey: String by envOf("1919810bbbbbb")
 
     @Description("对方将其端口暴露给你时，在本机监听的地址")
     val LocalListenAddress: String by envOf("127.0.0.2")
@@ -95,9 +98,6 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     }
 
     // Pre shared key (256bits)
-    val PeerPSK: ByteArray = PeerKey.let { strText ->
-        val messageDigest = MessageDigest.getInstance("SHA-256")
-        messageDigest.update(strText.toByteArray())
-        messageDigest.digest()
-    }
+    val PeerPSK: ByteArray = sha256Of(PeerKey)
+    val ServerPSK: ByteArray = sha256Of(ServerKey)
 }
