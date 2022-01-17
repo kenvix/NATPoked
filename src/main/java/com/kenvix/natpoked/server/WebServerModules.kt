@@ -48,7 +48,7 @@ fun Application.module() {
 
         //header(HttpHeaders.Authorization)
         //header("MyCustomHeader")
-        allowCredentials = true
+        allowCredentials = AppEnv.CorsAllowCredentials
 
         if (AppEnv.CorsOriginAnyHost)
             anyHost()

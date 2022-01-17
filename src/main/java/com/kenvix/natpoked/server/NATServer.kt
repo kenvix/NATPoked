@@ -2,6 +2,8 @@ package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.web.server.CachedClasses
+import com.kenvix.web.server.KtorModule
 import io.ktor.application.*
 import io.ktor.server.cio.*
 import io.ktor.util.*
@@ -11,6 +13,7 @@ import io.ktor.server.engine.embeddedServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
+import java.io.File
 
 object NATServer {
     internal val logger = LoggerFactory.getLogger(javaClass)
@@ -59,6 +62,40 @@ object NATServer {
     }, module = Application::module)
 
     suspend fun start() = withContext(Dispatchers.IO) {
+        logger.info("Starting web server")
+        preload()
+        startHttpServer()
+    }
 
+    internal suspend fun preload() {
+        checkFiles()
+        CachedClasses
+    }
+
+    private fun startHttpServer() {
+        ktorEmbeddedServer.start(false)
+    }
+
+    private suspend fun checkFiles() = withContext(Dispatchers.IO) {
+        val publicDir = File(AppEnv.PublicDirPath)
+
+        if (!publicDir.exists())
+            publicDir.mkdirs()
+    }
+
+    fun registerRoutes(application: Application, testing: Boolean = false) {
+        WebServerBasicRoutes.module(application, testing)
+
+        // Deprecated due to performance issue. use hard code instead.
+//        val reflections = Reflections(BuildConfig.PACKAGE_NAME + ".http.routes", SubTypesScanner(true))
+//        val modules = reflections.getSubTypesOf(KtorModule::class.java)
+//        for (module in modules) {
+//            val instance = module.getConstructor().newInstance()
+//            if (instance is KtorModule) {
+//                instance.module(application, testing)
+//            } else {
+//                logger.warn("Invalid route class: ${module.name}")
+//            }
+//        }
     }
 }

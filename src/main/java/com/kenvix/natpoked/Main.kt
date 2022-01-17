@@ -33,7 +33,8 @@ object Main : CoroutineScope {
 
         registerCommands()
         registerShutdownHandler()
-        launch {
+
+        launch(Dispatchers.IO) {
             runCatching {
                 logger.info("Starting server ...")
                 NATServer.start()

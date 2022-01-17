@@ -78,8 +78,11 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("是否启用压缩")
     val EnableCompression by envOf(false)
 
-    val CorsOriginAnyHost by envOf(true)
+    val CorsOriginAnyHost by envOf(false)
     val CorsOriginHosts by envOf("")
+    val CorsAllowCredentials by envOf(true)
+    val PublicDirUrl by envOf("/public")
+    val PublicDirPath by envOf("public")
 
     /********* FOR INTERNAL USE ONLY ***********/
     val StunServerList: List<Pair<String, Int>> = StunServers.split(' ').map {
