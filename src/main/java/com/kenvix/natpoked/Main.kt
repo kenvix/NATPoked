@@ -19,8 +19,8 @@ object Main : CoroutineScope {
 
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        logger.info("Application start")
-        logger.debug("Working directory: " + AppConstants.workingFolder)
+        logger.trace("Application start")
+        logger.trace("Working directory: " + AppConstants.workingFolder)
         ExceptionHandler.registerGlobalExceptionHandler()
         val cmd = loadCommandLine(args)
 

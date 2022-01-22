@@ -8,7 +8,7 @@ plugins {
     kotlin("plugin.serialization") version "1.6.10"
     id("com.google.protobuf") version "0.8.18"
     id("org.graalvm.buildtools.native") version "0.9.9"
-    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("com.github.johnrengelman.shadow") version "6.1.0"
 }
 
 val krotoplusVersion: String by project
@@ -46,11 +46,11 @@ dependencies {
     implementation("com.github.marcoferrer.krotoplus:kroto-plus-coroutines:$krotoplusVersion")
     implementation("com.github.marcoferrer.krotoplus:kroto-plus-message:$krotoplusVersion")
 
-    implementation("com.google.protobuf:protobuf-java:$protobufVersion")
-
-    implementation("io.grpc:grpc-protobuf:$grpcVersion")
-    implementation("io.grpc:grpc-stub:$grpcVersion")
-    implementation("io.grpc:grpc-netty:$grpcVersion")
+//    implementation("com.google.protobuf:protobuf-java:$protobufVersion")
+//
+//    implementation("io.grpc:grpc-protobuf:$grpcVersion")
+//    implementation("io.grpc:grpc-stub:$grpcVersion")
+//    implementation("io.grpc:grpc-netty:$grpcVersion")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
@@ -63,6 +63,9 @@ dependencies {
     // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-serialization-protobuf
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.3.2")
 
+    // https://mvnrepository.com/artifact/com.google.guava/guava
+    implementation("com.google.guava:guava:31.0.1-jre")
+
 
     /* Ktor server things */
     implementation("io.ktor:ktor-server-cio:$ktorVersion")
@@ -72,13 +75,6 @@ dependencies {
     implementation("io.ktor:ktor-locations:$ktorVersion")
     implementation("io.ktor:ktor-server-sessions:$ktorVersion")
     implementation("io.ktor:ktor-serialization:$ktorVersion")
-
-
-    // https://mvnrepository.com/artifact/chat.dim/STUN
-    // implementation("chat.dim:STUN:0.1.5")
-
-    // https://mvnrepository.com/artifact/de.javawi.jstun/jstun
-    // implementation("de.javawi.jstun:jstun:0.7.4")
 
 
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
@@ -96,15 +92,19 @@ dependencies {
 
 
     // https://mvnrepository.com/artifact/io.netty/netty-all
-    implementation("io.netty:netty-all:4.1.73.Final") {
-        exclude("org.slf4j:slf4j-simple")
-    }
+//    implementation("io.netty:netty-all:4.1.73.Final") {
+//        exclude("org.slf4j:slf4j-simple")
+//    }
+//
+//    // https://mvnrepository.com/artifact/com.github.l42111996/kcp-base
+//    implementation("com.github.l42111996:kcp-base:1.6") {
+//        exclude("io.netty:netty-all")
+//        exclude("org.slf4j:slf4j-simple")
+//    }
 
-    // https://mvnrepository.com/artifact/com.github.l42111996/kcp-base
-    implementation("com.github.l42111996:kcp-base:1.6") {
-        exclude("io.netty:netty-all")
-        exclude("org.slf4j:slf4j-simple")
-    }
+    // https://mvnrepository.com/artifact/org.apache.commons/commons-math3
+    implementation("org.apache.commons:commons-math3:3.6.1")
+
 }
 
 tasks.getByName<Test>("test") {
@@ -122,7 +122,7 @@ sourceSets {
             File(buildDir, "src"),
             File("$buildDir/generated/source/proto/main/java"),
             File("$buildDir/generated/source/proto/main/grpc"),
-            File("$buildDir/generated/source/proto/main/coroutines"),
+            File("$buildDir/generated/source/proto/main/coroutines")
         )
         resources.srcDirs("$mainSrcDir/resources")
     }
@@ -135,7 +135,7 @@ sourceSets {
             File(buildDir, "src"),
             File("$buildDir/generated/source/proto/main/java"),
             File("$buildDir/generated/source/proto/main/grpc"),
-            File("$buildDir/generated/source/proto/main/coroutines"),
+            File("$buildDir/generated/source/proto/main/coroutines")
         )
         resources.srcDirs("$testSrcDir/resources")
     }
@@ -151,6 +151,48 @@ tasks {
     withType<JavaCompile> {
         options.encoding = "utf-8"
     }
+
+    withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+        archiveBaseName.set(archivesBaseName)
+
+        destinationDirectory.set(file("${buildDir}/output"))
+        isZip64 = true
+//        minimize {
+//            exclude(dependency("commons-logging:commons-logging:.*"))
+//        }
+
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+
+    withType<ProcessResources> {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+
+    withType<Jar> {
+        manifest {
+            attributes(
+                mapOf(
+                    "Implementation-Title" to project.name,
+                    "Implementation-Version" to project.version,
+                    "Main-Class" to appMainClass,
+                    "Class-Path" to configurations.runtimeClasspath.files.joinToString(" ") { "$libDirName/${it.name}" }
+                )
+            )
+        }
+    }
+
+    register("jarWithDepends", Jar::class.java) {
+        dependsOn("copyJarLibs")
+        destinationDir = file("${buildDir}/output")
+        baseName = applicationName
+    }
+
+    register("copyJarLibs", Copy::class.java) {
+        doLast {
+            into("${buildDir}/output/$libDirName")
+            from(configurations.runtime)
+        }
+    }
 }
 
 apply(from = "enableGRPC.gradle")
@@ -159,14 +201,21 @@ nativeBuild {
     mainClass.set(appMainClass)
     debug.set(false) // Determines if debug info should be generated, defaults to false
     verbose.set(true) // Add verbose output, defaults to false
-    fallback.set(true) // Sets the fallback mode of native-image, defaults to false
+    fallback.set(false) // Sets the fallback mode of native-image, defaults to false
     sharedLibrary.set(false) // Determines if image is a shared library, defaults to false if `java-library` plugin isn't included
 
+
     // Advanced options
-    // buildArgs.add("") // Passes '-H:Extra' to the native image builder options. This can be used to pass parameters which are not directly supported by this extension
+    buildArgs.addAll(
+        "--report-unsupported-elements-at-runtime",
+         "--allow-incomplete-classpath",
+        "--enable-url-protocols=http",
+        "-H:+ReportExceptionStackTraces"
+    )
+    // Passes '' to the native image builder options. This can be used to pass parameters which are not directly supported by this extension
     // jvmArgs.add("") // Passes 'flag' directly to the JVM running the native image builder
 
     // Development options
-    agent.set(true) // Enables the reflection agent. Can be also set on command line using '-Pagent'
-    useFatJar.set(true) // Instead of passing each jar individually, builds a fat jar
+    // agent.set(false) // Enables the reflection agent. Can be also set on command line using '-Pagent'
+    // useFatJar.set(true) // Instead of passing each jar individually, builds a fat jar
 }
