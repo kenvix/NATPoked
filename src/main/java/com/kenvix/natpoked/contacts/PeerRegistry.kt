@@ -14,13 +14,17 @@ interface IPeerRegistry {
     fun removePeer(peerId: PeerId)
     operator fun contains(peerId: PeerId): Boolean
     fun updatePeer(peerId: PeerId, client: NATClientItem)
-}
 
-abstract class PeerRegistry : IPeerRegistry {
     operator fun plusAssign(client: NATClientItem) = addPeer(client)
     fun removePeer(client: NATClientItem) = removePeer(client.clientId)
     operator fun minusAssign(client: NATClientItem) = removePeer(client.clientId)
     operator fun set(peerId: PeerId, client: NATClientItem) = updatePeer(peerId, client)
+}
+
+abstract class PeerRegistry : IPeerRegistry {
+    override fun toString(): String {
+        return "${javaClass.name}: "
+    }
 }
 
 @Serializable

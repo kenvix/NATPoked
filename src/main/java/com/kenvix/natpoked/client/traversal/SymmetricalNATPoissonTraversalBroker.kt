@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.apache.commons.math3.distribution.PoissonDistribution
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -21,30 +22,9 @@ import kotlin.random.Random
 
 class SymmetricalNATPoissonTraversalBroker {
 
-
     companion object {
         val clientBindNum = 50
         val logger = LoggerFactory.getLogger(SymmetricalNATPoissonTraversalBroker::class.java)
-
-        /**
-         * Re-implement of random.poisson(lam=1.0, size=None) in numpy
-         */
-        fun poissonSampling(avg: Double, timeSpan: Long): Int {
-            var t: Double = .0
-            var n = 0
-            while (t <= timeSpan) {
-                val u = Random.nextDouble()
-                t = (1 / avg) * ln(u)
-
-                if (t <= timeSpan) {
-                    n++
-                } else {
-                    return n
-                }
-            }
-
-            throw IllegalStateException("BUG! PoissonSampling ran into unknown state")
-        }
     }
 }
 
@@ -62,6 +42,7 @@ fun main() {
     var lastTime: Long
     val avg: Double
 
+    logger.info("Waiting packets")
     runBlocking {
         withContext(Dispatchers.IO) {
             for (i in 0 until SymmetricalNATPoissonTraversalBroker.clientBindNum) {
@@ -88,16 +69,6 @@ fun main() {
     }
 
     println("Guessing ports: ")
-    val guessPortNum = 50
-    val guessedPorts = ArrayList<Int>()
-    var n: Int = 0
 
-    for (i in 0 until guessPortNum) {
-        val t = System.currentTimeMillis()
-        n += SymmetricalNATPoissonTraversalBroker.poissonSampling(avg, t - lastTime)
-        val port: Double = lastPort.toDouble() + i * avg * t + n
-        guessedPorts.add(round(port).toInt())
-    }
-
-    println(guessedPorts)
+    //println(SymmetricalNATPoissonTraversalBroker.poissonPortGuess(avg, timeElapsed, lastPort))
 }

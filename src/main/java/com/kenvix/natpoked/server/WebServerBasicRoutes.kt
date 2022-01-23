@@ -2,6 +2,8 @@
 
 package com.kenvix.natpoked.server
 
+import com.kenvix.natpoked.client.NATClient
+import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.lang.toUnit
@@ -15,6 +17,9 @@ import io.ktor.response.*
 import io.ktor.routing.*
 import io.ktor.routing.get
 import io.ktor.sessions.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
 import org.slf4j.LoggerFactory
 
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
@@ -22,7 +27,7 @@ internal object WebServerBasicRoutes : KtorModule {
     val logger = LoggerFactory.getLogger(javaClass)!!
     val encryptor = AES256GCM(AppEnv.ServerPSK)
 
-    @OptIn(KtorExperimentalLocationsAPI::class)
+    @OptIn(KtorExperimentalLocationsAPI::class, ExperimentalSerializationApi::class)
     override fun module(application: Application, testing: Boolean) = application.apply {
         install(Sessions) {
 
@@ -47,11 +52,12 @@ internal object WebServerBasicRoutes : KtorModule {
                 route("/peers") {
                     /**
                      * 添加或更新 Peer 信息
-                     * 请求信息使用 AES-256-GCM 加密的 Protobuf
+                     * 请求信息可以使用 AES-256-GCM 加密的 Protobuf（根据设置决定是否加密）
                      * Content-Type: application/octet-stream
                      */
                     post("/") {
-                        val proto = encryptor.decrypt(call.receive())
+                        val data: NATClientItem = receiveInternalProtobuf()
+
                     }
 
                     //
