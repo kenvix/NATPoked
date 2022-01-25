@@ -17,9 +17,7 @@ import io.ktor.util.date.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
-import java.net.URI
 import java.time.Duration
-import javax.crypto.AEADBadTagException
 import javax.crypto.BadPaddingException
 
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
@@ -113,28 +111,28 @@ fun Application.module() {
     }
 
     install(StatusPages) {
-        exception<BadRequestException> { respondError(HttpStatusCode.BadRequest, it) }
-        exception<InvalidResultException> { respondError(HttpStatusCode.BadRequest, it) }
-        exception<NumberFormatException> { respondError(HttpStatusCode.BadRequest, it) }
-        exception<com.kenvix.utils.exception.BadRequestException> { respondError(HttpStatusCode.BadRequest, it) }
+        exception<BadRequestException> { call.respondError(HttpStatusCode.BadRequest, it) }
+        exception<InvalidResultException> { call.respondError(HttpStatusCode.BadRequest, it) }
+        exception<NumberFormatException> { call.respondError(HttpStatusCode.BadRequest, it) }
+        exception<com.kenvix.utils.exception.BadRequestException> { call.respondError(HttpStatusCode.BadRequest, it) }
 
-        exception<InvalidAuthorizationException> { respondError(HttpStatusCode.Unauthorized, it) }
-        exception<BadPaddingException> { respondError(HttpStatusCode.Unauthorized, it) }
+        exception<InvalidAuthorizationException> { call.respondError(HttpStatusCode.Unauthorized, it) }
+        exception<BadPaddingException> { call.respondError(HttpStatusCode.Unauthorized, it) }
 
-        exception<ForbiddenOperationException> { respondError(HttpStatusCode.Forbidden, it) }
-        exception<CommonBusinessException> { respondError(HttpStatusCode.NotAcceptable, it) }
+        exception<ForbiddenOperationException> { call.respondError(HttpStatusCode.Forbidden, it) }
+        exception<CommonBusinessException> { call.respondError(HttpStatusCode.NotAcceptable, it) }
 
-        exception<NotFoundException> { respondError(HttpStatusCode.NotFound, it) }
-        exception<com.kenvix.utils.exception.NotFoundException> { respondError(HttpStatusCode.NotFound, it) }
+        exception<NotFoundException> { call.respondError(HttpStatusCode.NotFound, it) }
+        exception<com.kenvix.utils.exception.NotFoundException> { call.respondError(HttpStatusCode.NotFound, it) }
 
-        exception<TooManyRequestException> { respondError(HttpStatusCode.TooManyRequests, it) }
-        exception<NotSupportedException> { respondError(HttpStatusCode.UnsupportedMediaType, it) }
+        exception<TooManyRequestException> { call.respondError(HttpStatusCode.TooManyRequests, it) }
+        exception<NotSupportedException> { call.respondError(HttpStatusCode.UnsupportedMediaType, it) }
 
-        exception<NotImplementedError> { respondError(HttpStatusCode.NotImplemented, it) }
+        exception<NotImplementedError> { call.respondError(HttpStatusCode.NotImplemented, it) }
 
         exception<Throwable> {
             com.kenvix.web.utils.error("HTTP request failed unexpectedly", it, NATServer.logger)
-            respondError(HttpStatusCode.InternalServerError, it)
+            call.respondError(HttpStatusCode.InternalServerError, it)
         }
 
         status(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden,
@@ -143,7 +141,7 @@ fun Application.module() {
                 HttpStatusCode.Gone, HttpStatusCode.UnsupportedMediaType, HttpStatusCode.BadGateway,
                 HttpStatusCode.PayloadTooLarge, HttpStatusCode.NotImplemented, HttpStatusCode.ServiceUnavailable,
                 HttpStatusCode.UpgradeRequired, HttpStatusCode.Locked) {
-            respondError(it)
+            call.respondError(it)
         }
     }
 

@@ -7,10 +7,15 @@
 package com.kenvix.natpoked.contacts
 
 import kotlinx.serialization.Serializable
+import kotlin.jvm.Throws
 
 interface IPeerRegistry {
     fun connect()
     fun addPeer(client: NATClientItem)
+
+    @Throws(NoSuchElementException::class)
+    fun getPeer(peerId: PeerId /* = kotlin.Long */): NATClientItem
+
     fun removePeer(peerId: PeerId)
     operator fun contains(peerId: PeerId): Boolean
     fun updatePeer(peerId: PeerId, client: NATClientItem)
@@ -19,6 +24,9 @@ interface IPeerRegistry {
     fun removePeer(client: NATClientItem) = removePeer(client.clientId)
     operator fun minusAssign(client: NATClientItem) = removePeer(client.clientId)
     operator fun set(peerId: PeerId, client: NATClientItem) = updatePeer(peerId, client)
+
+    @Throws(NoSuchElementException::class)
+    operator fun get(peerId: PeerId /* = kotlin.Long */) = getPeer(peerId)
 }
 
 abstract class PeerRegistry : IPeerRegistry {
@@ -36,6 +44,10 @@ class SimplePeerRegistry : PeerRegistry() {
 
     override fun addPeer(client: NATClientItem) {
         peersList[client.clientId] = client
+    }
+
+    override fun getPeer(peerId: PeerId): NATClientItem {
+        return peersList[peerId] ?: throw NoSuchElementException("$peerId")
     }
 
     override fun removePeer(peerId: PeerId) {
