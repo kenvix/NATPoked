@@ -1,0 +1,16 @@
+package com.kenvix.natpoked.contacts
+
+enum class RequestTypes(val typeId: Int) {
+    UNKNOWN(0),
+
+    ACTION_KEEP_ALIVE(0x1000_0000),
+    ACTION_ECHO(0x1000_0002),
+    ACTION_CONNECT_PEER(0x1000_0006),
+
+    MESSAGE_KEEP_ALIVE(0x2000_0000),
+    MESSAGE_HANDSHAKE(0x2000_0001),
+    MESSAGE_ECHO(0x2000_0002),
+
+    MESSAGE_GET_PEER_INFO(0x2000_0003),
+    MESSAGE_CONNECT_PEER(0x2000_0006),
+}

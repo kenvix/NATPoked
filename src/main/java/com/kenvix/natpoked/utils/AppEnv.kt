@@ -4,6 +4,9 @@ import com.kenvix.natpoked.AppConstants
 import com.kenvix.utils.annotation.Description
 import com.kenvix.utils.preferences.ManagedEnvFile
 import java.security.MessageDigest
+import kotlin.time.Duration
+import kotlin.time.DurationUnit
+import kotlin.time.toDuration
 
 
 object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
@@ -87,6 +90,9 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PublicDirUrl by envOf("/public")
     val PublicDirPath by envOf("public")
 
+    val PeerToBrokenPingInterval by envOf(30_000)
+    val PeerToBrokenTimeout by envOf(100_000)
+
     /********* FOR INTERNAL USE ONLY ***********/
     val StunServerList: List<Pair<String, Int>> = StunServers.split(' ').map {
         if (":" in it) {
@@ -100,4 +106,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     // Pre shared key (256bits)
     val PeerPSK: ByteArray = sha256Of(PeerKey)
     val ServerPSK: ByteArray = sha256Of(ServerKey)
+
+    val PeerToBrokenPingIntervalDuration = PeerToBrokenPingInterval.toDuration(DurationUnit.MILLISECONDS)
+    val PeerToBrokenTimeoutDuration = PeerToBrokenTimeout.toDuration(DurationUnit.MILLISECONDS)
 }

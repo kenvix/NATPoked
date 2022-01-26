@@ -1,9 +1,7 @@
 package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.AppConstants
-import com.kenvix.natpoked.contacts.IPeerRegistry
-import com.kenvix.natpoked.contacts.PeerRegistry
-import com.kenvix.natpoked.contacts.SimplePeerRegistry
+import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.server.CachedClasses
 import com.kenvix.web.server.KtorModule
@@ -20,8 +18,7 @@ import java.io.File
 
 object NATServer {
     internal val logger = LoggerFactory.getLogger(javaClass)
-    lateinit var peerRegistry: IPeerRegistry
-        private set
+    val peerConnections: MutableMap<PeerId, NATPeerToBrokerConnection> = HashMap()
 
     val ktorEmbeddedServer = embeddedServer(CIO, port = AppEnv.HttpPort, host = AppEnv.HttpHost, watchPaths = run {
         if (AppEnv.DebugMode && System.getProperty("hotReloadSupported")?.toBoolean() == true) {
@@ -76,7 +73,6 @@ object NATServer {
         checkFiles()
         CachedClasses
         // TODO: More registry & service autowired
-        peerRegistry = SimplePeerRegistry()
     }
 
     private fun startHttpServer() {

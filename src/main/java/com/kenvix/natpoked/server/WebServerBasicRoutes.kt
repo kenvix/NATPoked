@@ -3,6 +3,10 @@
 package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.contacts.NATClientItem
+import com.kenvix.natpoked.contacts.NATPeerToBrokerConnection
+import com.kenvix.natpoked.contacts.NATPeerToBrokerConnectionStage
+import com.kenvix.natpoked.contacts.RequestTypes
+import com.kenvix.natpoked.contacts.RequestTypes.*
 import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.lang.toUnit
@@ -11,6 +15,7 @@ import com.kenvix.web.utils.respondData
 import com.kenvix.web.utils.respondSuccess
 import io.ktor.application.*
 import io.ktor.features.*
+import io.ktor.http.cio.websocket.*
 import io.ktor.http.content.*
 import io.ktor.locations.*
 import io.ktor.request.*
@@ -20,6 +25,8 @@ import io.ktor.sessions.*
 import io.ktor.websocket.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
 internal object WebServerBasicRoutes : KtorModule {
@@ -56,24 +63,49 @@ internal object WebServerBasicRoutes : KtorModule {
                      */
                     post("/") {
                         val data: NATClientItem = call.receiveInternalData()
-                        NATServer.peerRegistry += data
+                        NATServer.peerConnections[data.clientId] = NATPeerToBrokerConnection(data)
                         call.respondSuccess()
                     }
 
                     get<PeerIDLocation> { peerId ->
-                        call.respondData(NATServer.peerRegistry[peerId.id])
+                        call.respondData(NATServer.peerConnections[peerId.id])
                     }
 
                     delete<PeerIDLocation> { peerId ->
-                        NATServer.peerRegistry.removePeer(peerId.id)
+                        NATServer.peerConnections.remove(peerId.id)
                         call.respondSuccess()
                     }
 
                     webSocket("/") {
                         logger.debug("Peer stage 2 ws connected : ")
                         for (frame in incoming) {
-                            val incomingReq: CommonRequest<*> = call.receiveInternalData()
+                            if (frame is Frame.Binary) {
+                                val incomingReq: CommonRequest<*> = call.receiveInternalData()
+                                when (incomingReq.type) {
+                                    MESSAGE_HANDSHAKE.typeId -> {
+                                        val req = call.receiveInternalData() as CommonRequest<NATClientItem>
+                                        val client = if (req.data.clientId in NATServer.peerConnections)
+                                            NATServer.peerConnections[req.data.clientId]!! else NATPeerToBrokerConnection(
+                                            req.data
+                                        )
+                                        client.session = this
+                                        this.pingInterval = AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration()
+                                        this.timeout = AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration()
 
+                                        call.respondSuccess()
+                                        client.stage = NATPeerToBrokerConnectionStage.READY
+                                    }
+
+                                    MESSAGE_KEEP_ALIVE.typeId -> {
+
+                                    }
+
+                                    MESSAGE_CONNECT_PEER.typeId -> {
+                                        val req = call.receiveInternalData() as CommonRequest<NATClientItem>
+
+                                    }
+                                }
+                            }
                         }
                     }
 
