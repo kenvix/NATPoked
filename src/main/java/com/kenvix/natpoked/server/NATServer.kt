@@ -9,16 +9,19 @@ import io.ktor.application.*
 import io.ktor.server.cio.*
 import io.ktor.util.*
 import io.ktor.application.Application
+import io.ktor.http.cio.websocket.*
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 object NATServer {
     internal val logger = LoggerFactory.getLogger(javaClass)
-    val peerConnections: MutableMap<PeerId, NATPeerToBrokerConnection> = HashMap()
+    val peerConnections: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
+    val peerWebsocketSessionMap: MutableMap<DefaultWebSocketSession, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
 
     val ktorEmbeddedServer = embeddedServer(CIO, port = AppEnv.HttpPort, host = AppEnv.HttpHost, watchPaths = run {
         if (AppEnv.DebugMode && System.getProperty("hotReloadSupported")?.toBoolean() == true) {

@@ -78,31 +78,51 @@ internal object WebServerBasicRoutes : KtorModule {
 
                     webSocket("/") {
                         logger.debug("Peer stage 2 ws connected : ")
+
                         for (frame in incoming) {
-                            if (frame is Frame.Binary) {
-                                val incomingReq: CommonRequest<*> = call.receiveInternalData()
-                                when (incomingReq.type) {
-                                    MESSAGE_HANDSHAKE.typeId -> {
-                                        val req = call.receiveInternalData() as CommonRequest<NATClientItem>
-                                        val client = if (req.data.clientId in NATServer.peerConnections)
-                                            NATServer.peerConnections[req.data.clientId]!! else NATPeerToBrokerConnection(
-                                            req.data
-                                        )
-                                        client.session = this
-                                        this.pingInterval = AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration()
-                                        this.timeout = AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration()
+                            when (frame) {
+                                is Frame.Binary -> {
+                                    val incomingReq: CommonRequest<*> = call.receiveInternalData()
+                                    when (incomingReq.type) {
+                                        MESSAGE_HANDSHAKE.typeId -> {
+                                            val req = call.receiveInternalData() as CommonRequest<NATClientItem>
+                                            val client = if (req.data.clientId in NATServer.peerConnections)
+                                                NATServer.peerConnections[req.data.clientId]!! else NATPeerToBrokerConnection(
+                                                req.data
+                                            )
+                                            client.session = this
+                                            NATServer.peerWebsocketSessionMap[this] = client
+                                            this.pingInterval = AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration()
+                                            this.timeout = AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration()
 
-                                        call.respondSuccess()
-                                        client.stage = NATPeerToBrokerConnectionStage.READY
+                                            call.respondSuccess()
+                                            client.stage = NATPeerToBrokerConnectionStage.READY
+                                        }
+
+                                        MESSAGE_KEEP_ALIVE.typeId -> {
+
+                                        }
+
+                                        MESSAGE_CONNECT_PEER.typeId -> {
+                                            val req = call.receiveInternalData() as CommonRequest<NATClientItem>
+
+                                        }
                                     }
+                                }
 
-                                    MESSAGE_KEEP_ALIVE.typeId -> {
+                                is Frame.Ping -> {
 
-                                    }
+                                }
 
-                                    MESSAGE_CONNECT_PEER.typeId -> {
-                                        val req = call.receiveInternalData() as CommonRequest<NATClientItem>
+                                is Frame.Close -> {
+                                    try {
+                                        NATServer.peerWebsocketSessionMap[this]?.apply {
+                                            NATServer.peerConnections.remove(client.clientId)
+                                        }
 
+                                        NATServer.peerWebsocketSessionMap.remove(this)
+                                    } catch (e: Exception) {
+                                        logger.error("Unable to unregister", e)
                                     }
                                 }
                             }
