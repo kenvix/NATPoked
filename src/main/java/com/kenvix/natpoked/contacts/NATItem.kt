@@ -52,6 +52,10 @@ enum class NATType(val levelId: Int) : Comparable<NATType> {
     SYMMETRIC(60),
     PORT_RESTRICTED_CONE(70),
     RESTRICTED_CONE(80),
+
+    /**
+     * A Full-Cone NAT or uPnP supported NAT
+     */
     FULL_CONE(90),
     PUBLIC(100),
 }

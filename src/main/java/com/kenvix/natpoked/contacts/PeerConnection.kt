@@ -3,6 +3,7 @@ package com.kenvix.natpoked.contacts
 import com.google.common.collect.Sets
 import io.ktor.http.cio.websocket.*
 import io.ktor.util.collections.*
+import java.util.concurrent.ConcurrentHashMap
 
 enum class NATPeerToBrokerConnectionStage {
     UNKNOWN,
@@ -10,11 +11,20 @@ enum class NATPeerToBrokerConnectionStage {
     READY
 }
 
+enum class NATPeerToPeerConnectionStage {
+    UNKNOWN,
+    HANDSHAKE_TO_BROKER,
+    CONNECTED
+}
+
 data class NATPeerToBrokerConnection(
     val client: NATClientItem,
     var session: DefaultWebSocketSession? = null,
     var stage: NATPeerToBrokerConnectionStage = NATPeerToBrokerConnectionStage.HANDSHAKE,
-    val wantToConnect: MutableSet<PeerId> = Sets.newConcurrentHashSet()
+    /**
+     * State machine for peer to peer connection
+     */
+    val wantToConnect: MutableMap<PeerId, NATPeerToPeerConnectionStage> = ConcurrentHashMap()
 ) {
     companion object {
         @JvmStatic

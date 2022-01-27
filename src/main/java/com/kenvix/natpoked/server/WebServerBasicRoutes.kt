@@ -91,6 +91,7 @@ internal object WebServerBasicRoutes : KtorModule {
         }
     }.toUnit()
 
+    // TODO: respondSuccess, respondError, Exception handler
     private suspend fun DefaultWebSocketSession.handlePeerControlSocketFrame(frame: Frame, call: ApplicationCall) {
         @Suppress("NON_EXHAUSTIVE_WHEN_STATEMENT")
         when (frame) {
@@ -130,7 +131,7 @@ internal object WebServerBasicRoutes : KtorModule {
                         val req = call.receiveInternalData() as CommonRequest<PeerId>
                         val targetPeerId = req.data
                         val my: NATPeerToBrokerConnection = NATServer.peerWebsocketSessionMap.getOrFail(this)
-                        my.wantToConnect.add(targetPeerId)
+                        my.wantToConnect[targetPeerId] = NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER
 
                         val targetPeer = NATServer.peerConnections[targetPeerId]
                         if (targetPeer != null) {
@@ -141,12 +142,13 @@ internal object WebServerBasicRoutes : KtorModule {
                                 val clientRolePeer: NATPeerToBrokerConnection = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
 
                                 when (serverRolePeer.client.clientNatType) {
-                                    NATType.PUBLIC -> {
+                                    NATType.PUBLIC, NATType.FULL_CONE -> {
                                         requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
                                     }
 
-                                    NATType.FULL_CONE -> {
-
+                                    NATType.RESTRICTED_CONE -> {
+                                        requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
+                                        requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
                                     }
                                 }
                             }
