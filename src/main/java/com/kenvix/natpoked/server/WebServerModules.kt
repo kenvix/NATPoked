@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import java.time.Duration
 import javax.crypto.BadPaddingException
+import kotlin.time.toJavaDuration
 
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
 fun Application.module() {
@@ -78,10 +79,10 @@ fun Application.module() {
     }
 
     install(io.ktor.websocket.WebSockets) {
-        pingPeriod = Duration.ofSeconds(15)
-        timeout = Duration.ofSeconds(15)
         maxFrameSize = Long.MAX_VALUE
         masking = false
+        this.pingPeriod = AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration()
+        this.timeout = AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration()
     }
 
     install(PartialContent) {

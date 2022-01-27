@@ -2,17 +2,14 @@
 
 package com.kenvix.natpoked.server
 
-import com.kenvix.natpoked.contacts.NATClientItem
-import com.kenvix.natpoked.contacts.NATPeerToBrokerConnection
-import com.kenvix.natpoked.contacts.NATPeerToBrokerConnectionStage
-import com.kenvix.natpoked.contacts.RequestTypes
+import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.RequestTypes.*
+import com.kenvix.natpoked.server.WebServerBasicRoutes.handlePeerControlSocketFrame
 import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.lang.toUnit
 import com.kenvix.web.server.KtorModule
-import com.kenvix.web.utils.respondData
-import com.kenvix.web.utils.respondSuccess
+import com.kenvix.web.utils.*
 import io.ktor.application.*
 import io.ktor.features.*
 import io.ktor.http.cio.websocket.*
@@ -28,7 +25,7 @@ import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
-@Suppress("unused", "DuplicatedCode") // Referenced in application.conf
+@Suppress("unused", "DuplicatedCode", "UNCHECKED_CAST") // Referenced in application.conf
 internal object WebServerBasicRoutes : KtorModule {
     val logger = LoggerFactory.getLogger(javaClass)!!
     val encryptor = AES256GCM(AppEnv.ServerPSK)
@@ -78,54 +75,11 @@ internal object WebServerBasicRoutes : KtorModule {
 
                     webSocket("/") {
                         logger.debug("Peer stage 2 ws connected : ")
+                        this.pingInterval = AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration()
+                        this.timeout = AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration()
 
                         for (frame in incoming) {
-                            when (frame) {
-                                is Frame.Binary -> {
-                                    val incomingReq: CommonRequest<*> = call.receiveInternalData()
-                                    when (incomingReq.type) {
-                                        MESSAGE_HANDSHAKE.typeId -> {
-                                            val req = call.receiveInternalData() as CommonRequest<NATClientItem>
-                                            val client = if (req.data.clientId in NATServer.peerConnections)
-                                                NATServer.peerConnections[req.data.clientId]!! else NATPeerToBrokerConnection(
-                                                req.data
-                                            )
-                                            client.session = this
-                                            NATServer.peerWebsocketSessionMap[this] = client
-                                            this.pingInterval = AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration()
-                                            this.timeout = AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration()
-
-                                            call.respondSuccess()
-                                            client.stage = NATPeerToBrokerConnectionStage.READY
-                                        }
-
-                                        MESSAGE_KEEP_ALIVE.typeId -> {
-
-                                        }
-
-                                        MESSAGE_CONNECT_PEER.typeId -> {
-                                            val req = call.receiveInternalData() as CommonRequest<NATClientItem>
-
-                                        }
-                                    }
-                                }
-
-                                is Frame.Ping -> {
-
-                                }
-
-                                is Frame.Close -> {
-                                    try {
-                                        NATServer.peerWebsocketSessionMap[this]?.apply {
-                                            NATServer.peerConnections.remove(client.clientId)
-                                        }
-
-                                        NATServer.peerWebsocketSessionMap.remove(this)
-                                    } catch (e: Exception) {
-                                        logger.error("Unable to unregister", e)
-                                    }
-                                }
-                            }
+                            handlePeerControlSocketFrame(frame, call)
                         }
                     }
 
@@ -136,4 +90,92 @@ internal object WebServerBasicRoutes : KtorModule {
             }
         }
     }.toUnit()
+
+    private suspend fun DefaultWebSocketSession.handlePeerControlSocketFrame(frame: Frame, call: ApplicationCall) {
+        @Suppress("NON_EXHAUSTIVE_WHEN_STATEMENT")
+        when (frame) {
+            is Frame.Binary -> {
+                val incomingReq: CommonRequest<*> = call.receiveInternalData()
+                when (incomingReq.type) {
+                    /**
+                     * @throws NotFoundException (HTTP 404) if client not exist
+                     */
+                    MESSAGE_HANDSHAKE.typeId -> {
+                        val req = incomingReq as CommonRequest<NATClientItem>
+                        val client = if (req.data.clientId in NATServer.peerConnections)
+                            NATServer.peerConnections.getOrFail(req.data.clientId) else NATPeerToBrokerConnection(
+                            req.data
+                        )
+                        client.session = this
+                        NATServer.peerWebsocketSessionMap[this] = client
+
+
+                        call.respondSuccess()
+                        client.stage = NATPeerToBrokerConnectionStage.READY
+                    }
+
+                    MESSAGE_KEEP_ALIVE.typeId -> {
+
+                    }
+
+                    /**
+                     * @throws NoSuchElementException (HTTP 404) if client not exist
+                     */
+                    MESSAGE_GET_PEER_INFO.typeId, MESSAGE_GET_PEER_INFO_NOCHECK.typeId -> {
+                        val id = (incomingReq as CommonRequest<PeerId>).data
+                        call.respondProtobuf(NATServer.peerConnections.getOrFail(id).client)
+                    }
+
+                    MESSAGE_CONNECT_PEER.typeId -> {
+                        val req = call.receiveInternalData() as CommonRequest<PeerId>
+                        val targetPeerId = req.data
+                        val my: NATPeerToBrokerConnection = NATServer.peerWebsocketSessionMap.getOrFail(this)
+                        my.wantToConnect.add(targetPeerId)
+
+                        val targetPeer = NATServer.peerConnections[targetPeerId]
+                        if (targetPeer != null) {
+                            if (my.client.clientId !in targetPeer.wantToConnect) {
+                                call.respondSuccess("Waiting target peer accept connection")
+                            } else {
+                                val serverRolePeer: NATPeerToBrokerConnection = maxOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                                val clientRolePeer: NATPeerToBrokerConnection = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+
+                                when (serverRolePeer.client.clientNatType) {
+                                    NATType.PUBLIC -> {
+                                        requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
+                                    }
+
+                                    NATType.FULL_CONE -> {
+
+                                    }
+                                }
+                            }
+                        } else {
+                            call.respondSuccess("Waiting target peer online")
+                        }
+                    }
+
+                    else -> {
+                        throw NotImplementedError("Broker not implemented")
+                    }
+                }
+            }
+
+            is Frame.Close -> {
+                try {
+                    NATServer.peerWebsocketSessionMap[this]?.apply {
+                        NATServer.peerConnections.remove(client.clientId)
+                    }
+
+                    NATServer.peerWebsocketSessionMap.remove(this)
+                } catch (e: Exception) {
+                    logger.error("Unable to unregister", e)
+                }
+            }
+        }
+    }
+
+    private suspend fun requestPeerMakeConnection(requestedPeer: DefaultWebSocketSession, targetPeerClientInfo: NATClientItem) {
+        requestedPeer.sendProtobuf(ACTION_CONNECT_PEER, targetPeerClientInfo)
+    }
 }

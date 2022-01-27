@@ -3,7 +3,9 @@
 
 package com.kenvix.web.utils
 
+import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.CommonJsonResult
+import com.kenvix.natpoked.server.CommonRequest
 import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.exception.CommonBusinessException
@@ -11,6 +13,7 @@ import io.ktor.application.*
 import io.ktor.client.utils.EmptyContent.status
 import io.ktor.features.*
 import io.ktor.http.*
+import io.ktor.http.cio.websocket.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
@@ -242,3 +245,9 @@ suspend inline fun <reified T> ApplicationCall.receiveData(): T {
     }
 }
 
+
+suspend fun <T> DefaultWebSocketSession.sendProtobuf(typeId: Int, data: T) {
+    send(ProtoBuf.encodeToByteArray(CommonRequest<T>(typeId, data)))
+}
+
+suspend fun <T> DefaultWebSocketSession.sendProtobuf(typeId: RequestTypes, data: T) = sendProtobuf(typeId.typeId, data)

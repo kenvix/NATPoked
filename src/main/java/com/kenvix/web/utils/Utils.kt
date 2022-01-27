@@ -15,6 +15,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.NoSuchElementException
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -264,3 +265,5 @@ fun URI.appendQuery(appendQuery: String): URI {
         fragment
     )
 }
+
+fun <K, V> Map<K, V>.getOrFail(key: K): V = this[key] ?: throw NoSuchElementException("$key not exist")
