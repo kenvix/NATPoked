@@ -7,40 +7,41 @@
 package com.kenvix.natpoked.utils.network
 
 import com.kenvix.natpoked.utils.AppEnv
+import io.netty.buffer.ByteBuf
 import kotlinx.coroutines.*
+import org.beykery.jkcp.Kcp
+import org.beykery.jkcp.Output
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import kotlin.coroutines.CoroutineContext
 
 class KCPARQProvider(
     private val conv: Long,
-    private val onRawPacketToSendHandler: suspend (buffer: ByteArray, size: Int) -> Unit,
+    private val onRawPacketToSendHandler: suspend (buffer: ByteBuf, user: Any?) -> Unit,
 ) : CoroutineScope, Closeable {
     private val job = Job() + CoroutineName("KCPARQProvider for session $conv")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO + CoroutineName("KCPBasedARQ for session $conv")
 
     private val kcpClockTimerJob: Job
     // TODO: Singleton KCP Clock
-    private val kcp = object : KCP(conv, null) {
-        override fun output(buffer: ByteArray, size: Int) {
-            launch(Dispatchers.IO) {
-                onRawPacketToSendHandler(buffer, size)
-            }
+    private val kcp = Kcp(Output { msg, kcp, user ->
+        launch(Dispatchers.IO) {
+            onRawPacketToSendHandler(msg, user)
         }
-    }
+    }, null)
 
     @Volatile
     private var shouldStop = false
 
     init {
-        kcp.SetMtu(AppEnv.KcpMtu)
-        kcp.WndSize(AppEnv.KcpSndWnd, AppEnv.KcpRcvWnd)
-        kcp.NoDelay(AppEnv.KcpNoDelay, AppEnv.KcpInterval, AppEnv.KcpResend, AppEnv.KcpNC)
+        kcp.setMtu(AppEnv.KcpMtu)
+        kcp.wndSize(AppEnv.KcpSndWnd, AppEnv.KcpRcvWnd)
+        kcp.noDelay(AppEnv.KcpNoDelay, AppEnv.KcpInterval, AppEnv.KcpResend, AppEnv.KcpNC)
         kcpClockTimerJob = launch(Dispatchers.IO) {
             while (true) {
                 val t = System.currentTimeMillis() // TODO: Timestamp Performance optimization
-                kcp.Update(t)
-                val nextCheckDelay = kcp.Check(t) - t
+                kcp.update(t)
+                val nextCheckDelay = kcp.check(t) - t
                 delay(nextCheckDelay)
             }
         }
@@ -49,22 +50,22 @@ class KCPARQProvider(
     /**
      * when you received a low level packet (eg. UDP packet), call it
      */
-    fun onRawPacketIncoming(buffer: ByteArray, size: Int = buffer.size) {
-        kcp.Input(buffer, size)
+    fun onRawPacketIncoming(buffer: ByteBuf) {
+        kcp.input(buffer)
     }
 
     /**
      * user/upper level send, returns below zero for error
      */
-    fun write(buffer: ByteArray): Int {
-        return kcp.Send(buffer)
+    fun write(buffer: ByteBuf): Int {
+        return kcp.send(buffer)
     }
 
     /**
      * user/upper level recv: returns size, returns below zero for EAGAIN
      */
-    fun read(buffer: ByteArray, len: Int = buffer.size): Int {
-        return kcp.Recv(buffer, len)
+    fun read(buffer: ByteBuf): Int {
+        return kcp.receive(buffer)
     }
 
     fun flush() {

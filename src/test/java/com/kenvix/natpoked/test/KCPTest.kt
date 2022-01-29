@@ -7,18 +7,16 @@
 package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.network.KCPARQProvider
-import com.kenvix.utils.lang.serializeToBytes
+import io.netty.buffer.Unpooled
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Test
-import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
-import java.nio.charset.Charset
+import java.nio.channels.DatagramChannel
 
 object KCPTest {
     private val testStr1 = "package com.kenvix.natpoked.test"
@@ -27,7 +25,8 @@ object KCPTest {
     private val testBytes2 = testStr2.toByteArray(Charsets.UTF_8)
 
     fun server(connectPort: Int, connectHost: String = "127.0.0.1", bindPort: Int = 0, conv: Long = 114514): Pair<DatagramSocket, KCPARQProvider> {
-        val server = DatagramSocket(null)
+        val channel = DatagramChannel.open()
+        val server = channel.socket()
         server.reuseAddress = true
         server.also {
             it.bind(InetSocketAddress(bindPort))
@@ -40,8 +39,8 @@ object KCPTest {
 
 
         val kcpServer = KCPARQProvider(conv, onRawPacketToSendHandler = { buffer, size ->
-            val packet = DatagramPacket(buffer, size)
-            server.send(packet)
+            val b = buffer.nioBuffer()
+            channel.write(b)
         })
 
         return Pair(server, kcpServer)
@@ -56,21 +55,22 @@ object KCPTest {
         runBlocking(Dispatchers.IO) {
             launch(Dispatchers.IO) {
                 while (true) {
-                    val p = DatagramPacket(ByteArray(1500), 1500)
+                    val a = ByteArray(1500)
+                    val p = DatagramPacket(a, 1500)
                     serverSocket.receive(p)
-                    serverKcp.onRawPacketIncoming(p.data)
+                    serverKcp.onRawPacketIncoming(Unpooled.wrappedBuffer(a, p.offset, p.length))
                 }
             }
 
             launch(Dispatchers.IO) {
                 while (true) {
-                    val inBuf = ByteArray(200)
+                    val inBuf = Unpooled.buffer(1500)
                     val readSize = serverKcp.read(inBuf)
                     if (readSize > 0) {
-                        val s = String(inBuf, 0, readSize)
+                        val s = inBuf.toString(Charsets.UTF_8)
                         println("server recv: $readSize | " + s)
                         Assertions.assertEquals(testStr1, s)
-                        serverKcp.write(testBytes2)
+                        serverKcp.write(Unpooled.wrappedBuffer(testBytes2))
                         serverKcp.flush()
                     } else {
                         delay(500)
@@ -80,18 +80,19 @@ object KCPTest {
 
             launch(Dispatchers.IO) {
                 while (true) {
-                    val p = DatagramPacket(ByteArray(1500), 1500)
+                    val a = ByteArray(1500)
+                    val p = DatagramPacket(a, 1500)
                     clientSocket.receive(p)
-                    clientKcp.onRawPacketIncoming(p.data)
+                    clientKcp.onRawPacketIncoming(Unpooled.wrappedBuffer(a, p.offset, p.length))
                 }
             }
 
             launch(Dispatchers.IO) {
                 while (true) {
-                    val inBuf = ByteArray(200)
+                    val inBuf = Unpooled.buffer(1500)
                     val readSize = clientKcp.read(inBuf)
                     if (readSize > 0) {
-                        val s = String(inBuf, 0, readSize)
+                        val s = inBuf.toString(Charsets.UTF_8)
                         println("client recv: $readSize | " + s)
                         Assertions.assertEquals(testStr2, s)
                     } else {
@@ -102,7 +103,7 @@ object KCPTest {
 
             launch(Dispatchers.IO) {
                 while (true) {
-                    clientKcp.write(testBytes)
+                    clientKcp.write(Unpooled.wrappedBuffer(testBytes))
                     clientKcp.flush()
                     delay(100)
                 }
