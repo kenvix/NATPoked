@@ -144,10 +144,17 @@ internal object WebServerBasicRoutes : KtorModule {
                                 when (serverRolePeer.client.clientNatType) {
                                     NATType.PUBLIC, NATType.FULL_CONE -> {
                                         requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
+                                        clientRolePeer.wantToConnect[serverRolePeer.client.clientId] =
+                                            NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
+
                                     }
 
                                     NATType.RESTRICTED_CONE -> {
                                         requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
+                                        serverRolePeer.wantToConnect[clientRolePeer.client.clientId] =
+                                            NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER
+
+
                                         requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
                                     }
                                 }
@@ -155,6 +162,10 @@ internal object WebServerBasicRoutes : KtorModule {
                         } else {
                             call.respondSuccess("Waiting target peer online")
                         }
+                    }
+
+                    MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
+
                     }
 
                     else -> {

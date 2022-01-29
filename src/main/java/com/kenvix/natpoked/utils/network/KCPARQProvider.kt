@@ -10,30 +10,61 @@ import com.kenvix.natpoked.utils.AppEnv
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.Closeable
-import java.net.DatagramSocket
 import kotlin.coroutines.CoroutineContext
-
-abstract class ARQProvider {
-    val onDataNeedToSend: ((buffer: ByteArray, size: Int) -> Unit)? = null
-    abstract fun write(buffer: ByteArray)
-}
 
 class KCPARQProvider(
     private val conv: Long,
-) : KCP(conv), CoroutineScope, Closeable {
+    private val onRawPacketToSendHandler: suspend (buffer: ByteArray, size: Int) -> Unit,
+) : CoroutineScope, Closeable {
     private val job = Job() + CoroutineName("KCPARQProvider for session $conv")
-
-    init {
-        SetMtu(AppEnv.KcpMtu)
-        WndSize(AppEnv.KcpSndWnd, AppEnv.KcpRcvWnd)
-        NoDelay(AppEnv.KcpNoDelay, AppEnv.KcpInterval, AppEnv.KcpResend, AppEnv.KcpNC)
+    private val kcpClockTimerJob: Job
+    private val kcp = object : KCP(conv) {
+        override fun output(buffer: ByteArray, size: Int) {
+            launch(Dispatchers.IO) {
+                onRawPacketToSendHandler(buffer, size)
+            }
+        }
     }
 
-    override fun output(buffer: ByteArray?, size: Int) {
+    @Volatile
+    private var shouldStop = false
 
+    init {
+        kcp.SetMtu(AppEnv.KcpMtu)
+        kcp.WndSize(AppEnv.KcpSndWnd, AppEnv.KcpRcvWnd)
+        kcp.NoDelay(AppEnv.KcpNoDelay, AppEnv.KcpInterval, AppEnv.KcpResend, AppEnv.KcpNC)
+        kcpClockTimerJob = launch(Dispatchers.IO) {
+            while (true) {
+                val t = System.currentTimeMillis() // TODO: Timestamp Performance optimization
+                kcp.Update(t)
+                delay(kcp.Check(t))
+            }
+        }
+    }
+
+    /**
+     * when you received a low level packet (eg. UDP packet), call it
+     */
+    fun onRawPacketIncoming(buffer: ByteArray) {
+        kcp.Input(buffer)
+    }
+
+    /**
+     * user/upper level send, returns below zero for error
+     */
+    fun write(buffer: ByteArray): Int {
+        return kcp.Send(buffer)
+    }
+
+    /**
+     * user/upper level recv: returns size, returns below zero for EAGAIN
+     */
+    fun read(buffer: ByteArray): Int {
+        return kcp.Recv(buffer)
     }
 
     override fun close() {
+        kcpClockTimerJob.cancel()
         job.cancel()
     }
 
@@ -41,6 +72,6 @@ class KCPARQProvider(
 
     companion object {
         const val EAGAIN = -1
-        private val logger = LoggerFactory.getLogger("KCPARQProvider")
+        private val logger = LoggerFactory.getLogger(KCPARQProvider::class.java)
     }
 }

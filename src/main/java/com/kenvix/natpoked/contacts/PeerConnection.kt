@@ -14,6 +14,8 @@ enum class NATPeerToBrokerConnectionStage {
 enum class NATPeerToPeerConnectionStage {
     UNKNOWN,
     HANDSHAKE_TO_BROKER,
+    REQUESTED_TO_CONNECT_CLIENT_PEER,
+    REQUESTED_TO_CONNECT_SERVER_PEER,
     CONNECTED
 }
 

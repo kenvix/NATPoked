@@ -16,4 +16,6 @@ enum class RequestTypes(val typeId: Int) {
     MESSAGE_GET_PEER_INFO_NOCHECK          (0x2000_0031),
 
     MESSAGE_CONNECT_PEER                   (0x2000_0060),
+
+    MESSAGE_SENT_PACKET_TO_CLIENT_PEER     (0x2000_0070),
 }
