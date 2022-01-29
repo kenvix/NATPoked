@@ -21,7 +21,7 @@ class KCPARQProvider(
 
     private val kcpClockTimerJob: Job
     // TODO: Singleton KCP Clock
-    private val kcp = object : KCP(conv) {
+    private val kcp = object : KCP(conv, null) {
         override fun output(buffer: ByteArray, size: Int) {
             launch(Dispatchers.IO) {
                 onRawPacketToSendHandler(buffer, size)
@@ -49,8 +49,8 @@ class KCPARQProvider(
     /**
      * when you received a low level packet (eg. UDP packet), call it
      */
-    fun onRawPacketIncoming(buffer: ByteArray) {
-        kcp.Input(buffer)
+    fun onRawPacketIncoming(buffer: ByteArray, size: Int = buffer.size) {
+        kcp.Input(buffer, size)
     }
 
     /**
@@ -63,8 +63,8 @@ class KCPARQProvider(
     /**
      * user/upper level recv: returns size, returns below zero for EAGAIN
      */
-    fun read(buffer: ByteArray): Int {
-        return kcp.Recv(buffer)
+    fun read(buffer: ByteArray, len: Int = buffer.size): Int {
+        return kcp.Recv(buffer, len)
     }
 
     fun flush() {

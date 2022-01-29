@@ -1,22 +1,11 @@
-//=====================================================================
-//
-// KCP - A Better ARQ Protocol Implementation
-// skywind3000 (at) gmail.com, 2010-2011
-//
-// Features:
-// + Average RTT reduce 30% - 40% vs traditional ARQ like tcp.
-// + Maximum RTT reduce three times vs tcp.
-// + Lightweight, distributed as a single source file.
-//
-//=====================================================================
 package com.kenvix.natpoked.utils.network;
 
-import java.util.ArrayList;
+import java.util.*;
 
-@SuppressWarnings("all")
 public abstract class KCP {
 
-//    https://github.com/hkspirt/kcp-java
+    //参考 https://github.com/hkspirt/kcp-java进行修改。
+    //更注重贴近原版kcp，作为java基础版本对照
 
     //=====================================================================
     // KCP BASIC
@@ -43,60 +32,75 @@ public abstract class KCP {
     public final int IKCP_PROBE_INIT = 7000;    // 7 secs to probe window size
     public final int IKCP_PROBE_LIMIT = 120000; // up to 120 secs to probe window
 
+
+    public final int IKCP_LOG_OUTPUT = 1;
+    public final int IKCP_LOG_INPUT = 2;
+    public final int IKCP_LOG_SEND = 4;
+    public final int IKCP_LOG_RECV = 8;
+    public final int IKCP_LOG_IN_DATA = 16;
+    public final int IKCP_LOG_IN_ACK = 32;
+    public final int IKCP_LOG_IN_PROBE = 64;
+    public final int IKCP_LOG_IN_WINS = 128;
+    public final int IKCP_LOG_OUT_DATA = 256;
+    public final int IKCP_LOG_OUT_ACK = 512;
+    public final int IKCP_LOG_OUT_PROBE = 1024;
+    public final int IKCP_LOG_OUT_WINS = 2048;
+
     protected abstract void output(byte[] buffer, int size); // 需具体实现
 
-    // encode 8 bits unsigned int
+    //采用小端编码： https://github.com/skywind3000/kcp/issues/53
+
+    /**
+     * encode 8 bits unsigned int
+     */
     public static void ikcp_encode8u(byte[] p, int offset, byte c) {
         p[0 + offset] = c;
     }
 
-    // decode 8 bits unsigned int
+    /**
+     * decode 8 bits unsigned int
+     */
     public static byte ikcp_decode8u(byte[] p, int offset) {
         return p[0 + offset];
     }
 
-    /* encode 16 bits unsigned int (msb) */
+    /**
+     * encode 16 bits unsigned int (msb)
+     */
     public static void ikcp_encode16u(byte[] p, int offset, int w) {
-        p[offset + 0] = (byte) (w >> 8);
-        p[offset + 1] = (byte) (w >> 0);
-    }
-
-    /* decode 16 bits unsigned int (msb) */
-    public static int ikcp_decode16u(byte[] p, int offset) {
-        int ret = (p[offset + 0] & 0xFF) << 8
-                | (p[offset + 1] & 0xFF);
-        return ret;
-    }
-
-    /* encode 32 bits unsigned int (msb) */
-    public static void ikcp_encode32u(byte[] p, int offset, long l) {
-        p[offset + 0] = (byte) (l >> 24);
-        p[offset + 1] = (byte) (l >> 16);
-        p[offset + 2] = (byte) (l >> 8);
-        p[offset + 3] = (byte) (l >> 0);
-    }
-
-    /* decode 32 bits unsigned int (msb) */
-    public static long ikcp_decode32u(byte[] p, int offset) {
-        long ret = (p[offset + 0] & 0xFFL) << 24
-                | (p[offset + 1] & 0xFFL) << 16
-                | (p[offset + 2] & 0xFFL) << 8
-                | p[offset + 3] & 0xFFL;
-        return ret;
+        p[offset + 0] = (byte) (w & 0xff);
+        p[offset + 1] = (byte) ((w >>> 8) & 0xff);
     }
 
     /**
-     * 只保留 start 到 stop 的几个元素
+     * decode 16 bits unsigned int (msb)
      */
-    public static <E> void slice(ArrayList<E> list, int start, int stop) {
-        int size = list.size();
-        for (int i = 0; i < size; ++i) {
-            if (i < stop - start) {
-                list.set(i, list.get(i + start));
-            } else {
-                list.remove(stop - start);
-            }
-        }
+    public static int ikcp_decode16u(byte[] p, int offset) {
+        int x1 = ((int) p[offset + 0]) & 0xff;
+        int x2 = ((int) p[offset + 1]) & 0xff;
+        return ((x2 << 8) | x1) & 0xffff;
+    }
+
+    /**
+     * encode 32 bits unsigned int (msb)
+     */
+    public static void ikcp_encode32u(byte[] p, int offset, long l) {
+        p[offset + 0] = (byte) (l & 0xff);
+        p[offset + 1] = (byte) ((l >>> 8) & 0xff);
+        p[offset + 2] = (byte) ((l >>> 16) & 0xff);
+        p[offset + 3] = (byte) ((l >>> 24) & 0xff);
+    }
+
+    /**
+     * decode 32 bits unsigned int (msb)
+     */
+    public static long ikcp_decode32u(byte[] p, int offset) {
+        int x1 = ((int) p[offset + 0]) & 0xff;
+        int x2 = ((int) p[offset + 1]) & 0xff;
+        int x3 = ((int) p[offset + 2]) & 0xff;
+        int x4 = ((int) p[offset + 3]) & 0xff;
+        int x5 = (x1) | (x2 << 8) | (x3 << 16) | (x4 << 24);
+        return ((long) x5) & 0xffffffff;
     }
 
     static long _imin_(long a, long b) {
@@ -113,6 +117,46 @@ public abstract class KCP {
 
     static int _itimediff(long later, long earlier) {
         return ((int) (later - earlier));
+    }
+
+    // write log
+    void ikcp_log(int mask, String fmt, Object... args) {
+        if ((mask & this.logmask) == 0)
+            return;
+        String str = String.format(fmt, args);
+        this.writelog(str, user);
+    }
+
+    // check log mask
+    int ikcp_canlog(int mask) {
+        if ((mask & this.logmask) == 0)
+            return 0;
+        return 1;
+    }
+
+    // output segment
+    int ikcp_output(byte[] data, int size) {
+        if (ikcp_canlog(IKCP_LOG_OUTPUT) != 0) {
+            ikcp_log(IKCP_LOG_OUTPUT, "[RO] %ld bytes", (long) data.length);
+        }
+        if (data.length == 0)
+            return 0;
+        return size;
+    }
+
+    // output queue
+    void ikcp_qprint(String name, List<Segment> list) {
+        System.out.printf("<%s>: [", name);
+        for (Segment seg : list) {
+            System.out.printf("(%lu %d)", (long) seg.sn, (int) (seg.ts % 10000));
+            System.out.printf(",");
+        }
+        System.out.printf("]\n");
+    }
+
+    // can be override
+    void writelog(String str, Object user) {
+        System.out.println(str + ", user:" + user);
     }
 
     private class Segment {
@@ -134,10 +178,13 @@ public abstract class KCP {
             this.data = new byte[size];
         }
 
-        //---------------------------------------------------------------------
-        // ikcp_encode_seg
-        //---------------------------------------------------------------------
-        // encode a segment into buffer
+        /**
+         * ---------------------------------------------------------------------
+         * ikcp_encode_seg
+         * <p>
+         * encode a segment into buffer
+         * ---------------------------------------------------------------------
+         */
         protected int encode(byte[] ptr, int offset) {
             int offset_ = offset;
 
@@ -162,61 +209,99 @@ public abstract class KCP {
         }
     }
 
-    public long conv = 0;
-    //long user = user;
-    long snd_una = 0;
-    long snd_nxt = 0;
-    long rcv_nxt = 0;
-    long ts_recent = 0;
-    long ts_lastack = 0;
-    long ts_probe = 0;
-    long probe_wait = 0;
-    long snd_wnd = IKCP_WND_SND;
-    long rcv_wnd = IKCP_WND_RCV;
-    long rmt_wnd = IKCP_WND_RCV;
-    long cwnd = 0;
-    long incr = 0;
-    long probe = 0;
-    long mtu = IKCP_MTU_DEF;
-    long mss = this.mtu - IKCP_OVERHEAD;
-    byte[] buffer = new byte[(int) (mtu + IKCP_OVERHEAD) * 3];
-    ArrayList<Segment> nrcv_buf = new ArrayList<>(128);
-    ArrayList<Segment> nsnd_buf = new ArrayList<>(128);
-    ArrayList<Segment> nrcv_que = new ArrayList<>(128);
-    ArrayList<Segment> nsnd_que = new ArrayList<>(128);
-    long state = 0;
-    ArrayList<Long> acklist = new ArrayList<>(128);
+
+    long conv, mtu, mss, state;
+    long snd_una, snd_nxt, rcv_nxt;
+    long ts_recent, ts_lastack, ssthresh;
+    long rx_rttval, rx_srtt, rx_rto, rx_minrto;
+    long snd_wnd, rcv_wnd, rmt_wnd, cwnd, probe;
+    long current, interval, ts_flush, xmit;
+    //    long nrcv_buf, nsnd_buf;
+//    long nrcv_que, nsnd_que;
+    long nodelay, updated;
+    long ts_probe, probe_wait;
+    long dead_link, incr;
+    Deque<Segment> snd_queue;
+    Deque<Segment> rcv_queue;
+    Deque<Segment> snd_buf;
+    Deque<Segment> rcv_buf;
+    List<Long> acklist;
+    //long ackcount = 0;    //用于计算 acklist 当前长度和可容纳长度的，java不需要
     //long ackblock = 0;
-    //long ackcount = 0;
-    long rx_srtt = 0;
-    long rx_rttval = 0;
-    long rx_rto = IKCP_RTO_DEF;
-    long rx_minrto = IKCP_RTO_MIN;
-    long current = 0;
-    long interval = IKCP_INTERVAL;
-    long ts_flush = IKCP_INTERVAL;
-    long nodelay = 0;
-    long updated = 0;
-    long logmask = 0;
-    long ssthresh = IKCP_THRESH_INIT;
-    long fastresend = 0;
-    long nocwnd = 0;
-    long xmit = 0;
-    long dead_link = IKCP_DEADLINK;
+    public Object user;
+    byte[] buffer;
+    long fastresend;
+    long nocwnd, stream;
+    int logmask = 0;
     //long ikcp_output = NULL;
     //long writelog = NULL;
 
-    public KCP(long conv_) {
-        conv = conv_;
+    public KCP(long conv, Object user) {
+        this.conv = conv;
+        this.user = user;
+        this.snd_una = 0;
+        this.snd_nxt = 0;
+        this.rcv_nxt = 0;
+        this.ts_recent = 0;
+        this.ts_lastack = 0;
+        this.ts_probe = 0;
+        this.probe_wait = 0;
+        this.snd_wnd = IKCP_WND_SND;
+        this.rcv_wnd = IKCP_WND_RCV;
+        this.rmt_wnd = IKCP_WND_RCV;
+        this.cwnd = 0;
+        this.incr = 0;
+        this.probe = 0;
+        this.mtu = IKCP_MTU_DEF;
+        this.mss = this.mtu - IKCP_OVERHEAD;
+        this.stream = 0;
+
+        this.buffer = new byte[(int) (mtu + IKCP_OVERHEAD) * 3];
+
+        this.snd_queue = new LinkedList<>();
+        this.rcv_queue = new LinkedList<>();
+        this.snd_buf = new LinkedList<>();
+        this.rcv_buf = new LinkedList<>();
+//        this.nrcv_buf = 0;
+//        this.nsnd_buf = 0;
+//        this.nrcv_que = 0;
+//        this.nsnd_que = 0;
+        this.state = 0;
+        this.acklist = new ArrayList<>(8);
+        //this.ackcount = 0;
+        //this.ackblock = 0;
+        this.rx_srtt = 0;
+        this.rx_rttval = 0;
+        this.rx_rto = IKCP_RTO_DEF;
+        this.rx_minrto = IKCP_RTO_MIN;
+        this.current = 0;
+        this.interval = IKCP_INTERVAL;
+        this.ts_flush = IKCP_INTERVAL;
+        this.nodelay = 0;
+        this.updated = 0;
+        this.logmask = 0;
+        this.ssthresh = IKCP_THRESH_INIT;
+        this.fastresend = 0;
+        this.nocwnd = 0;
+        this.xmit = 0;
+        this.dead_link = IKCP_DEADLINK;
+        //this.ikcp_output = NULL;
+        //this.writelog = NULL;
     }
 
-    //---------------------------------------------------------------------
-    // user/upper level recv: returns size, returns below zero for EAGAIN
-    //---------------------------------------------------------------------
-    // 将接收队列中的数据传递给上层引用
-    public int Recv(byte[] buffer) {
+    /**
+     * ---------------------------------------------------------------------
+     * user/upper level recv: returns size, returns below zero for EAGAIN
+     * 将接收队列中的数据传递给上层引用
+     * ---------------------------------------------------------------------
+     */
+    public int Recv(byte[] buffer, int len) {
 
-        if (0 == nrcv_que.size()) {
+        int ispeek = (len < 0) ? 1 : 0;
+        if (len < 0)
+            len = -len;
+
+        if (0 == rcv_queue.size()) {
             return -1;
         }
 
@@ -225,106 +310,141 @@ public abstract class KCP {
             return -2;
         }
 
-        if (peekSize > buffer.length) {
+        if (peekSize > len) {
             return -3;
         }
 
         boolean recover = false;
-        if (nrcv_que.size() >= rcv_wnd) {
+        if (rcv_queue.size() >= rcv_wnd) {
             recover = true;
         }
 
         // merge fragment.
-        int count = 0;
-        int n = 0;
-        for (Segment seg : nrcv_que) {
-            System.arraycopy(seg.data, 0, buffer, n, seg.data.length);
-            n += seg.data.length;
-            count++;
-            if (0 == seg.frg) {
+        len = 0;
+        for (Iterator<Segment> iter = rcv_queue.iterator(); iter.hasNext(); ) {
+            Segment seg = iter.next();
+
+            if (buffer != null) {
+                System.arraycopy(seg.data, 0, buffer, len, seg.data.length);
+                len += seg.data.length;
+            }
+            long fragment = seg.frg;
+
+            if (ikcp_canlog(IKCP_LOG_RECV) != 0) {
+                ikcp_log(IKCP_LOG_RECV, "recv sn=%lu", seg.sn);
+            }
+
+            if (ispeek == 0) {
+                seg = null;
+                iter.remove();
+            }
+
+            if (fragment == 0) {
                 break;
             }
         }
 
-        if (0 < count) {
-            slice(nrcv_que, count, nrcv_que.size());
-        }
+        assert (len == peekSize);
 
-        // move available data from rcv_buf -> nrcv_que
-        count = 0;
-        for (Segment seg : nrcv_buf) {
-            if (seg.sn == rcv_nxt && nrcv_que.size() < rcv_wnd) {
-                nrcv_que.add(seg);
-                rcv_nxt++;
-                count++;
+        // move available data from rcv_buf -> rcv_queue
+        for (Iterator<Segment> iter = rcv_buf.iterator(); iter.hasNext(); ) {
+            Segment seg = iter.next();
+            if (seg.sn == this.rcv_nxt && this.rcv_queue.size() < rcv_wnd) {
+                iter.remove();
+                this.rcv_queue.add(seg);
+                this.rcv_nxt++;
             } else {
                 break;
             }
         }
 
-        if (0 < count) {
-            slice(nrcv_buf, count, nrcv_buf.size());
-        }
-
         // fast recover
-        if (nrcv_que.size() < rcv_wnd && recover) {
+        if (this.rcv_queue.size() < this.rcv_wnd && recover) {
             // ready to send back IKCP_CMD_WINS in ikcp_flush
             // tell remote my window size
             probe |= IKCP_ASK_TELL;
         }
 
-        return n;
+        return len;
     }
 
-    //---------------------------------------------------------------------
-    // peek data size
-    //---------------------------------------------------------------------
-    // check the size of next message in the recv queue
-    // 计算接收队列中有多少可用的数据
+    /**
+     * ---------------------------------------------------------------------
+     * peek data size
+     * check the size of next message in the recv queue
+     * 计算接收队列中有多少可用的数据
+     * ---------------------------------------------------------------------
+     */
     public int PeekSize() {
-        if (0 == nrcv_que.size()) {
+        Segment seg = rcv_queue.peek(); // 返回队列头部的元素  如果队列为空，则返回null
+        if (seg == null) {
             return -1;
         }
 
-        Segment seq = nrcv_que.get(0);
-
-        if (0 == seq.frg) {
-            return seq.data.length;
+        if (seg.frg == 0) {
+            return seg.data.length;
         }
 
-        if (nrcv_que.size() < seq.frg + 1) {
+        if (this.rcv_queue.size() < seg.frg + 1) {
             return -1;
         }
 
         int length = 0;
-
-        for (Segment item : nrcv_que) {
+        for (Segment item : rcv_queue) {
             length += item.data.length;
-            if (0 == item.frg) {
+            if (item.frg == 0)
                 break;
-            }
         }
-
         return length;
     }
+
 
     //---------------------------------------------------------------------
     // user/upper level send, returns below zero for error
     //---------------------------------------------------------------------
     // 上层要发送的数据丢给发送队列，发送队列会根据mtu大小分片
     public int Send(byte[] buffer) {
+        assert (mss > 0);
 
         if (0 == buffer.length) {
             return -1;
         }
 
         int count;
+        int offset = 0;
+        int len = buffer.length;
+        if (stream != 0) {
+            if (!snd_queue.isEmpty()) {
+                Segment old = snd_queue.peekLast(); //peekLast 队列为空时返回null
+                if (old.data.length < this.mss) {
+                    int capacity = (int) (this.mss - old.data.length);
+                    int extend = (len < capacity) ? len : capacity;
+                    Segment seg = new Segment(old.data.length + extend);    //seg->len = old->len + extend;
+                    assert (seg != null);
+//                    if (seg == null) {
+//                        return -2;
+//                    }
+                    System.arraycopy(old.data, 0, seg.data, 0, old.data.length);
+
+                    if (buffer != null) {
+                        System.arraycopy(buffer, 0, seg.data, old.data.length, extend);
+                        offset += extend;
+                    }
+                    seg.frg = 0;
+                    len -= extend;
+                    snd_queue.pollLast();//弹出队列尾部元素,队列为空时返回null
+                    snd_queue.add(seg);
+                }
+            }
+            if (len <= 0)
+                return 0;
+        }
 
         // 根据mss大小分片
-        if (buffer.length < mss) {
+        if (len <= mss) {
             count = 1;
         } else {
-            count = (int) (buffer.length + mss - 1) / (int) mss;
+            count = (int) (len + mss - 1) / (int) mss;
         }
 
         if (255 < count) {
@@ -335,21 +455,24 @@ public abstract class KCP {
             count = 1;
         }
 
-        int offset = 0;
+        offset = 0;
 
         // 分片后加入到发送队列
         int length = buffer.length;
         for (int i = 0; i < count; i++) {
             int size = (int) (length > mss ? mss : length);
             Segment seg = new Segment(size);
-            System.arraycopy(buffer, offset, seg.data, 0, size);
+            if (buffer != null && len > 0)
+                System.arraycopy(buffer, offset, seg.data, 0, size);
+            seg.frg = (this.stream == 0) ? (count - i - 1) : 0;
+            snd_queue.add(seg);
             offset += size;
-            seg.frg = count - i - 1;
-            nsnd_que.add(seg);
             length -= size;
         }
+
         return 0;
     }
+
 
     //---------------------------------------------------------------------
     // parse ack
@@ -377,8 +500,9 @@ public abstract class KCP {
 
     // 计算本地真实snd_una
     void shrink_buf() {
-        if (nsnd_buf.size() > 0) {
-            snd_una = nsnd_buf.get(0).sn;
+        Segment seg = snd_buf.peekFirst();
+        if (seg != null) {
+            snd_una = seg.sn;
         } else {
             snd_una = snd_nxt;
         }
@@ -391,35 +515,41 @@ public abstract class KCP {
         }
 
         int index = 0;
-        for (Segment seg : nsnd_buf) {
-            if (_itimediff(sn, seg.sn) < 0) {
-                break;
-            }
-
-            // 原版ikcp_parse_fastack&ikcp_parse_ack逻辑重复
-            seg.fastack++;
-
+        for (Segment seg : snd_buf) {
             if (sn == seg.sn) {
-                nsnd_buf.remove(index);
+                snd_buf.remove(index);
                 break;
             }
             index++;
+            if (_itimediff(sn, seg.sn) < 0) {
+                break;
+            }
         }
     }
 
     // 通过对端传回的una将已经确认发送成功包从发送缓存中移除
     void parse_una(long una) {
-        int count = 0;
-        for (Segment seg : nsnd_buf) {
+        for (Iterator<Segment> iter = snd_buf.iterator(); iter.hasNext(); ) {
+            Segment seg = iter.next();
             if (_itimediff(una, seg.sn) > 0) {
-                count++;
+                iter.remove();
             } else {
                 break;
             }
         }
+    }
 
-        if (0 < count) {
-            slice(nsnd_buf, count, nsnd_buf.size());
+    void parse_fastack(long sn) {
+        if (_itimediff(sn, snd_una) < 0 || _itimediff(sn, snd_nxt) >= 0) {
+            return;
+        }
+
+        for (Segment seg : snd_buf) {
+            if (_itimediff(sn, seg.sn) < 0) {
+                break;
+            } else if (sn != seg.sn) {
+                seg.fastack++;
+            }
         }
     }
 
@@ -428,15 +558,18 @@ public abstract class KCP {
     //---------------------------------------------------------------------
     // 收数据包后需要给对端回ack，flush时发送出去
     void ack_push(long sn, long ts) {
-        // c原版实现中按*2扩大容量
+        // c原版实现中数组按*2扩大容量，arrayList自动扩容，不需要考虑这个
         acklist.add(sn);
         acklist.add(ts);
     }
 
-    //---------------------------------------------------------------------
-    // parse data
-    //---------------------------------------------------------------------
-    // 用户数据包解析
+    /**
+     * ---------------------------------------------------------------------
+     * parse data
+     * <p>
+     * 用户数据包解析
+     * ---------------------------------------------------------------------
+     */
     void parse_data(Segment newseg) {
         long sn = newseg.sn;
         boolean repeat = false;
@@ -445,48 +578,38 @@ public abstract class KCP {
             return;
         }
 
-        int n = nrcv_buf.size() - 1;
-        int after_idx = -1;
-
+        int i = rcv_buf.size() - 1; // 初始指向最后一个元素的下标位置
         // 判断是否是重复包，并且计算插入位置
-        for (int i = n; i >= 0; i--) {
-            Segment seg = nrcv_buf.get(i);
+        for (Iterator<Segment> iter = rcv_buf.descendingIterator(); iter.hasNext(); i--) {
+            Segment seg = iter.next();
             if (seg.sn == sn) {
                 repeat = true;
                 break;
             }
 
             if (_itimediff(sn, seg.sn) > 0) {
-                after_idx = i;
                 break;
             }
         }
 
         // 如果不是重复包，则插入
         if (!repeat) {
-            if (after_idx == -1) {
-                nrcv_buf.add(0, newseg);
-            } else {
-                nrcv_buf.add(after_idx + 1, newseg);
-            }
+            //iqueue_add(&newseg->node, p);   //原版C代码，newseg添加在p后面。
+            // 这里下标i 就是p的位置，要插入p的后面，则下标应该为 i+1
+            ((LinkedList<Segment>) rcv_buf).add(i + 1, newseg);
         }
 
-        // move available data from nrcv_buf -> nrcv_que
+        // move available data from rcv_buf -> rcv_queue
         // 将连续包加入到接收队列
-        int count = 0;
-        for (Segment seg : nrcv_buf) {
-            if (seg.sn == rcv_nxt && nrcv_que.size() < rcv_wnd) {
-                nrcv_que.add(seg);
-                rcv_nxt++;
-                count++;
+        for (Iterator<Segment> iter = rcv_buf.iterator(); iter.hasNext(); ) {
+            Segment seg = iter.next();
+            if (seg.sn == rcv_nxt && rcv_queue.size() < rcv_wnd) {
+                iter.remove();// 从接收缓存中移除
+                this.rcv_queue.add(seg);
+                this.rcv_nxt++;
             } else {
                 break;
             }
-        }
-
-        // 从接收缓存中移除
-        if (0 < count) {
-            slice(nrcv_buf, count, nrcv_buf.size());
         }
     }
 
@@ -495,11 +618,18 @@ public abstract class KCP {
     // input data
     //---------------------------------------------------------------------
     // 底层收包后调用，再由上层通过Recv获得处理后的数据
-    public int Input(byte[] data) {
+    public int Input(byte[] data, int size) {
+
+        boolean flag = false;
+        long maxack = 0;
+
+        if (ikcp_canlog(IKCP_LOG_INPUT) != 0) {
+            ikcp_log(IKCP_LOG_INPUT, "[RI] %d bytes", size);
+        }
 
         long s_una = snd_una;
-        if (data.length < IKCP_OVERHEAD) {
-            return 0;
+        if (data == null || size < IKCP_OVERHEAD) {
+            return -1;
         }
 
         int offset = 0;
@@ -509,7 +639,7 @@ public abstract class KCP {
             int wnd;
             byte cmd, frg;
 
-            if (data.length - offset < IKCP_OVERHEAD) {
+            if (size - offset < IKCP_OVERHEAD) {
                 break;
             }
 
@@ -552,7 +682,24 @@ public abstract class KCP {
                 }
                 parse_ack(sn);
                 shrink_buf();
+                if (flag == false) {
+                    flag = true;
+                    maxack = sn;
+                } else {
+                    if (_itimediff(sn, maxack) > 0) {
+                        maxack = sn;
+                    }
+                }
+                if (ikcp_canlog(IKCP_LOG_IN_ACK) != 0) {
+                    ikcp_log(IKCP_LOG_IN_DATA,
+                            "input ack: sn=%lu rtt=%ld rto=%ld", sn,
+                            (long) _itimediff(this.current, ts),
+                            (long) this.rx_rto);
+                }
             } else if (IKCP_CMD_PUSH == cmd) {
+                if (ikcp_canlog(IKCP_LOG_IN_DATA) != 0) {
+                    ikcp_log(IKCP_LOG_IN_DATA, "input psh: sn=%lu ts=%lu", sn, ts);
+                }
                 if (_itimediff(sn, rcv_nxt + rcv_wnd) < 0) {
                     ack_push(sn, ts);
                     if (_itimediff(sn, rcv_nxt) >= 0) {
@@ -576,13 +723,22 @@ public abstract class KCP {
                 // ready to send back IKCP_CMD_WINS in Ikcp_flush
                 // tell remote my window size
                 probe |= IKCP_ASK_TELL;
+                if (ikcp_canlog(IKCP_LOG_IN_PROBE) != 0) {
+                    ikcp_log(IKCP_LOG_IN_PROBE, "input probe");
+                }
             } else if (IKCP_CMD_WINS == cmd) {
                 // do nothing
+                if (ikcp_canlog(IKCP_LOG_IN_WINS) != 0) {
+                    ikcp_log(IKCP_LOG_IN_WINS, "input wins: %lu", (long) (wnd));
+                }
             } else {
                 return -3;
             }
 
             offset += (int) length;
+        }
+        if (flag == true) {
+            parse_fastack(maxack);
         }
 
         if (_itimediff(snd_una, s_una) > 0) {
@@ -610,20 +766,17 @@ public abstract class KCP {
         return 0;
     }
 
+
     // 接收窗口可用大小
     int wnd_unused() {
-        if (nrcv_que.size() < rcv_wnd) {
-            return (int) (int) rcv_wnd - nrcv_que.size();
+        if (rcv_queue.size() < rcv_wnd) {
+            return (int) (int) rcv_wnd - rcv_queue.size();
         }
         return 0;
     }
 
-    //---------------------------------------------------------------------
-    // ikcp_flush
-    //---------------------------------------------------------------------
-    void flush() {
+    void flush() {//viewed
         long current_ = current;
-        byte[] buffer_ = buffer;
         int change = 0;
         int lost = 0;
 
@@ -641,16 +794,16 @@ public abstract class KCP {
         // flush acknowledges
         // 将acklist中的ack发送出去
         int count = acklist.size() / 2;
-        int offset = 0;
+        int size = 0;
         for (int i = 0; i < count; i++) {
-            if (offset + IKCP_OVERHEAD > mtu) {
-                output(buffer, offset);
-                offset = 0;
+            if (size + IKCP_OVERHEAD > mtu) {
+                ikcp_output(buffer, size);
+                size = 0;
             }
             // ikcp_ack_get
             seg.sn = acklist.get(i * 2 + 0);
             seg.ts = acklist.get(i * 2 + 1);
-            offset += seg.encode(buffer, offset);
+            size += seg.encode(buffer, size);
         }
         acklist.clear();
 
@@ -683,25 +836,25 @@ public abstract class KCP {
         // 请求对端接收窗口
         if ((probe & IKCP_ASK_SEND) != 0) {
             seg.cmd = IKCP_CMD_WASK;
-            if (offset + IKCP_OVERHEAD > mtu) {
-                output(buffer, offset);
-                offset = 0;
+            if (size + IKCP_OVERHEAD > mtu) {
+                ikcp_output(buffer, size);
+                size = 0;
             }
-            offset += seg.encode(buffer, offset);
+            size += seg.encode(buffer, size);
         }
 
         // flush window probing commands(c#)
         // 告诉对端自己的接收窗口
         if ((probe & IKCP_ASK_TELL) != 0) {
             seg.cmd = IKCP_CMD_WINS;
-            if (offset + IKCP_OVERHEAD > mtu) {
-                output(buffer, offset);
-                offset = 0;
+            if (size + IKCP_OVERHEAD > mtu) {
+                ikcp_output(buffer, size);
+                size = 0;
             }
-            offset += seg.encode(buffer, offset);
+            size += seg.encode(buffer, size);
         }
 
-        probe = 0;
+        this.probe = 0;
 
         // calculate window size
         long cwnd_ = _imin_(snd_wnd, rmt_wnd);
@@ -712,28 +865,22 @@ public abstract class KCP {
 
         count = 0;
         // move data from snd_queue to snd_buf
-        for (Segment nsnd_que1 : nsnd_que) {
-            if (_itimediff(snd_nxt, snd_una + cwnd_) >= 0) {
-                break;
+        while (_itimediff(snd_nxt, snd_una + cwnd_) < 0) {
+            Segment newseg = snd_queue.poll();
+            if (newseg != null) {
+                newseg.conv = this.conv;
+                newseg.cmd = IKCP_CMD_PUSH;
+                newseg.wnd = seg.wnd;
+                newseg.ts = current_;
+                newseg.sn = snd_nxt;
+                newseg.una = rcv_nxt;
+                newseg.resendts = current_;
+                newseg.rto = this.rx_rto;
+                newseg.fastack = 0;
+                newseg.xmit = 0;
+                snd_buf.add(newseg);
+                snd_nxt++;
             }
-            Segment newseg = nsnd_que1;
-            newseg.conv = conv;
-            newseg.cmd = IKCP_CMD_PUSH;
-            newseg.wnd = seg.wnd;
-            newseg.ts = current_;
-            newseg.sn = snd_nxt;
-            newseg.una = rcv_nxt;
-            newseg.resendts = current_;
-            newseg.rto = rx_rto;
-            newseg.fastack = 0;
-            newseg.xmit = 0;
-            nsnd_buf.add(newseg);
-            snd_nxt++;
-            count++;
-        }
-
-        if (0 < count) {
-            slice(nsnd_que, count, nsnd_que.size());
         }
 
         // calculate resent
@@ -741,7 +888,7 @@ public abstract class KCP {
         long rtomin = (nodelay == 0) ? (rx_rto >> 3) : 0;
 
         // flush data segments
-        for (Segment segment : nsnd_buf) {
+        for (Segment segment : snd_buf) {
             boolean needsend = false;
             if (0 == segment.xmit) {
                 // 第一次传输
@@ -776,15 +923,15 @@ public abstract class KCP {
                 segment.una = rcv_nxt;
 
                 int need = IKCP_OVERHEAD + segment.data.length;
-                if (offset + need >= mtu) {
-                    output(buffer, offset);
-                    offset = 0;
+                if (size + need >= mtu) {
+                    ikcp_output(buffer, size);
+                    size = 0;
                 }
 
-                offset += segment.encode(buffer, offset);
+                size += segment.encode(buffer, size);
                 if (segment.data.length > 0) {
-                    System.arraycopy(segment.data, 0, buffer, offset, segment.data.length);
-                    offset += segment.data.length;
+                    System.arraycopy(segment.data, 0, buffer, size, segment.data.length);
+                    size += segment.data.length;
                 }
 
                 if (segment.xmit >= dead_link) {
@@ -794,8 +941,8 @@ public abstract class KCP {
         }
 
         // flash remain segments
-        if (offset > 0) {
-            output(buffer, offset);
+        if (size > 0) {
+            ikcp_output(buffer, size);
         }
 
         // update ssthresh
@@ -830,7 +977,7 @@ public abstract class KCP {
     // ikcp_check when to call it again (without ikcp_input/_send calling).
     // 'current' - current timestamp in millisec.
     //---------------------------------------------------------------------
-    public void Update(long current_) {
+    public void Update(long current_) {//viewed
 
         current = current_;
 
@@ -859,6 +1006,7 @@ public abstract class KCP {
         }
     }
 
+
     //---------------------------------------------------------------------
     // Determine when should you invoke ikcp_update:
     // returns when you should invoke ikcp_update in millisec, if there
@@ -868,8 +1016,7 @@ public abstract class KCP {
     // schedule ikcp_update (eg. implementing an epoll-like mechanism,
     // or optimize ikcp_update when handling massive kcp connections)
     //---------------------------------------------------------------------
-    public long Check(long current_) {
-
+    long Check(long current_) {
         long ts_flush_ = ts_flush;
         long tm_flush = 0x7fffffff;
         long tm_packet = 0x7fffffff;
@@ -889,7 +1036,7 @@ public abstract class KCP {
 
         tm_flush = _itimediff(ts_flush_, current_);
 
-        for (Segment seg : nsnd_buf) {
+        for (Segment seg : snd_buf) {
             int diff = _itimediff(seg.resendts, current_);
             if (diff <= 0) {
                 return current_;
@@ -907,30 +1054,24 @@ public abstract class KCP {
         return current_ + minimal;
     }
 
+
     // change MTU size, default is 1400
-    public int SetMtu(int mtu_) {
-        if (mtu_ < 50 || mtu_ < (int) IKCP_OVERHEAD) {
+    int SetMtu(int mtu_) {
+        if (mtu_ < 50 || mtu_ < IKCP_OVERHEAD)
             return -1;
-        }
-
-        byte[] buffer_ = new byte[(mtu_ + IKCP_OVERHEAD) * 3];
-        if (null == buffer_) {
-            return -2;
-        }
-
-        mtu = (long) mtu_;
-        mss = mtu - IKCP_OVERHEAD;
-        buffer = buffer_;
+        byte[] buffer_ = new byte[(int) (mtu_ + IKCP_OVERHEAD) * 3];
+//        if (buffer_ == null)
+//            return -2;
+        this.mtu = (long) mtu_;
+        mss = mtu_ - IKCP_OVERHEAD;
+        this.buffer = buffer_;
         return 0;
     }
 
-    public int Interval(int interval_) {
-        if (interval_ > 5000) {
-            interval_ = 5000;
-        } else if (interval_ < 10) {
-            interval_ = 10;
-        }
-        interval = (long) interval_;
+    int Interval(int interval) {
+        if (interval > 5000) interval = 5000;
+        else if (interval < 10) interval = 10;
+        this.interval = interval;
         return 0;
     }
 
@@ -939,51 +1080,51 @@ public abstract class KCP {
     // interval: internal update timer interval in millisec, default is 100ms
     // resend: 0:disable fast resend(default), 1:enable fast resend
     // nc: 0:normal congestion control(default), 1:disable congestion control
-    public int NoDelay(int nodelay_, int interval_, int resend_, int nc_) {
-
-        if (nodelay_ >= 0) {
-            nodelay = nodelay_;
-            if (nodelay_ != 0) {
-                rx_minrto = IKCP_RTO_NDL;
+    int NoDelay(int nodelay, int interval, int resend, int nc) {
+        if (nodelay >= 0) {
+            this.nodelay = nodelay;
+            if (nodelay != 0) {
+                this.rx_minrto = IKCP_RTO_NDL;
             } else {
-                rx_minrto = IKCP_RTO_MIN;
+                this.rx_minrto = IKCP_RTO_MIN;
             }
         }
-
-        if (interval_ >= 0) {
-            if (interval_ > 5000) {
-                interval_ = 5000;
-            } else if (interval_ < 10) {
-                interval_ = 10;
-            }
-            interval = interval_;
+        if (interval >= 0) {
+            if (interval > 5000) interval = 5000;
+            else if (interval < 10) interval = 10;
+            this.interval = interval;
         }
-
-        if (resend_ >= 0) {
-            fastresend = resend_;
+        if (resend >= 0) {
+            this.fastresend = resend;
         }
-
-        if (nc_ >= 0) {
-            nocwnd = nc_;
+        if (nc >= 0) {
+            this.nocwnd = nc;
         }
-
         return 0;
     }
 
     // set maximum window size: sndwnd=32, rcvwnd=32 by default
-    public int WndSize(int sndwnd, int rcvwnd) {
+    int WndSize(int sndwnd, int rcvwnd) {
         if (sndwnd > 0) {
-            snd_wnd = (long) sndwnd;
+            this.snd_wnd = sndwnd;
         }
-
         if (rcvwnd > 0) {   // must >= max fragment size
-            rcv_wnd = _imax_(rcvwnd, IKCP_WND_RCV);
+            this.rcv_wnd = _imax_(rcvwnd, IKCP_WND_RCV);
         }
         return 0;
     }
 
     // get how many packet is waiting to be sent
-    public int WaitSnd() {
-        return nsnd_buf.size() + nsnd_que.size();
+    int WaitSnd() {
+        return this.snd_buf.size() + this.snd_queue.size();
     }
+
+
+    // read conv
+    long ikcp_getconv(byte[] data, int offset) {
+        long conv_ = ikcp_decode32u(data, offset);
+        return conv_;
+    }
+
+
 }
