@@ -17,7 +17,10 @@ class KCPARQProvider(
     private val onRawPacketToSendHandler: suspend (buffer: ByteArray, size: Int) -> Unit,
 ) : CoroutineScope, Closeable {
     private val job = Job() + CoroutineName("KCPARQProvider for session $conv")
+    override val coroutineContext: CoroutineContext = job + Dispatchers.IO + CoroutineName("KCPBasedARQ for session $conv")
+
     private val kcpClockTimerJob: Job
+    // TODO: Singleton KCP Clock
     private val kcp = object : KCP(conv) {
         override fun output(buffer: ByteArray, size: Int) {
             launch(Dispatchers.IO) {
@@ -37,7 +40,8 @@ class KCPARQProvider(
             while (true) {
                 val t = System.currentTimeMillis() // TODO: Timestamp Performance optimization
                 kcp.Update(t)
-                delay(kcp.Check(t))
+                val nextCheckDelay = kcp.Check(t) - t
+                delay(nextCheckDelay)
             }
         }
     }
@@ -67,8 +71,6 @@ class KCPARQProvider(
         kcpClockTimerJob.cancel()
         job.cancel()
     }
-
-    override val coroutineContext: CoroutineContext = job + Dispatchers.IO + CoroutineName("KCPBasedARQ for session $conv")
 
     companion object {
         const val EAGAIN = -1
