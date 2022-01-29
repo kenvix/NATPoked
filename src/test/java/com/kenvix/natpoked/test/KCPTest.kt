@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
@@ -20,8 +21,10 @@ import java.net.InetSocketAddress
 import java.nio.charset.Charset
 
 object KCPTest {
-    private val testBytes = "package com.kenvix.natpoked.test".toByteArray(Charsets.UTF_8)
-    private val testBytes2 = "    fun server(): Pair<DatagramSocket, KCPARQProvider> {".toByteArray(Charsets.UTF_8)
+    private val testStr1 = "package com.kenvix.natpoked.test"
+    private val testStr2 = "    fun server(): Pair<DatagramSocket, KCPARQProvider> {"
+    private val testBytes = testStr1.toByteArray(Charsets.UTF_8)
+    private val testBytes2 = testStr2.toByteArray(Charsets.UTF_8)
 
     fun server(connectPort: Int, connectHost: String = "127.0.0.1", bindPort: Int = 0, conv: Long = 114514): Pair<DatagramSocket, KCPARQProvider> {
         val server = DatagramSocket(null)
@@ -64,8 +67,11 @@ object KCPTest {
                     val inBuf = ByteArray(200)
                     val readSize = serverKcp.read(inBuf)
                     if (readSize > 0) {
-                        println("server recv: " + String(inBuf, 0, readSize))
+                        val s = String(inBuf, 0, readSize)
+                        println("server recv: $readSize | " + s)
+                        Assertions.assertEquals(testStr1, s)
                         serverKcp.write(testBytes2)
+                        serverKcp.flush()
                     } else {
                         delay(500)
                     }
@@ -85,7 +91,9 @@ object KCPTest {
                     val inBuf = ByteArray(200)
                     val readSize = clientKcp.read(inBuf)
                     if (readSize > 0) {
-                        println("client recv: " + String(inBuf, 0, readSize))
+                        val s = String(inBuf, 0, readSize)
+                        println("client recv: $readSize | " + s)
+                        Assertions.assertEquals(testStr2, s)
                     } else {
                         delay(500)
                     }
@@ -95,7 +103,8 @@ object KCPTest {
             launch(Dispatchers.IO) {
                 while (true) {
                     clientKcp.write(testBytes)
-                    delay(3500)
+                    clientKcp.flush()
+                    delay(100)
                 }
             }
         }

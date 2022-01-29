@@ -67,6 +67,10 @@ class KCPARQProvider(
         return kcp.Recv(buffer)
     }
 
+    fun flush() {
+        kcp.flush()
+    }
+
     override fun close() {
         kcpClockTimerJob.cancel()
         job.cancel()
