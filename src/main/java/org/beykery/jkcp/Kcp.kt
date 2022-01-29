@@ -6,116 +6,93 @@
  * + Maximum RTT reduce three times vs tcp.
  * + Lightweight, distributed as a single source file.
  */
-package org.beykery.jkcp;
+package org.beykery.jkcp
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.PooledByteBufAllocator;
-
-import java.util.ArrayDeque;
-import java.util.ArrayList;
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.PooledByteBufAllocator
+import java.lang.RuntimeException
+import java.util.ArrayDeque
+import java.util.ArrayList
 
 /**
  * @author beykery
  */
-public class Kcp {
-
-    public static final int IKCP_RTO_NDL = 30;  // no delay min rto
-    public static final int IKCP_RTO_MIN = 100; // normal min rto
-    public static final int IKCP_RTO_DEF = 200;
-    public static final int IKCP_RTO_MAX = 60000;
-    public static final int IKCP_CMD_PUSH = 81; // cmd: push data
-    public static final int IKCP_CMD_ACK = 82; // cmd: ack
-    public static final int IKCP_CMD_WASK = 83; // cmd: window probe (ask)
-    public static final int IKCP_CMD_WINS = 84; // cmd: window size (tell)
-    public static final int IKCP_ASK_SEND = 1;  // need to send IKCP_CMD_WASK
-    public static final int IKCP_ASK_TELL = 2;  // need to send IKCP_CMD_WINS
-    public static final int IKCP_WND_SND = 32;
-    public static final int IKCP_WND_RCV = 32;
-    public static final int IKCP_MTU_DEF = 1400;
-    public static final int IKCP_ACK_FAST = 3;
-    public static final int IKCP_INTERVAL = 100;
-    public static final int IKCP_OVERHEAD = 24;
-    public static final int IKCP_DEADLINK = 10;
-    public static final int IKCP_THRESH_INIT = 2;
-    public static final int IKCP_THRESH_MIN = 2;
-    public static final int IKCP_PROBE_INIT = 7000;   // 7 secs to probe window size
-    public static final int IKCP_PROBE_LIMIT = 120000; // up to 120 secs to probe window
-
-    private int conv;
-    private int mtu;
-    private int mss;
-    private int state;
-    private int snd_una;
-    private int snd_nxt;
-    private int rcv_nxt;
-    private int ts_recent;
-    private int ts_lastack;
-    private int ssthresh;
-    private int rx_rttval;
-    private int rx_srtt;
-    private int rx_rto;
-    private int rx_minrto;
-    private int snd_wnd;
-    private int rcv_wnd;
-    private int rmt_wnd;
-    private int cwnd;
-    private int probe;
-    private int current;
-    private int interval;
-    private int ts_flush;
-    private int xmit;
-    private int nodelay;
-    private int updated;
-    private int ts_probe;
-    private int probe_wait;
-    private final int dead_link;
-    private int incr;
-    private final ArrayDeque<Segment> snd_queue = new ArrayDeque<>();
-    private final ArrayDeque<Segment> rcv_queue = new ArrayDeque<>();
-    private final ArrayList<Segment> snd_buf = new ArrayList<>();
-    private final ArrayList<Segment> rcv_buf = new ArrayList<>();
-    private final ArrayList<Integer> acklist = new ArrayList<>();
-    private ByteBuf buffer;
-    private int fastresend;
-    private int nocwnd;
-    private boolean stream;//流模式
-    private final Output output;
-    private final Object user;//远端地址
-    private long nextUpdate;//the next update time.
-
-    private static int _ibound_(int lower, int middle, int upper) {
-        return Math.min(Math.max(lower, middle), upper);
-    }
-
-    private static int _itimediff(int later, int earlier) {
-        return later - earlier;
-    }
-
-    private static long _itimediff(long later, long earlier) {
-        return later - earlier;
-    }
+class Kcp(output: Output, user: Any?) {
+    /**
+     * conv
+     *
+     * @return
+     */
+    /**
+     * conv
+     *
+     * @param conv
+     */
+    var conv = 0
+    private var mtu: Int
+    private var mss: Int
+    private var state = 0
+    private var snd_una = 0
+    private var snd_nxt = 0
+    private var rcv_nxt = 0
+    private val ts_recent = 0
+    private val ts_lastack = 0
+    private var ssthresh: Int
+    private var rx_rttval = 0
+    private var rx_srtt = 0
+    private var rx_rto: Int
+    private var rx_minrto: Int
+    private var snd_wnd: Int
+    private var rcv_wnd: Int
+    private var rmt_wnd: Int
+    private var cwnd = 0
+    private var probe = 0
+    private var current = 0
+    private var interval: Int
+    private var ts_flush: Int
+    private var xmit = 0
+    private var nodelay = 0
+    private var updated = 0
+    private var ts_probe = 0
+    private var probe_wait = 0
+    private val dead_link: Int
+    private var incr = 0
+    private val snd_queue = ArrayDeque<Segment>()
+    private val rcv_queue = ArrayDeque<Segment>()
+    private val snd_buf = ArrayList<Segment>()
+    private val rcv_buf = ArrayList<Segment>()
+    private val acklist = ArrayList<Int>()
+    private var buffer: ByteBuf?
+    private var fastresend = 0
+    private var nocwnd = 0
+    var isStream //流模式
+            = false
+    private val output: Output
+    val user //远端地址
+            : Any?
+    var nextUpdate //the next update time.
+            : Long = 0
 
     /**
      * SEGMENT
      */
-    class Segment {
+    internal inner class Segment constructor(size: Int) {
+        var conv = 0
+        var cmd: Byte = 0
+        var frg = 0
+        var wnd = 0
+        var ts = 0
+        var sn = 0
+        var una = 0
+        var resendts = 0
+        var rto = 0
+        var fastack = 0
+        var xmit = 0
+        var data: ByteBuf? = null
 
-        private int conv = 0;
-        private byte cmd = 0;
-        private int frg = 0;
-        private int wnd = 0;
-        private int ts = 0;
-        private int sn = 0;
-        private int una = 0;
-        private int resendts = 0;
-        private int rto = 0;
-        private int fastack = 0;
-        private int xmit = 0;
-        private ByteBuf data;
-
-        private Segment(int size) {
+        init {
             if (size > 0) {
-                this.data = PooledByteBufAllocator.DEFAULT.buffer(size);
+                data = PooledByteBufAllocator.DEFAULT.buffer(size)
             }
         }
 
@@ -125,25 +102,25 @@ public class Kcp {
          * @param buf
          * @return
          */
-        private int encode(ByteBuf buf) {
-            int off = buf.writerIndex();
-            buf.writeIntLE(conv);
-            buf.writeByte(cmd);
-            buf.writeByte(frg);
-            buf.writeShortLE(wnd);
-            buf.writeIntLE(ts);
-            buf.writeIntLE(sn);
-            buf.writeIntLE(una);
-            buf.writeIntLE(data == null ? 0 : data.readableBytes());
-            return buf.writerIndex() - off;
+        fun encode(buf: ByteBuf?): Int {
+            val off = buf!!.writerIndex()
+            buf.writeIntLE(conv)
+            buf.writeByte(cmd.toInt())
+            buf.writeByte(frg)
+            buf.writeShortLE(wnd)
+            buf.writeIntLE(ts)
+            buf.writeIntLE(sn)
+            buf.writeIntLE(una)
+            buf.writeIntLE(data?.readableBytes() ?: 0)
+            return buf.writerIndex() - off
         }
 
         /**
          * 释放内存
          */
-        private void release() {
-            if (this.data != null && data.refCnt() > 0) {
-                this.data.release(data.refCnt());
+        fun release() {
+            if (data != null && data!!.refCnt() > 0) {
+                data!!.release(data!!.refCnt())
             }
         }
     }
@@ -154,21 +131,21 @@ public class Kcp {
      * @param output
      * @param user
      */
-    public Kcp(Output output, Object user) {
-        snd_wnd = IKCP_WND_SND;
-        rcv_wnd = IKCP_WND_RCV;
-        rmt_wnd = IKCP_WND_RCV;
-        mtu = IKCP_MTU_DEF;
-        mss = mtu - IKCP_OVERHEAD;
-        rx_rto = IKCP_RTO_DEF;
-        rx_minrto = IKCP_RTO_MIN;
-        interval = IKCP_INTERVAL;
-        ts_flush = IKCP_INTERVAL;
-        ssthresh = IKCP_THRESH_INIT;
-        dead_link = IKCP_DEADLINK;
-        buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
-        this.output = output;
-        this.user = user;
+    init {
+        snd_wnd = IKCP_WND_SND
+        rcv_wnd = IKCP_WND_RCV
+        rmt_wnd = IKCP_WND_RCV
+        mtu = IKCP_MTU_DEF
+        mss = mtu - IKCP_OVERHEAD
+        rx_rto = IKCP_RTO_DEF
+        rx_minrto = IKCP_RTO_MIN
+        interval = IKCP_INTERVAL
+        ts_flush = IKCP_INTERVAL
+        ssthresh = IKCP_THRESH_INIT
+        dead_link = IKCP_DEADLINK
+        buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
+        this.output = output
+        this.user = user
     }
 
     /**
@@ -176,25 +153,25 @@ public class Kcp {
      *
      * @return
      */
-    public int peekSize() {
+    fun peekSize(): Int {
         if (rcv_queue.isEmpty()) {
-            return -1;
+            return -1
         }
-        Segment seq = rcv_queue.getFirst();
+        val seq = rcv_queue.first
         if (seq.frg == 0) {
-            return seq.data.readableBytes();
+            return seq.data!!.readableBytes()
         }
-        if (rcv_queue.size() < seq.frg + 1) {
-            return -1;
+        if (rcv_queue.size < seq.frg + 1) {
+            return -1
         }
-        int length = 0;
-        for (Segment item : rcv_queue) {
-            length += item.data.readableBytes();
+        var length = 0
+        for (item in rcv_queue) {
+            length += item.data!!.readableBytes()
             if (item.frg == 0) {
-                break;
+                break
             }
         }
-        return length;
+        return length
     }
 
     /**
@@ -203,57 +180,57 @@ public class Kcp {
      * @param buffer
      * @return
      */
-    public int receive(ByteBuf buffer) {
+    fun receive(buffer: ByteBuf): Int {
         if (rcv_queue.isEmpty()) {
-            return -1;
+            return -1
         }
-        int peekSize = peekSize();
+        val peekSize = peekSize()
         if (peekSize < 0) {
-            return -2;
+            return -2
         }
-        boolean recover = rcv_queue.size() >= rcv_wnd;
+        val recover = rcv_queue.size >= rcv_wnd
         // merge fragment.
-        int c = 0;
-        int len = 0;
-        for (Segment seg : rcv_queue) {
-            len += seg.data.readableBytes();
-            buffer.writeBytes(seg.data);
-            c++;
+        var c = 0
+        var len = 0
+        for (seg in rcv_queue) {
+            len += seg.data!!.readableBytes()
+            buffer.writeBytes(seg.data)
+            c++
             if (seg.frg == 0) {
-                break;
+                break
             }
         }
         if (c > 0) {
-            for (int i = 0; i < c; i++) {
-                rcv_queue.removeFirst().data.release();
+            for (i in 0 until c) {
+                rcv_queue.removeFirst().data!!.release()
             }
         }
         if (len != peekSize) {
-            throw new RuntimeException("数据异常.");
+            throw RuntimeException("数据异常.")
         }
         // move available data from rcv_buf -> rcv_queue
-        c = 0;
-        for (Segment seg : rcv_buf) {
-            if (seg.sn == rcv_nxt && rcv_queue.size() < rcv_wnd) {
-                rcv_queue.add(seg);
-                rcv_nxt++;
-                c++;
+        c = 0
+        for (seg in rcv_buf) {
+            if (seg.sn == rcv_nxt && rcv_queue.size < rcv_wnd) {
+                rcv_queue.add(seg)
+                rcv_nxt++
+                c++
             } else {
-                break;
+                break
             }
         }
         if (c > 0) {
-            for (int i = 0; i < c; i++) {
-                rcv_buf.remove(0);
+            for (i in 0 until c) {
+                rcv_buf.removeAt(0)
             }
         }
         // fast recover
-        if (rcv_queue.size() < rcv_wnd && recover) {
+        if (rcv_queue.size < rcv_wnd && recover) {
             // ready to send back IKCP_CMD_WINS in ikcp_flush
             // tell remote my window size
-            probe |= IKCP_ASK_TELL;
+            probe = probe or IKCP_ASK_TELL
         }
-        return len;
+        return len
     }
 
     /**
@@ -262,44 +239,44 @@ public class Kcp {
      * @param buffer
      * @return
      */
-    public int send(ByteBuf buffer) {
+    fun send(buffer: ByteBuf): Int {
         if (buffer.readableBytes() == 0) {
-            return -1;
+            return -1
         }
         // append to previous segment in streaming mode (if possible)
-        if (this.stream && !this.snd_queue.isEmpty()) {
-            Segment seg = snd_queue.getLast();
-            if (seg.data != null && seg.data.readableBytes() < mss) {
-                int capacity = mss - seg.data.readableBytes();
-                int extend = Math.min(buffer.readableBytes(), capacity);
-                seg.data.writeBytes(buffer, extend);
+        if (isStream && !snd_queue.isEmpty()) {
+            val seg = snd_queue.last
+            if (seg.data != null && seg.data!!.readableBytes() < mss) {
+                val capacity = mss - seg.data!!.readableBytes()
+                val extend = Math.min(buffer.readableBytes(), capacity)
+                seg.data!!.writeBytes(buffer, extend)
                 if (buffer.readableBytes() == 0) {
-                    return 0;
+                    return 0
                 }
             }
         }
-        int count;
-        if (buffer.readableBytes() <= mss) {
-            count = 1;
+        var count: Int
+        count = if (buffer.readableBytes() <= mss) {
+            1
         } else {
-            count = (buffer.readableBytes() + mss - 1) / mss;
+            (buffer.readableBytes() + mss - 1) / mss
         }
         if (count > 255) {
-            return -2;
+            return -2
         }
         if (count == 0) {
-            count = 1;
+            count = 1
         }
         //fragment
-        for (int i = 0; i < count; i++) {
-            int size = Math.min(buffer.readableBytes(), mss);
-            Segment seg = new Segment(size);
-            seg.data.writeBytes(buffer, size);
-            seg.frg = this.stream ? 0 : count - i - 1;
-            snd_queue.add(seg);
+        for (i in 0 until count) {
+            val size = Math.min(buffer.readableBytes(), mss)
+            val seg: Segment = Segment(size)
+            seg.data!!.writeBytes(buffer, size)
+            seg.frg = if (isStream) 0 else count - i - 1
+            snd_queue.add(seg)
         }
-        buffer.release();
-        return 0;
+        buffer.release()
+        return 0
     }
 
     /**
@@ -307,76 +284,76 @@ public class Kcp {
      *
      * @param rtt
      */
-    private void update_ack(int rtt) {
+    private fun update_ack(rtt: Int) {
         if (rx_srtt == 0) {
-            rx_srtt = rtt;
-            rx_rttval = rtt / 2;
+            rx_srtt = rtt
+            rx_rttval = rtt / 2
         } else {
-            int delta = rtt - rx_srtt;
+            var delta = rtt - rx_srtt
             if (delta < 0) {
-                delta = -delta;
+                delta = -delta
             }
-            rx_rttval = (3 * rx_rttval + delta) / 4;
-            rx_srtt = (7 * rx_srtt + rtt) / 8;
+            rx_rttval = (3 * rx_rttval + delta) / 4
+            rx_srtt = (7 * rx_srtt + rtt) / 8
             if (rx_srtt < 1) {
-                rx_srtt = 1;
+                rx_srtt = 1
             }
         }
-        int rto = rx_srtt + Math.max(interval, 4 * rx_rttval);
-        rx_rto = _ibound_(rx_minrto, rto, IKCP_RTO_MAX);
+        val rto = rx_srtt + Math.max(interval, 4 * rx_rttval)
+        rx_rto = _ibound_(rx_minrto, rto, IKCP_RTO_MAX)
     }
 
-    private void shrink_buf() {
-        if (snd_buf.size() > 0) {
-            snd_una = snd_buf.get(0).sn;
+    private fun shrink_buf() {
+        snd_una = if (snd_buf.size > 0) {
+            snd_buf[0].sn
         } else {
-            snd_una = snd_nxt;
+            snd_nxt
         }
     }
 
-    private void parse_ack(int sn) {
+    private fun parse_ack(sn: Int) {
         if (_itimediff(sn, snd_una) < 0 || _itimediff(sn, snd_nxt) >= 0) {
-            return;
+            return
         }
-        for (int i = 0; i < snd_buf.size(); i++) {
-            Segment seg = snd_buf.get(i);
+        for (i in snd_buf.indices) {
+            val seg = snd_buf[i]
             if (sn == seg.sn) {
-                snd_buf.remove(i);
-                seg.data.release(seg.data.refCnt());
-                break;
+                snd_buf.removeAt(i)
+                seg.data!!.release(seg.data!!.refCnt())
+                break
             }
             if (_itimediff(sn, seg.sn) < 0) {
-                break;
+                break
             }
         }
     }
 
-    private void parse_una(int una) {
-        int c = 0;
-        for (Segment seg : snd_buf) {
+    private fun parse_una(una: Int) {
+        var c = 0
+        for (seg in snd_buf) {
             if (_itimediff(una, seg.sn) > 0) {
-                c++;
+                c++
             } else {
-                break;
+                break
             }
         }
         if (c > 0) {
-            for (int i = 0; i < c; i++) {
-                Segment seg = snd_buf.remove(0);
-                seg.data.release(seg.data.refCnt());
+            for (i in 0 until c) {
+                val seg = snd_buf.removeAt(0)
+                seg.data!!.release(seg.data!!.refCnt())
             }
         }
     }
 
-    private void parse_fastack(int sn) {
+    private fun parse_fastack(sn: Int) {
         if (_itimediff(sn, snd_una) < 0 || _itimediff(sn, snd_nxt) >= 0) {
-            return;
+            return
         }
-        for (Segment seg : this.snd_buf) {
+        for (seg in snd_buf) {
             if (_itimediff(sn, seg.sn) < 0) {
-                break;
+                break
             } else if (sn != seg.sn) {
-                seg.fastack++;
+                seg.fastack++
             }
         }
     }
@@ -387,50 +364,50 @@ public class Kcp {
      * @param sn
      * @param ts
      */
-    private void ack_push(int sn, int ts) {
-        acklist.add(sn);
-        acklist.add(ts);
+    private fun ack_push(sn: Int, ts: Int) {
+        acklist.add(sn)
+        acklist.add(ts)
     }
 
-    private void parse_data(Segment newseg) {
-        int sn = newseg.sn;
+    private fun parse_data(newseg: Segment) {
+        val sn = newseg.sn
         if (_itimediff(sn, rcv_nxt + rcv_wnd) >= 0 || _itimediff(sn, rcv_nxt) < 0) {
-            newseg.release();
-            return;
+            newseg.release()
+            return
         }
-        int n = rcv_buf.size() - 1;
-        int temp = -1;
-        boolean repeat = false;
-        for (int i = n; i >= 0; i--) {
-            Segment seg = rcv_buf.get(i);
+        val n = rcv_buf.size - 1
+        var temp = -1
+        var repeat = false
+        for (i in n downTo 0) {
+            val seg = rcv_buf[i]
             if (seg.sn == sn) {
-                repeat = true;
-                break;
+                repeat = true
+                break
             }
             if (_itimediff(sn, seg.sn) > 0) {
-                temp = i;
-                break;
+                temp = i
+                break
             }
         }
         if (!repeat) {
-            rcv_buf.add(temp + 1, newseg);
+            rcv_buf.add(temp + 1, newseg)
         } else {
-            newseg.release();
+            newseg.release()
         }
         // move available data from rcv_buf -> rcv_queue
-        int c = 0;
-        for (Segment seg : rcv_buf) {
-            if (seg.sn == rcv_nxt && rcv_queue.size() < rcv_wnd) {
-                rcv_queue.add(seg);
-                rcv_nxt++;
-                c++;
+        var c = 0
+        for (seg in rcv_buf) {
+            if (seg.sn == rcv_nxt && rcv_queue.size < rcv_wnd) {
+                rcv_queue.add(seg)
+                rcv_nxt++
+                c++
             } else {
-                break;
+                break
             }
         }
         if (0 < c) {
-            for (int i = 0; i < c; i++) {
-                rcv_buf.remove(0);
+            for (i in 0 until c) {
+                rcv_buf.removeAt(0)
             }
         }
     }
@@ -441,310 +418,295 @@ public class Kcp {
      * @param data
      * @return
      */
-    public int input(ByteBuf data) {
-        int una_temp = snd_una;
-        int flag = 0, maxack = 0;
+    fun input(data: ByteBuf?): Int {
+        val una_temp = snd_una
+        var flag = 0
+        var maxack = 0
         if (data == null || data.readableBytes() < IKCP_OVERHEAD) {
-            return -1;
+            return -1
         }
         while (true) {
-            boolean readed = false;
-            int ts;
-            int sn;
-            int len;
-            int una;
-            int conv_;
-            int wnd;
-            byte cmd;
-            byte frg;
+            var readed = false
+            var ts: Int
+            var sn: Int
+            var len: Int
+            var una: Int
+            var conv_: Int
+            var wnd: Int
+            var cmd: Byte
+            var frg: Byte
             if (data.readableBytes() < IKCP_OVERHEAD) {
-                break;
+                break
             }
-            conv_ = data.readIntLE();
-            if (this.conv != conv_) {
-                return -1;
+            conv_ = data.readIntLE()
+            if (conv != conv_) {
+                return -1
             }
-            cmd = data.readByte();
-            frg = data.readByte();
-            wnd = data.readShortLE();
-            ts = data.readIntLE();
-            sn = data.readIntLE();
-            una = data.readIntLE();
-            len = data.readIntLE();
+            cmd = data.readByte()
+            frg = data.readByte()
+            wnd = data.readShortLE().toInt()
+            ts = data.readIntLE()
+            sn = data.readIntLE()
+            una = data.readIntLE()
+            len = data.readIntLE()
             if (data.readableBytes() < len) {
-                return -2;
+                return -2
             }
-            switch ((int) cmd) {
-                case IKCP_CMD_PUSH:
-                case IKCP_CMD_ACK:
-                case IKCP_CMD_WASK:
-                case IKCP_CMD_WINS:
-                    break;
-                default:
-                    return -3;
+            when (cmd.toInt()) {
+                IKCP_CMD_PUSH, IKCP_CMD_ACK, IKCP_CMD_WASK, IKCP_CMD_WINS -> {}
+                else -> return -3
             }
-            rmt_wnd = wnd & 0x0000ffff;
-            parse_una(una);
-            shrink_buf();
-            switch (cmd) {
-                case IKCP_CMD_ACK:
+            rmt_wnd = wnd and 0x0000ffff
+            parse_una(una)
+            shrink_buf()
+            when (cmd.toInt()) {
+                IKCP_CMD_ACK -> {
                     if (_itimediff(current, ts) >= 0) {
-                        update_ack(_itimediff(current, ts));
+                        update_ack(_itimediff(current, ts))
                     }
-                    parse_ack(sn);
-                    shrink_buf();
+                    parse_ack(sn)
+                    shrink_buf()
                     if (flag == 0) {
-                        flag = 1;
-                        maxack = sn;
+                        flag = 1
+                        maxack = sn
                     } else if (_itimediff(sn, maxack) > 0) {
-                        maxack = sn;
+                        maxack = sn
                     }
-                    break;
-                case IKCP_CMD_PUSH:
-                    if (_itimediff(sn, rcv_nxt + rcv_wnd) < 0) {
-                        ack_push(sn, ts);
-                        if (_itimediff(sn, rcv_nxt) >= 0) {
-                            Segment seg = new Segment(len);
-                            seg.conv = conv_;
-                            seg.cmd = cmd;
-                            seg.frg = frg & 0x000000ff;
-                            seg.wnd = wnd;
-                            seg.ts = ts;
-                            seg.sn = sn;
-                            seg.una = una;
-                            if (len > 0) {
-                                seg.data.writeBytes(data, len);
-                                readed = true;
-                            }
-                            parse_data(seg);
+                }
+                IKCP_CMD_PUSH -> if (_itimediff(sn, rcv_nxt + rcv_wnd) < 0) {
+                    ack_push(sn, ts)
+                    if (_itimediff(sn, rcv_nxt) >= 0) {
+                        val seg: Segment = Segment(len)
+                        seg.conv = conv_
+                        seg.cmd = cmd
+                        seg.frg = frg.toInt() and 0x000000ff
+                        seg.wnd = wnd
+                        seg.ts = ts
+                        seg.sn = sn
+                        seg.una = una
+                        if (len > 0) {
+                            seg.data!!.writeBytes(data, len)
+                            readed = true
                         }
+                        parse_data(seg)
                     }
-                    break;
-                case IKCP_CMD_WASK:
-                    // ready to send back IKCP_CMD_WINS in Ikcp_flush
+                }
+                IKCP_CMD_WASK ->                     // ready to send back IKCP_CMD_WINS in Ikcp_flush
                     // tell remote my window size
-                    probe |= IKCP_ASK_TELL;
-                    break;
-                case IKCP_CMD_WINS:
-                    // do nothing
-                    break;
-                default:
-                    return -3;
+                    probe = probe or IKCP_ASK_TELL
+                IKCP_CMD_WINS -> {}
+                else -> return -3
             }
             if (!readed) {
-                data.skipBytes(len);
+                data.skipBytes(len)
             }
         }
         if (flag != 0) {
-            parse_fastack(maxack);
+            parse_fastack(maxack)
         }
         if (_itimediff(snd_una, una_temp) > 0) {
-            if (this.cwnd < this.rmt_wnd) {
-                if (this.cwnd < this.ssthresh) {
-                    this.cwnd++;
-                    this.incr += mss;
+            if (cwnd < rmt_wnd) {
+                if (cwnd < ssthresh) {
+                    cwnd++
+                    incr += mss
                 } else {
-                    if (this.incr < mss) {
-                        this.incr = mss;
+                    if (incr < mss) {
+                        incr = mss
                     }
-                    this.incr += (mss * mss) / this.incr + (mss / 16);
-                    if ((this.cwnd + 1) * mss <= this.incr) {
-                        this.cwnd++;
+                    incr += mss * mss / incr + mss / 16
+                    if ((cwnd + 1) * mss <= incr) {
+                        cwnd++
                     }
                 }
-                if (this.cwnd > this.rmt_wnd) {
-                    this.cwnd = this.rmt_wnd;
-                    this.incr = this.rmt_wnd * mss;
+                if (cwnd > rmt_wnd) {
+                    cwnd = rmt_wnd
+                    incr = rmt_wnd * mss
                 }
             }
         }
-        return 0;
+        return 0
     }
 
-    private int wnd_unused() {
-        if (rcv_queue.size() < rcv_wnd) {
-            return rcv_wnd - rcv_queue.size();
-        }
-        return 0;
+    private fun wnd_unused(): Int {
+        return if (rcv_queue.size < rcv_wnd) {
+            rcv_wnd - rcv_queue.size
+        } else 0
     }
 
     /**
      * force flush
      */
-    public void forceFlush() {
-        int cur = current;
-        int change = 0;
-        int lost = 0;
-        Segment seg = new Segment(0);
-        seg.conv = conv;
-        seg.cmd = IKCP_CMD_ACK;
-        seg.wnd = wnd_unused();
-        seg.una = rcv_nxt;
+    fun forceFlush() {
+        val cur = current
+        var change = 0
+        var lost = 0
+        val seg: Segment = Segment(0)
+        seg.conv = conv
+        seg.cmd = IKCP_CMD_ACK.toByte()
+        seg.wnd = wnd_unused()
+        seg.una = rcv_nxt
         // flush acknowledges
-        int c = acklist.size() / 2;
-        for (int i = 0; i < c; i++) {
-            if (buffer.readableBytes() + IKCP_OVERHEAD > mtu) {
-                this.output.out(buffer, this, user);
-                buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
+        var c = acklist.size / 2
+        for (i in 0 until c) {
+            if (buffer!!.readableBytes() + IKCP_OVERHEAD > mtu) {
+                output.out(buffer, this, user)
+                buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
             }
-            seg.sn = acklist.get(i * 2 + 0);
-            seg.ts = acklist.get(i * 2 + 1);
-            seg.encode(buffer);
+            seg.sn = acklist[i * 2 + 0]
+            seg.ts = acklist[i * 2 + 1]
+            seg.encode(buffer)
         }
-        acklist.clear();
+        acklist.clear()
         // probe window size (if remote window size equals zero)
         if (rmt_wnd == 0) {
             if (probe_wait == 0) {
-                probe_wait = IKCP_PROBE_INIT;
-                ts_probe = current + probe_wait;
+                probe_wait = IKCP_PROBE_INIT
+                ts_probe = current + probe_wait
             } else if (_itimediff(current, ts_probe) >= 0) {
                 if (probe_wait < IKCP_PROBE_INIT) {
-                    probe_wait = IKCP_PROBE_INIT;
+                    probe_wait = IKCP_PROBE_INIT
                 }
-                probe_wait += probe_wait / 2;
+                probe_wait += probe_wait / 2
                 if (probe_wait > IKCP_PROBE_LIMIT) {
-                    probe_wait = IKCP_PROBE_LIMIT;
+                    probe_wait = IKCP_PROBE_LIMIT
                 }
-                ts_probe = current + probe_wait;
-                probe |= IKCP_ASK_SEND;
+                ts_probe = current + probe_wait
+                probe = probe or IKCP_ASK_SEND
             }
         } else {
-            ts_probe = 0;
-            probe_wait = 0;
+            ts_probe = 0
+            probe_wait = 0
         }
         // flush window probing commands
-        if ((probe & IKCP_ASK_SEND) != 0) {
-            seg.cmd = IKCP_CMD_WASK;
-            if (buffer.readableBytes() + IKCP_OVERHEAD > mtu) {
-                this.output.out(buffer, this, user);
-                buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
+        if (probe and IKCP_ASK_SEND != 0) {
+            seg.cmd = IKCP_CMD_WASK.toByte()
+            if (buffer!!.readableBytes() + IKCP_OVERHEAD > mtu) {
+                output.out(buffer, this, user)
+                buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
             }
-            seg.encode(buffer);
+            seg.encode(buffer)
         }
         // flush window probing commands
-        if ((probe & IKCP_ASK_TELL) != 0) {
-            seg.cmd = IKCP_CMD_WINS;
-            if (buffer.readableBytes() + IKCP_OVERHEAD > mtu) {
-                this.output.out(buffer, this, user);
-                buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
+        if (probe and IKCP_ASK_TELL != 0) {
+            seg.cmd = IKCP_CMD_WINS.toByte()
+            if (buffer!!.readableBytes() + IKCP_OVERHEAD > mtu) {
+                output.out(buffer, this, user)
+                buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
             }
-            seg.encode(buffer);
+            seg.encode(buffer)
         }
-        probe = 0;
+        probe = 0
         // calculate window size
-        int cwnd_temp = Math.min(snd_wnd, rmt_wnd);
+        var cwnd_temp = Math.min(snd_wnd, rmt_wnd)
         if (nocwnd == 0) {
-            cwnd_temp = Math.min(cwnd, cwnd_temp);
+            cwnd_temp = Math.min(cwnd, cwnd_temp)
         }
         // move data from snd_queue to snd_buf
-        c = 0;
-        for (Segment item : snd_queue) {
+        c = 0
+        for (item in snd_queue) {
             if (_itimediff(snd_nxt, snd_una + cwnd_temp) >= 0) {
-                break;
+                break
             }
-            Segment newseg = item;
-            newseg.conv = conv;
-            newseg.cmd = IKCP_CMD_PUSH;
-            newseg.wnd = seg.wnd;
-            newseg.ts = cur;
-            newseg.sn = snd_nxt++;
-            newseg.una = rcv_nxt;
-            newseg.resendts = cur;
-            newseg.rto = rx_rto;
-            newseg.fastack = 0;
-            newseg.xmit = 0;
-            snd_buf.add(newseg);
-            c++;
+            item.conv = conv
+            item.cmd = IKCP_CMD_PUSH.toByte()
+            item.wnd = seg.wnd
+            item.ts = cur
+            item.sn = snd_nxt++
+            item.una = rcv_nxt
+            item.resendts = cur
+            item.rto = rx_rto
+            item.fastack = 0
+            item.xmit = 0
+            snd_buf.add(item)
+            c++
         }
         if (c > 0) {
-            for (int i = 0; i < c; i++) {
-                snd_queue.removeFirst();
+            for (i in 0 until c) {
+                snd_queue.removeFirst()
             }
         }
         // calculate resent
-        int resent = (fastresend > 0) ? fastresend : Integer.MAX_VALUE;
-        int rtomin = (nodelay == 0) ? (rx_rto >> 3) : 0;
+        val resent = if (fastresend > 0) fastresend else Int.MAX_VALUE
+        val rtomin = if (nodelay == 0) rx_rto shr 3 else 0
         // flush data segments
-        for (Segment segment : snd_buf) {
-            boolean needsend = false;
+        for (segment in snd_buf) {
+            var needsend = false
             if (segment.xmit == 0) {
-                needsend = true;
-                segment.xmit++;
-                segment.rto = rx_rto;
-                segment.resendts = cur + segment.rto + rtomin;
+                needsend = true
+                segment.xmit++
+                segment.rto = rx_rto
+                segment.resendts = cur + segment.rto + rtomin
             } else if (_itimediff(cur, segment.resendts) >= 0) {
-                needsend = true;
-                segment.xmit++;
-                xmit++;
+                needsend = true
+                segment.xmit++
+                xmit++
                 if (nodelay == 0) {
-                    segment.rto += rx_rto;
+                    segment.rto += rx_rto
                 } else {
-                    segment.rto += rx_rto / 2;
+                    segment.rto += rx_rto / 2
                 }
-                segment.resendts = cur + segment.rto;
-                lost = 1;
+                segment.resendts = cur + segment.rto
+                lost = 1
             } else if (segment.fastack >= resent) {
-                needsend = true;
-                segment.xmit++;
-                segment.fastack = 0;
-                segment.resendts = cur + segment.rto;
-                change++;
+                needsend = true
+                segment.xmit++
+                segment.fastack = 0
+                segment.resendts = cur + segment.rto
+                change++
             }
             if (needsend) {
-                segment.ts = cur;
-                segment.wnd = seg.wnd;
-                segment.una = rcv_nxt;
-                int need = IKCP_OVERHEAD + segment.data.readableBytes();
-                if (buffer.readableBytes() + need > mtu) {
-                    this.output.out(buffer, this, user);
-                    buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
+                segment.ts = cur
+                segment.wnd = seg.wnd
+                segment.una = rcv_nxt
+                val need = IKCP_OVERHEAD + segment.data!!.readableBytes()
+                if (buffer!!.readableBytes() + need > mtu) {
+                    output.out(buffer, this, user)
+                    buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
                 }
-                segment.encode(buffer);
-                if (segment.data.readableBytes() > 0) {
-                    buffer.writeBytes(segment.data.duplicate());
+                segment.encode(buffer)
+                if (segment.data!!.readableBytes() > 0) {
+                    buffer!!.writeBytes(segment.data!!.duplicate())
                 }
                 if (segment.xmit >= dead_link) {
-                    state = -1;
+                    state = -1
                 }
             }
         }
         // flash remain segments
-        if (buffer.readableBytes() > 0) {
-            this.output.out(buffer, this, user);
-            buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
+        if (buffer!!.readableBytes() > 0) {
+            output.out(buffer, this, user)
+            buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
         }
         // update ssthresh
         if (change != 0) {
-            int inflight = snd_nxt - snd_una;
-            ssthresh = inflight / 2;
+            val inflight = snd_nxt - snd_una
+            ssthresh = inflight / 2
             if (ssthresh < IKCP_THRESH_MIN) {
-                ssthresh = IKCP_THRESH_MIN;
+                ssthresh = IKCP_THRESH_MIN
             }
-            cwnd = ssthresh + resent;
-            incr = cwnd * mss;
+            cwnd = ssthresh + resent
+            incr = cwnd * mss
         }
         if (lost != 0) {
-            ssthresh = cwnd / 2;
+            ssthresh = cwnd / 2
             if (ssthresh < IKCP_THRESH_MIN) {
-                ssthresh = IKCP_THRESH_MIN;
+                ssthresh = IKCP_THRESH_MIN
             }
-            cwnd = 1;
-            incr = mss;
+            cwnd = 1
+            incr = mss
         }
         if (cwnd < 1) {
-            cwnd = 1;
-            incr = mss;
+            cwnd = 1
+            incr = mss
         }
     }
 
     /**
      * flush pending data
      */
-    public void flush() {
+    fun flush() {
         //if (updated != 0)
-        {
-            forceFlush();
-        }
+        run { forceFlush() }
     }
 
     /**
@@ -753,23 +715,23 @@ public class Kcp {
      *
      * @param current current timestamp in millisec.
      */
-    public void update(long current) {
-        this.current = (int) current;
+    fun update(current: Long) {
+        this.current = current.toInt()
         if (updated == 0) {
-            updated = 1;
-            ts_flush = this.current;
+            updated = 1
+            ts_flush = this.current
         }
-        int slap = _itimediff(this.current, ts_flush);
+        var slap = _itimediff(this.current, ts_flush)
         if (slap >= 10000 || slap < -10000) {
-            ts_flush = this.current;
-            slap = 0;
+            ts_flush = this.current
+            slap = 0
         }
         if (slap >= 0) {
-            ts_flush += interval;
+            ts_flush += interval
             if (_itimediff(this.current, ts_flush) >= 0) {
-                ts_flush = this.current + interval;
+                ts_flush = this.current + interval
             }
-            flush();
+            flush()
         }
     }
 
@@ -784,34 +746,34 @@ public class Kcp {
      * @param current
      * @return
      */
-    public long check(long current) {
-        long cur = current;
+    fun check(current: Long): Long {
+        val cur = current
         if (updated == 0) {
-            return cur;
+            return cur
         }
-        long ts_flush_temp = this.ts_flush;
-        long tm_packet = 0x7fffffff;
+        var ts_flush_temp = ts_flush.toLong()
+        var tm_packet: Long = 0x7fffffff
         if (_itimediff(cur, ts_flush_temp) >= 10000 || _itimediff(cur, ts_flush_temp) < -10000) {
-            ts_flush_temp = cur;
+            ts_flush_temp = cur
         }
         if (_itimediff(cur, ts_flush_temp) >= 0) {
-            return cur;
+            return cur
         }
-        long tm_flush = _itimediff(ts_flush_temp, cur);
-        for (Segment seg : snd_buf) {
-            long diff = _itimediff(seg.resendts, cur);
+        val tm_flush = _itimediff(ts_flush_temp, cur)
+        for (seg in snd_buf) {
+            val diff = _itimediff(seg.resendts.toLong(), cur)
             if (diff <= 0) {
-                return cur;
+                return cur
             }
             if (diff < tm_packet) {
-                tm_packet = diff;
+                tm_packet = diff
             }
         }
-        long minimal = tm_packet < tm_flush ? tm_packet : tm_flush;
+        var minimal = if (tm_packet < tm_flush) tm_packet else tm_flush
         if (minimal >= interval) {
-            minimal = interval;
+            minimal = interval.toLong()
         }
-        return cur + minimal;
+        return cur + minimal
     }
 
     /**
@@ -820,36 +782,18 @@ public class Kcp {
      * @param mtu
      * @return
      */
-    public int setMtu(int mtu) {
+    fun setMtu(mtu: Int): Int {
         if (mtu < 50 || mtu < IKCP_OVERHEAD) {
-            return -1;
+            return -1
         }
-        ByteBuf buf = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
-        this.mtu = mtu;
-        mss = mtu - IKCP_OVERHEAD;
+        val buf = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3)
+        this.mtu = mtu
+        mss = mtu - IKCP_OVERHEAD
         if (buffer != null) {
-            buffer.release();
+            buffer!!.release()
         }
-        this.buffer = buf;
-        return 0;
-    }
-
-    /**
-     * conv
-     *
-     * @param conv
-     */
-    public void setConv(int conv) {
-        this.conv = conv;
-    }
-
-    /**
-     * conv
-     *
-     * @return
-     */
-    public int getConv() {
-        return conv;
+        buffer = buf
+        return 0
     }
 
     /**
@@ -858,14 +802,15 @@ public class Kcp {
      * @param interval
      * @return
      */
-    public int interval(int interval) {
+    fun interval(interval: Int): Int {
+        var interval = interval
         if (interval > 5000) {
-            interval = 5000;
+            interval = 5000
         } else if (interval < 10) {
-            interval = 10;
+            interval = 10
         }
-        this.interval = interval;
-        return 0;
+        this.interval = interval
+        return 0
     }
 
     /**
@@ -880,30 +825,31 @@ public class Kcp {
      * @param nc
      * @return
      */
-    public int noDelay(int nodelay, int interval, int resend, int nc) {
+    fun noDelay(nodelay: Int, interval: Int, resend: Int, nc: Int): Int {
+        var interval = interval
         if (nodelay >= 0) {
-            this.nodelay = nodelay;
-            if (nodelay != 0) {
-                rx_minrto = IKCP_RTO_NDL;
+            this.nodelay = nodelay
+            rx_minrto = if (nodelay != 0) {
+                IKCP_RTO_NDL
             } else {
-                rx_minrto = IKCP_RTO_MIN;
+                IKCP_RTO_MIN
             }
         }
         if (interval >= 0) {
             if (interval > 5000) {
-                interval = 5000;
+                interval = 5000
             } else if (interval < 10) {
-                interval = 10;
+                interval = 10
             }
-            this.interval = interval;
+            this.interval = interval
         }
         if (resend >= 0) {
-            fastresend = resend;
+            fastresend = resend
         }
         if (nc >= 0) {
-            nocwnd = nc;
+            nocwnd = nc
         }
-        return 0;
+        return 0
     }
 
     /**
@@ -913,14 +859,14 @@ public class Kcp {
      * @param rcvwnd
      * @return
      */
-    public int wndSize(int sndwnd, int rcvwnd) {
+    fun wndSize(sndwnd: Int, rcvwnd: Int): Int {
         if (sndwnd > 0) {
-            snd_wnd = sndwnd;
+            snd_wnd = sndwnd
         }
         if (rcvwnd > 0) {
-            rcv_wnd = rcvwnd;
+            rcv_wnd = rcvwnd
         }
-        return 0;
+        return 0
     }
 
     /**
@@ -928,57 +874,71 @@ public class Kcp {
      *
      * @return
      */
-    public int waitSnd() {
-        return snd_buf.size() + snd_queue.size();
+    fun waitSnd(): Int {
+        return snd_buf.size + snd_queue.size
     }
 
-    public void setNextUpdate(long nextUpdate) {
-        this.nextUpdate = nextUpdate;
+    fun setMinRto(min: Int) {
+        rx_minrto = min
     }
 
-    public long getNextUpdate() {
-        return nextUpdate;
-    }
-
-    public Object getUser() {
-        return user;
-    }
-
-    public boolean isStream() {
-        return stream;
-    }
-
-    public void setStream(boolean stream) {
-        this.stream = stream;
-    }
-
-    public void setMinRto(int min) {
-        rx_minrto = min;
-    }
-
-    @Override
-    public String toString() {
-        return this.user.toString();
+    override fun toString(): String {
+        return user.toString()
     }
 
     /**
      * 释放内存
      */
-    void release() {
-        if (buffer.refCnt() > 0) {
-            this.buffer.release(buffer.refCnt());
+    fun release() {
+        if (buffer!!.refCnt() > 0) {
+            buffer!!.release(buffer!!.refCnt())
         }
-        for (Segment seg : this.rcv_buf) {
-            seg.release();
+        for (seg in rcv_buf) {
+            seg.release()
         }
-        for (Segment seg : this.rcv_queue) {
-            seg.release();
+        for (seg in rcv_queue) {
+            seg.release()
         }
-        for (Segment seg : this.snd_buf) {
-            seg.release();
+        for (seg in snd_buf) {
+            seg.release()
         }
-        for (Segment seg : this.snd_queue) {
-            seg.release();
+        for (seg in snd_queue) {
+            seg.release()
+        }
+    }
+
+    companion object {
+        const val IKCP_RTO_NDL = 30 // no delay min rto
+        const val IKCP_RTO_MIN = 100 // normal min rto
+        const val IKCP_RTO_DEF = 200
+        const val IKCP_RTO_MAX = 60000
+        const val IKCP_CMD_PUSH = 81 // cmd: push data
+        const val IKCP_CMD_ACK = 82 // cmd: ack
+        const val IKCP_CMD_WASK = 83 // cmd: window probe (ask)
+        const val IKCP_CMD_WINS = 84 // cmd: window size (tell)
+        const val IKCP_ASK_SEND = 1 // need to send IKCP_CMD_WASK
+        const val IKCP_ASK_TELL = 2 // need to send IKCP_CMD_WINS
+        const val IKCP_WND_SND = 32
+        const val IKCP_WND_RCV = 32
+        const val IKCP_MTU_DEF = 1400
+        const val IKCP_ACK_FAST = 3
+        const val IKCP_INTERVAL = 100
+        const val IKCP_OVERHEAD = 24
+        const val IKCP_DEADLINK = 10
+        const val IKCP_THRESH_INIT = 2
+        const val IKCP_THRESH_MIN = 2
+        const val IKCP_PROBE_INIT = 7000 // 7 secs to probe window size
+        const val IKCP_PROBE_LIMIT = 120000 // up to 120 secs to probe window
+        private fun _ibound_(lower: Int, middle: Int, upper: Int): Int {
+            return Math.min(Math.max(lower, middle), upper)
+        }
+
+        private fun _itimediff(later: Int, earlier: Int): Int {
+            return later - earlier
+        }
+
+        private fun _itimediff(later: Long, earlier: Long): Long {
+            return later - earlier
         }
     }
 }
