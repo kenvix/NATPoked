@@ -41,7 +41,7 @@ object KCPTest {
         val kcpServer = KCPARQProvider(onRawPacketToSendHandler = { buffer, size ->
             val b = buffer.nioBuffer()
             channel.write(b)
-        })
+        }, useStreamMode = true)
 
         return Pair(server, kcpServer)
     }

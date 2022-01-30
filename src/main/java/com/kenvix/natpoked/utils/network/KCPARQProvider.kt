@@ -13,7 +13,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.slf4j.LoggerFactory
 import java.io.Closeable
 import kotlin.coroutines.CoroutineContext
 
@@ -28,9 +27,9 @@ class KCPARQProvider(
     useStreamMode: Boolean = false,
     mtu: Int = AppEnv.KcpMtu,
     private val autoReceive: Boolean = true
-) : CoroutineScope, Closeable {
-    private val job = Job() + CoroutineName("KCPARQProvider for session $user")
-    override val coroutineContext: CoroutineContext = job + Dispatchers.IO + CoroutineName("KCPBasedARQ for session $user")
+) : CoroutineScope, AutoCloseable {
+    private val job = Job() + CoroutineName("KCPARQProvider for user $user")
+    override val coroutineContext: CoroutineContext = job + Dispatchers.IO
 
     private val kcpClockTimerJob: Job
     // TODO: Singleton KCP Clock
@@ -52,7 +51,7 @@ class KCPARQProvider(
         kcp.wndSize(AppEnv.KcpSndWnd, AppEnv.KcpRcvWnd)
         kcp.noDelay(AppEnv.KcpNoDelay, AppEnv.KcpInterval, AppEnv.KcpResend, AppEnv.KcpNC)
         kcpClockTimerJob = launch(Dispatchers.IO) {
-            while (true) {
+            while (isActive) {
                 val nextCheckDelay = operationLock.withLock {
                     val t = System.currentTimeMillis() // TODO: Timestamp Performance optimization
                     kcp.update(t)
@@ -121,6 +120,7 @@ class KCPARQProvider(
         }
     }
 
+
     override fun close() {
         kcpClockTimerJob.cancel()
         job.cancel()
@@ -128,6 +128,5 @@ class KCPARQProvider(
 
     companion object {
         const val EAGAIN = -1
-        private val logger = LoggerFactory.getLogger(KCPARQProvider::class.java)
     }
 }
