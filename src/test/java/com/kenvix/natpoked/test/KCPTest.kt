@@ -54,58 +54,78 @@ object KCPTest {
 
         runBlocking(Dispatchers.IO) {
             launch(Dispatchers.IO) {
-                while (true) {
-                    val a = ByteArray(1500)
-                    val p = DatagramPacket(a, 1500)
-                    serverSocket.receive(p)
-                    serverKcp.onRawPacketIncoming(Unpooled.wrappedBuffer(a, p.offset, p.length))
-                }
-            }
-
-            launch(Dispatchers.IO) {
-                while (true) {
-                    val inBuf = Unpooled.buffer(1500)
-                    val readSize = serverKcp.read(inBuf)
-                    if (readSize > 0) {
-                        val s = inBuf.toString(Charsets.UTF_8)
-                        println("server recv: $readSize | " + s)
-                        Assertions.assertEquals(testStr1, s)
-                        serverKcp.write(Unpooled.wrappedBuffer(testBytes2))
-                        serverKcp.flush()
-                    } else {
-                        delay(500)
+                try {
+                    while (true) {
+                        val a = ByteArray(1500)
+                        val p = DatagramPacket(a, 1500)
+                        serverSocket.receive(p)
+                        serverKcp.onRawPacketIncoming(Unpooled.wrappedBuffer(a, p.offset, p.length))
                     }
+                } catch (e: Throwable) {
+                    e.printStackTrace()
                 }
             }
 
             launch(Dispatchers.IO) {
-                while (true) {
-                    val a = ByteArray(1500)
-                    val p = DatagramPacket(a, 1500)
-                    clientSocket.receive(p)
-                    clientKcp.onRawPacketIncoming(Unpooled.wrappedBuffer(a, p.offset, p.length))
-                }
-            }
-
-            launch(Dispatchers.IO) {
-                while (true) {
-                    val inBuf = Unpooled.buffer(1500)
-                    val readSize = clientKcp.read(inBuf)
-                    if (readSize > 0) {
-                        val s = inBuf.toString(Charsets.UTF_8)
-                        println("client recv: $readSize | " + s)
-                        Assertions.assertEquals(testStr2, s)
-                    } else {
-                        delay(500)
+                try {
+                    while (true) {
+                        val inBuf = Unpooled.buffer(1500)
+                        val readSize = serverKcp.read(inBuf)
+                        if (readSize > 0) {
+                            val s = inBuf.toString(Charsets.UTF_8)
+                            println("server recv: $readSize | " + s)
+                            Assertions.assertEquals(testStr1, s)
+                            serverKcp.write(Unpooled.wrappedBuffer(testBytes2))
+                            serverKcp.flush()
+                        } else {
+                            delay(500)
+                        }
                     }
+                } catch (e: Throwable) {
+                    e.printStackTrace()
                 }
             }
 
             launch(Dispatchers.IO) {
-                while (true) {
-                    clientKcp.write(Unpooled.wrappedBuffer(testBytes))
-                    clientKcp.flush()
-                    delay(100)
+                try {
+                    while (true) {
+                        val a = ByteArray(1500)
+                        val p = DatagramPacket(a, 1500)
+                        clientSocket.receive(p)
+                        clientKcp.onRawPacketIncoming(Unpooled.wrappedBuffer(a, p.offset, p.length))
+                    }
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                }
+            }
+
+            launch(Dispatchers.IO) {
+                try {
+                    while (true) {
+                        val inBuf = Unpooled.buffer(1500)
+                        val readSize = clientKcp.read(inBuf)
+                        if (readSize > 0) {
+                            val s = inBuf.toString(Charsets.UTF_8)
+                            println("client recv: $readSize | " + s)
+                            Assertions.assertEquals(testStr2, s)
+                        } else {
+                            delay(500)
+                        }
+                    }
+                } catch (e: Throwable) {
+                    e.printStackTrace()
+                }
+            }
+
+            launch(Dispatchers.IO) {
+                try {
+                    while (true) {
+                        clientKcp.write(Unpooled.wrappedBuffer(testBytes))
+                        clientKcp.flush()
+                        delay(100)
+                    }
+                } catch (e: Throwable) {
+                    e.printStackTrace()
                 }
             }
         }

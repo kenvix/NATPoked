@@ -8,6 +8,7 @@ import kotlinx.coroutines.runBlocking
 
 fun main() {
     runBlocking {
+        val channel = Channel<String>()
 
     }
 }
