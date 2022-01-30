@@ -1,6 +1,10 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.client.traversal.main
+import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
+import com.kenvix.natpoked.utils.AES256GCM
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.PooledByteBufAllocator
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
@@ -17,9 +21,17 @@ class NATClient(
     val brokerHost: String,
     val brokerPort: Int,
     val brokerPath: String = "/",
+    val encryptionKey: ByteArray
 ) : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName("NATClient for npbroker://$brokerHost:$brokerPort$brokerPath")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
+    private val currentIV: ByteArray = ByteArray(ivSize)
+    private val aes = AES256GCM(encryptionKey)
+    private val tcpRedirectorConnections: MutableMap<Int, >
+
+    companion object {
+        private const val ivSize = 16
+    }
 
     val udpChannel: DatagramChannel =
         DatagramChannel.open(if (useIpv6) StandardProtocolFamily.INET6 else StandardProtocolFamily.INET).apply {
@@ -27,12 +39,14 @@ class NATClient(
             configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
         }
 
-    private val readBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     val udpSocket: DatagramSocket = udpChannel.socket()!!
 
     val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
-
+            val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
+            val bufNioWrap = ByteBuffer.wrap(buf)
+            val addr = udpChannel.receive(bufNioWrap)
+            dispatchIncomingPacket(addr, buf, bufNioWrap.position())
         }
     }
 
@@ -53,31 +67,47 @@ class NATClient(
         udpChannel.receive(buffer)
     }
 
-    private suspend fun dispatchIncomingPacket(addr: SocketAddress) {
-        var buf = Unpooled.wrappedBuffer(readBuffer)
-        val size = buf.readableBytes()
-        val typeIdInt: Int = buf.readByte().toInt()
+    private fun dispatchIncomingPacket(addr: SocketAddress, inArrayBuf: ByteArray, inArrayBufLen: Int) {
+        val inBuf = Unpooled.wrappedBuffer(inArrayBuf, 0, inArrayBufLen)
+        val typeIdInt: Int = inBuf.readByte().toInt()
         if (typeIdInt < 0)
             return
 
-        val isEncrypted: Boolean = (typeIdInt and 0b001_0000) != 0
-        val mainTypeClass: Byte = (typeIdInt and 0b110_0000).toByte()
+        val mainTypeClass: Byte = PeerCommunicationType.getTypeMainClass(typeIdInt)
 
-        if (isEncrypted) {
-
+        if (PeerCommunicationType.hasIV(typeIdInt)) {
+            inBuf.readBytes(currentIV, 0, ivSize)
         }
 
-        when (mainTypeClass) {
-            TYPE_DATA_STREAM.typeId -> {
+        val decryptedBuf = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
+            Unpooled.wrappedBuffer(aes.decrypt(inArrayBuf, currentIV, inBuf.readerIndex(), inArrayBufLen - inBuf.readerIndex()))
+        } else {
+            Unpooled.wrappedBuffer(inArrayBuf, inBuf.readerIndex(), inArrayBufLen - inBuf.readerIndex())
+        }
 
-            }
+        val size = decryptedBuf.readableBytes()
 
-            TYPE_DATA_DGRAM.typeId -> {
+        launch(Dispatchers.IO) {
+            when (mainTypeClass) {
+                TYPE_DATA_STREAM.typeId -> {
+                    if (size > 3) {
+                        val port: Int = decryptedBuf.readUnsignedShort()
+                        if (port == 0) { // 端口为 0 表示内部控制类消息
 
-            }
+                        } else {
 
-            TYPE_CONTROL.typeId -> {
+                        }
+                    }
+                }
 
+                TYPE_DATA_DGRAM.typeId -> {
+                    if (size > 3) {
+                        val port: Int = decryptedBuf.readUnsignedShort()
+                        if (port > 0) {
+
+                        }
+                    }
+                }
             }
         }
     }

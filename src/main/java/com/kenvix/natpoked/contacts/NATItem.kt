@@ -7,22 +7,36 @@ import java.net.InetAddress
 enum class PeerCommunicationType(val typeId: Byte) {
     STATUS_NOT_ENCRYPTED      (0b000_0000),
     STATUS_ENCRYPTED          (0b001_0000),
+    STATUS_HAS_IV             (0b100_0000),
 
     TYPE_DATA_DGRAM           (0b000_0000), // 0x0_
     TYPE_DATA_DGRAM_RAW       (0b000_0000),
-    TYPE_DATA_DGRAM_KCP       (0b000_0011),
+    TYPE_DATA_DGRAM_KCP       (0b000_0001), // KCP without FEC
 
     TYPE_DATA_STREAM          (0b010_0000), // 0x2_
-    TYPE_DATA_STREAM_KCP      (0b010_0011),
+    TYPE_DATA_STREAM_KCP      (0b010_0001);
 
-    TYPE_DATA_L3              (0b100_0000), // 0x4_
-    TYPE_DATA_L3_WIREGUARD    (0b100_0001),
+    val isEncrypted: Boolean
+        get() = isEncrypted(typeId)
 
-    TYPE_CONTROL              (0b110_0000), // 0x6_
-    TYPE_CONTROL_KEEPALIVE    (0b110_0001), // 0x6_
-    TYPE_CONTROL_UPDATE_IV    (0b110_0010), // 0x6_
-    TYPE_CONTROL_CLOSE        (0b110_0011); // 0x6_
+    val typeMainClass: Byte
+        get() = getTypeMainClass(typeId)
+
+    val hasIV: Boolean
+        get() = hasIV(typeId)
+
+    companion object Utils {
+        fun isEncrypted(typeId: Byte) = isEncrypted(typeId.toInt())
+        fun isEncrypted(typeId: Int) = (typeId and 0b001_0000) != 0
+
+        fun getTypeMainClass(typeId: Int): Byte = (typeId and 0b010_0000).toByte()
+        fun getTypeMainClass(typeId: Byte): Byte = getTypeMainClass(typeId.toInt())
+
+        fun hasIV(typeId: Int): Boolean = (typeId and 0b100_0000) != 0
+        fun hasIV(typeId: Byte): Boolean = hasIV(typeId.toInt())
+    }
 }
+
 
 @Serializable
 data class PeerCommunicationPacket(
