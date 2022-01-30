@@ -6,21 +6,21 @@
  * + Maximum RTT reduce three times vs tcp.
  * + Lightweight, distributed as a single source file.
  */
-package org.beykery.jkcp;
+package com.kenvix.natpoked.utils.network;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
+import java.util.*;
 
 /**
  * Thread UNSAFE KCP Implement
  *
- * @author beykery
+ * @author beykery https://github.com/beykery/jkcp/
+ * @author Kenvix https://github.com/kenvix/CoroutineKCP
  */
 @SuppressWarnings({"JavaDoc", "SpellCheckingInspection", "DuplicatedCode", "unused", "SameParameterValue", "PointlessArithmeticExpression"})
-public class Kcp {
+public class KCP {
 
     public static final int IKCP_RTO_NDL = 30;  // no delay min rto
     public static final int IKCP_RTO_MIN = 100; // normal min rto
@@ -73,11 +73,12 @@ public class Kcp {
     private int probe_wait;
     private final int dead_link;
     private int incr;
-    private final ArrayDeque<Segment> snd_queue = new ArrayDeque<>();
-    private final ArrayDeque<Segment> rcv_queue = new ArrayDeque<>();
-    private final ArrayList<Segment> snd_buf = new ArrayList<>();
+    private final Deque<Segment> snd_queue = new ArrayDeque<>();
+    private final Deque<Segment> rcv_queue = new ArrayDeque<>();
+    private final List<Segment> snd_buf = new LinkedList<>();
     private final ArrayList<Segment> rcv_buf = new ArrayList<>();
-    private final ArrayList<Integer> acklist = new ArrayList<>();
+
+    private final List<Integer> acklist = new ArrayList<>(); // RandomAccess required
     private ByteBuf buffer;
     private int fastresend;
     private int nocwnd;
@@ -98,11 +99,16 @@ public class Kcp {
         return later - earlier;
     }
 
+    @FunctionalInterface
+    public interface Output {
+        void out(ByteBuf data, Object user);
+    }
+
     /**
      * SEGMENT
      */
     @SuppressWarnings("UnusedReturnValue")
-    static class Segment {
+    private static class Segment {
 
         private int conv = 0;
         private byte cmd = 0;
@@ -158,7 +164,7 @@ public class Kcp {
      * @param output
      * @param user
      */
-    public Kcp(Output output, Object user) {
+    public KCP(Output output, Object user) {
         snd_wnd = IKCP_WND_SND;
         rcv_wnd = IKCP_WND_RCV;
         rmt_wnd = IKCP_WND_RCV;
@@ -349,13 +355,15 @@ public class Kcp {
         if (_itimediff(sn, snd_una) < 0 || _itimediff(sn, snd_nxt) >= 0) {
             return;
         }
-        for (int i = 0; i < snd_buf.size(); i++) {
-            Segment seg = snd_buf.get(i);
+
+        Iterator<Segment> iterator = snd_buf.listIterator();
+        for (Segment seg : (Iterable<? extends Segment>) () -> iterator) {
             if (sn == seg.sn) {
-                snd_buf.remove(i);
+                iterator.remove();
                 seg.data.release(seg.data.refCnt());
                 break;
             }
+
             if (_itimediff(sn, seg.sn) < 0) {
                 break;
             }
@@ -372,9 +380,11 @@ public class Kcp {
             }
         }
         if (c > 0) {
+            Iterator<Segment> iterator = snd_buf.listIterator();
             for (int i = 0; i < c; i++) {
-                Segment seg = snd_buf.remove(0);
+                Segment seg = iterator.next();
                 seg.data.release(seg.data.refCnt());
+                iterator.remove();
             }
         }
     }
@@ -412,6 +422,8 @@ public class Kcp {
         int n = rcv_buf.size() - 1;
         int temp = -1;
         boolean repeat = false;
+
+
         for (int i = n; i >= 0; i--) {
             Segment seg = rcv_buf.get(i);
             if (seg.sn == sn) {
@@ -423,6 +435,9 @@ public class Kcp {
                 break;
             }
         }
+
+        //Iterator<Segment> iterator = rcv_buf.descendingIterator();
+
         if (!repeat) {
             rcv_buf.add(temp + 1, newseg);
         } else {
@@ -593,7 +608,7 @@ public class Kcp {
         int c = acklist.size() / 2;
         for (int i = 0; i < c; i++) {
             if (buffer.readableBytes() + IKCP_OVERHEAD > mtu) {
-                this.output.out(buffer, this, user);
+                this.output.out(buffer, user);
                 buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
             }
             seg.sn = acklist.get(i * 2 + 0);
@@ -625,7 +640,7 @@ public class Kcp {
         if ((probe & IKCP_ASK_SEND) != 0) {
             seg.cmd = IKCP_CMD_WASK;
             if (buffer.readableBytes() + IKCP_OVERHEAD > mtu) {
-                this.output.out(buffer, this, user);
+                this.output.out(buffer, user);
                 buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
             }
             seg.encode(buffer);
@@ -634,7 +649,7 @@ public class Kcp {
         if ((probe & IKCP_ASK_TELL) != 0) {
             seg.cmd = IKCP_CMD_WINS;
             if (buffer.readableBytes() + IKCP_OVERHEAD > mtu) {
-                this.output.out(buffer, this, user);
+                this.output.out(buffer, user);
                 buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
             }
             seg.encode(buffer);
@@ -705,7 +720,7 @@ public class Kcp {
                 segment.una = rcv_nxt;
                 int need = IKCP_OVERHEAD + segment.data.readableBytes();
                 if (buffer.readableBytes() + need > mtu) {
-                    this.output.out(buffer, this, user);
+                    this.output.out(buffer, user);
                     buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
                 }
                 segment.encode(buffer);
@@ -719,7 +734,7 @@ public class Kcp {
         }
         // flash remain segments
         if (buffer.readableBytes() > 0) {
-            this.output.out(buffer, this, user);
+            this.output.out(buffer, user);
             buffer = PooledByteBufAllocator.DEFAULT.buffer((mtu + IKCP_OVERHEAD) * 3);
         }
         // update ssthresh

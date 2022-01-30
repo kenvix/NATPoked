@@ -13,11 +13,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.beykery.jkcp.Kcp
-import org.beykery.jkcp.Output
 import org.slf4j.LoggerFactory
 import java.io.Closeable
-import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -35,7 +32,7 @@ class KCPARQProvider(
 
     private val kcpClockTimerJob: Job
     // TODO: Singleton KCP Clock
-    private val kcp = Kcp(Output { msg, kcp, user ->
+    private val kcp = KCP({ msg, user ->
         launch(Dispatchers.IO) {
             onRawPacketToSendHandler(msg, user)
         }
@@ -88,9 +85,13 @@ class KCPARQProvider(
         }
     }
 
+    /**
+     * 接收一个处理好的数据包，并在没有数据时挂起
+     */
     suspend fun receive() = readableDataChannel.receive()
 
     /**
+     * 接收一个处理好的数据包，并在没有数据时返回小于0的错误
      * user/upper level recv: returns size, returns below zero for EAGAIN
      */
     suspend fun read(buffer: ByteBuf): Int {
