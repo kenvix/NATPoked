@@ -19,13 +19,15 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * Thread safe & Coroutine KCP ARQ Wrapper
- * @author Kenvix
+ * @param autoReceive 自动接收
+ * @author Kenvix https://github.com/kenvix/CoroutineKCP
  */
 class KCPARQProvider(
     private val onRawPacketToSendHandler: suspend (buffer: ByteBuf, user: Any?) -> Unit,
     user: Any? = null,
     useStreamMode: Boolean = false,
     mtu: Int = AppEnv.KcpMtu,
+    private val autoReceive: Boolean = true
 ) : CoroutineScope, Closeable {
     private val job = Job() + CoroutineName("KCPARQProvider for session $user")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO + CoroutineName("KCPBasedARQ for session $user")
@@ -68,10 +70,12 @@ class KCPARQProvider(
         operationLock.withLock {
             kcp.input(buffer)
 
-            while (kcp.canReceive()) {
-                val b = PooledByteBufAllocator.DEFAULT.buffer()
-                val size = kcp.receive(b)
-                readableDataChannel.send(KCPPacket(b, size))
+            if (autoReceive) {
+                while (kcp.canReceive()) {
+                    val b = PooledByteBufAllocator.DEFAULT.buffer()
+                    val size = kcp.receive(b)
+                    readableDataChannel.send(KCPPacket(b, size))
+                }
             }
         }
     }
@@ -91,7 +95,7 @@ class KCPARQProvider(
     suspend fun receive() = readableDataChannel.receive()
 
     /**
-     * 接收一个处理好的数据包，并在没有数据时返回小于0的错误
+     * 接收一个处理好的数据包，并在没有数据时返回小于0的错误。autoReceive 有效时始终返回错误。
      * user/upper level recv: returns size, returns below zero for EAGAIN
      */
     suspend fun read(buffer: ByteBuf): Int {
@@ -100,8 +104,15 @@ class KCPARQProvider(
         }
     }
 
+    /**
+     * 是否有数据包可供读取。autoReceive 有效时表示 receive() 是否会导致挂起，autoReceive 无效时表示调用 read() 是否会 EAGAIN
+     */
+    @ExperimentalCoroutinesApi
     suspend fun canRead(): Boolean = operationLock.withLock {
-        kcp.canReceive()
+        if (autoReceive)
+            !readableDataChannel.isEmpty
+        else
+            kcp.canReceive()
     }
 
     suspend fun flush() {

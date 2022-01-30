@@ -17,7 +17,6 @@ import java.util.*;
  * Thread UNSAFE KCP Implement
  *
  * @author beykery https://github.com/beykery/jkcp/
- * @author Kenvix https://github.com/kenvix/CoroutineKCP
  */
 @SuppressWarnings({"JavaDoc", "SpellCheckingInspection", "DuplicatedCode", "unused", "SameParameterValue", "PointlessArithmeticExpression"})
 public class KCP {
@@ -76,8 +75,7 @@ public class KCP {
     private final Deque<Segment> snd_queue = new ArrayDeque<>();
     private final Deque<Segment> rcv_queue = new ArrayDeque<>();
     private final List<Segment> snd_buf = new LinkedList<>();
-    private final ArrayList<Segment> rcv_buf = new ArrayList<>();
-
+    private final List<Segment> rcv_buf = new ArrayList<>();
     private final List<Integer> acklist = new ArrayList<>(); // RandomAccess required
     private ByteBuf buffer;
     private int fastresend;
@@ -423,7 +421,6 @@ public class KCP {
         int temp = -1;
         boolean repeat = false;
 
-
         for (int i = n; i >= 0; i--) {
             Segment seg = rcv_buf.get(i);
             if (seg.sn == sn) {
@@ -435,8 +432,6 @@ public class KCP {
                 break;
             }
         }
-
-        //Iterator<Segment> iterator = rcv_buf.descendingIterator();
 
         if (!repeat) {
             rcv_buf.add(temp + 1, newseg);
