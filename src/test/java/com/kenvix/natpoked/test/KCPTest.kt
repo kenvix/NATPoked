@@ -19,10 +19,10 @@ import java.net.InetSocketAddress
 import java.nio.channels.DatagramChannel
 
 object KCPTest {
-    private val testStr1 = "package com.kenvix.natpoked.test"
-    private val testStr2 = "    fun server(): Pair<DatagramSocket, KCPARQProvider> {"
-    private val testBytes = testStr1.toByteArray(Charsets.UTF_8)
-    private val testBytes2 = testStr2.toByteArray(Charsets.UTF_8)
+    private val testStrClientSend = "CLIENT SEND>>>package com.kenvix.natpoked.test"
+    private val testStrServerSend = "SERVER SEND>>>    fun server(): Pair<DatagramSocket, KCPARQProvider> {"
+    private val testBytesClientSend = testStrClientSend.toByteArray(Charsets.UTF_8)
+    private val testBytesServerSend = testStrServerSend.toByteArray(Charsets.UTF_8)
 
     fun server(connectPort: Int, connectHost: String = "127.0.0.1", bindPort: Int = 0, conv: Long = 114514): Pair<DatagramSocket, KCPARQProvider> {
         val channel = DatagramChannel.open()
@@ -38,7 +38,7 @@ object KCPTest {
         }
 
 
-        val kcpServer = KCPARQProvider(conv, onRawPacketToSendHandler = { buffer, size ->
+        val kcpServer = KCPARQProvider(onRawPacketToSendHandler = { buffer, size ->
             val b = buffer.nioBuffer()
             channel.write(b)
         })
@@ -69,16 +69,12 @@ object KCPTest {
             launch(Dispatchers.IO) {
                 try {
                     while (true) {
-                        val inBuf = Unpooled.buffer(1500)
-                        val readSize = serverKcp.read(inBuf)
-                        if (readSize > 0) {
-                            val s = inBuf.toString(Charsets.UTF_8)
-                            println("server recv: $readSize | " + s)
-                            Assertions.assertEquals(testStr1, s)
-                            serverKcp.write(Unpooled.wrappedBuffer(testBytes2))
-                            serverKcp.flush()
-                        } else {
-                            delay(500)
+                        while (true) {
+                            val inBuf = serverKcp.receive()
+                            val s = inBuf.data.toString(Charsets.UTF_8)
+                            println("server recv: ${inBuf.size} | " + s)
+                            Assertions.assertEquals(testStrClientSend, s)
+                            serverKcp.write(Unpooled.wrappedBuffer(testBytesServerSend))
                         }
                     }
                 } catch (e: Throwable) {
@@ -102,15 +98,10 @@ object KCPTest {
             launch(Dispatchers.IO) {
                 try {
                     while (true) {
-                        val inBuf = Unpooled.buffer(1500)
-                        val readSize = clientKcp.read(inBuf)
-                        if (readSize > 0) {
-                            val s = inBuf.toString(Charsets.UTF_8)
-                            println("client recv: $readSize | " + s)
-                            Assertions.assertEquals(testStr2, s)
-                        } else {
-                            delay(500)
-                        }
+                        val inBuf = clientKcp.receive()
+                        val s = inBuf.data.toString(Charsets.UTF_8)
+                        println("client recv: ${inBuf.size} | " + s)
+                        Assertions.assertEquals(testStrServerSend, s)
                     }
                 } catch (e: Throwable) {
                     e.printStackTrace()
@@ -120,7 +111,7 @@ object KCPTest {
             launch(Dispatchers.IO) {
                 try {
                     while (true) {
-                        clientKcp.write(Unpooled.wrappedBuffer(testBytes))
+                        clientKcp.write(Unpooled.wrappedBuffer(testBytesClientSend))
                         clientKcp.flush()
                         delay(100)
                     }
