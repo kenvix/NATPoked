@@ -267,3 +267,30 @@ fun URI.appendQuery(appendQuery: String): URI {
 }
 
 fun <K, V> Map<K, V>.getOrFail(key: K): V = this[key] ?: throw NoSuchElementException("$key not exist")
+
+inline fun<K, V> MutableMap<K, V>.forEachAndRemove(each: (element: Map.Entry<K, V>) -> Unit) {
+    val iterator = this.iterator()
+    while (iterator.hasNext()) {
+        val element = iterator.next()
+        each(element)
+        iterator.remove()
+    }
+}
+
+inline fun<V> MutableList<V>.forEachAndRemove(each: (element: V) -> Unit) {
+    val iterator = this.iterator()
+    while (iterator.hasNext()) {
+        val element = iterator.next()
+        each(element)
+        iterator.remove()
+    }
+}
+
+inline fun<V> MutableSet<V>.forEachAndRemove(each: (element: V) -> Unit) {
+    val iterator = this.iterator()
+    while (iterator.hasNext()) {
+        val element = iterator.next()
+        each(element)
+        iterator.remove()
+    }
+}

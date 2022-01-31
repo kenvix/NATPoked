@@ -27,7 +27,6 @@ class NATClient(
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
-    private val tcpRedirectorConnections: MutableMap<Int, >
 
     companion object {
         private const val ivSize = 16

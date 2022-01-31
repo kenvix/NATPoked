@@ -6,7 +6,7 @@
 
 package com.kenvix.natpoked.test
 
-import com.kenvix.natpoked.utils.network.KCPARQProvider
+import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
