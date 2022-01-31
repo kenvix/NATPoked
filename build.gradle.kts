@@ -75,6 +75,7 @@ dependencies {
     implementation("io.ktor:ktor-locations:$ktorVersion")
     implementation("io.ktor:ktor-server-sessions:$ktorVersion")
     implementation("io.ktor:ktor-serialization:$ktorVersion")
+    implementation("io.ktor:ktor-network:$ktorVersion")
 
 
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-api

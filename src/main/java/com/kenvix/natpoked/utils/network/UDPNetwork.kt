@@ -6,6 +6,3 @@
 
 package com.kenvix.natpoked.utils.network
 
-class UDPNetwork {
-
-}
