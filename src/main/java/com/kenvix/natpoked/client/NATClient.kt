@@ -71,7 +71,7 @@ class NATClient(
         val inArrayBuf: ByteArray = packet.data
         val inArrayBufLen: Int = packet.length
 
-        val inBuf = Unpooled.wrappedBuffer(inArrayBuf, 0, inArrayBufLen)
+        val inBuf = Unpooled.wrappedBuffer(inArrayBuf, packet.offset, inArrayBufLen)
         val typeIdInt: Int = inBuf.readByte().toInt()
         if (typeIdInt < 0)
             return
