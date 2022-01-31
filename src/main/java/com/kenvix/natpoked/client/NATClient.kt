@@ -43,9 +43,9 @@ class NATClient(
     val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
             val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
-            val bufNioWrap = ByteBuffer.wrap(buf)
-            val addr = udpChannel.receive(bufNioWrap)
-            dispatchIncomingPacket(addr, buf, bufNioWrap.position())
+            val packet = DatagramPacket(buf, 1500)
+            udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
+            dispatchIncomingPacket(packet)
         }
     }
 
@@ -66,7 +66,11 @@ class NATClient(
         udpChannel.receive(buffer)
     }
 
-    private fun dispatchIncomingPacket(addr: SocketAddress, inArrayBuf: ByteArray, inArrayBufLen: Int) {
+    private fun dispatchIncomingPacket(packet: DatagramPacket) {
+        val addr: SocketAddress = packet.socketAddress
+        val inArrayBuf: ByteArray = packet.data
+        val inArrayBufLen: Int = packet.length
+
         val inBuf = Unpooled.wrappedBuffer(inArrayBuf, 0, inArrayBufLen)
         val typeIdInt: Int = inBuf.readByte().toInt()
         if (typeIdInt < 0)
