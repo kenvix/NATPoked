@@ -7,6 +7,7 @@ import org.apache.commons.lang3.math.NumberUtils
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.net.URI
+import java.nio.ByteBuffer
 import java.nio.file.Path
 import java.text.SimpleDateFormat
 import java.time.Duration
@@ -15,7 +16,6 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.*
-import kotlin.NoSuchElementException
 import kotlin.math.ln
 import kotlin.math.pow
 
@@ -293,4 +293,58 @@ inline fun<V> MutableSet<V>.forEachAndRemove(each: (element: V) -> Unit) {
         each(element)
         iterator.remove()
     }
+}
+
+fun ByteBuffer.getUnsignedByte(): Short {
+    return (this.get().toInt() and 0xff).toShort()
+}
+
+fun ByteBuffer.putUnsignedByte(value: Int) {
+    this.put((value and 0xff).toByte())
+}
+
+fun ByteBuffer.getUnsignedByte(position: Int): Short {
+    return (this.get(position).toInt() and 0xff).toShort()
+}
+
+fun ByteBuffer.putUnsignedByte(position: Int, value: Int) {
+    this.put(position, (value and 0xff).toByte())
+}
+
+// ---------------------------------------------------------------
+
+// ---------------------------------------------------------------
+fun ByteBuffer.getUnsignedShort(): Int {
+    return this.short.toInt() and 0xffff
+}
+
+fun ByteBuffer.putUnsignedShort(value: Int) {
+    this.putShort((value and 0xffff).toShort())
+}
+
+fun ByteBuffer.getUnsignedShort(position: Int): Int {
+    return this.getShort(position).toInt() and 0xffff
+}
+
+fun ByteBuffer.putUnsignedShort(position: Int, value: Int) {
+    this.putShort(position, (value and 0xffff).toShort())
+}
+
+// ---------------------------------------------------------------
+
+// ---------------------------------------------------------------
+fun ByteBuffer.getUnsignedInt(): Long {
+    return this.int.toLong() and 0xffffffffL
+}
+
+fun ByteBuffer.putUnsignedInt(value: Long) {
+    this.putInt((value and 0xffffffffL).toInt())
+}
+
+fun ByteBuffer.getUnsignedInt(position: Int): Long {
+    return this.getInt(position).toLong() and 0xffffffffL
+}
+
+fun ByteBuffer.putUnsignedInt(position: Int, value: Long) {
+    this.putInt(position, (value and 0xffffffffL).toInt())
 }

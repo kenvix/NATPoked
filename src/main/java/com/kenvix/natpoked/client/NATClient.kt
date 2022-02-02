@@ -3,13 +3,18 @@ package com.kenvix.natpoked.client
 import com.kenvix.natpoked.client.traversal.main
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
+import com.kenvix.natpoked.contacts.PeerCommunicationTypeId
 import com.kenvix.natpoked.utils.AES256GCM
+import com.kenvix.web.utils.putUnsignedShort
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.PooledByteBufAllocator
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.net.*
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
 import kotlin.coroutines.CoroutineContext
 
@@ -18,15 +23,19 @@ import kotlin.coroutines.CoroutineContext
  */
 class NATClient(
     val useIpv6: Boolean = false,
-    val brokerHost: String,
-    val brokerPort: Int,
-    val brokerPath: String = "/",
+    val brokerClient: BrokerClient,
+    val portRedirector: PortRedirector,
     val encryptionKey: ByteArray
 ) : CoroutineScope, AutoCloseable {
-    private val job = Job() + CoroutineName("NATClient for npbroker://$brokerHost:$brokerPort$brokerPath")
+    private val job = Job() + CoroutineName("NATClient for $brokerClient")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
+    private val sendBuffer = ByteBuffer.allocateDirect(1500)
+    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
+    private var ivUseCount = 0 // 无需线程安全
+    val sendLock: Mutex = Mutex()
+    val receiveLock: Mutex = Mutex()
 
     companion object {
         private const val ivSize = 16
@@ -66,17 +75,59 @@ class NATClient(
         udpChannel.receive(buffer)
     }
 
+    private fun putTypeFlags1(inTypeId: Int, targetAddr: InetAddress, encrypt: Boolean = false, compress: Boolean = false): Int {
+        var typeId: Int = inTypeId
+        if (encrypt) {
+            typeId = typeId or PeerCommunicationType.STATUS_ENCRYPTED.typeId.toInt()
+            // TODO
+        }
+
+        if (compress) {
+            typeId = typeId or PeerCommunicationType.STATUS_COMPRESSED.typeId.toInt()
+            // TODO
+        }
+
+        if (targetAddr is Inet6Address) {
+            typeId = typeId or PeerCommunicationType.INET_TYPE_6.typeId.toInt()
+        }
+
+        if (targetAddr.isLoopbackAddress) {
+            typeId = typeId or PeerCommunicationType.INET_ADDR_LOCALHOST.typeId.toInt()
+        }
+
+        return typeId
+    }
+
+    // TODO: ENCRYPT, IV, COMPRESS
+    suspend fun writeUdpRaw(targetPort: Int, targetAddr: InetAddress, data: ByteArray, offset: Int, size: Int, encrypt: Boolean = false, compress: Boolean = false) {
+        var typeId: Int = 0
+        typeId = putTypeFlags1(typeId, targetAddr, encrypt, compress)
+        typeId = typeId or PeerCommunicationType.TYPE_DATA_DGRAM_RAW.typeId.toInt()
+
+        sendLock.withLock {
+            sendBuffer.clear()
+            sendBuffer.order(ByteOrder.BIG_ENDIAN)
+
+            sendBuffer.putUnsignedShort(typeId)
+            sendBuffer.putUnsignedShort(targetPort)
+            sendBuffer.put(data, offset, size)
+
+            sendBuffer.flip()
+            writeRawDatagram(sendBuffer)
+        }
+    }
+
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
         val addr: SocketAddress = packet.socketAddress
         val inArrayBuf: ByteArray = packet.data
         val inArrayBufLen: Int = packet.length
 
         val inBuf = Unpooled.wrappedBuffer(inArrayBuf, packet.offset, inArrayBufLen)
-        val typeIdInt: Int = inBuf.readByte().toInt()
+        val typeIdInt: Int = inBuf.readShort().toInt()
         if (typeIdInt < 0)
             return
 
-        val mainTypeClass: Byte = PeerCommunicationType.getTypeMainClass(typeIdInt)
+        val mainTypeClass: Short = PeerCommunicationType.getTypeMainClass(typeIdInt)
 
         if (PeerCommunicationType.hasIV(typeIdInt)) {
             inBuf.readBytes(currentIV, 0, ivSize)
@@ -95,6 +146,8 @@ class NATClient(
                 TYPE_DATA_STREAM.typeId -> {
                     if (size > 3) {
                         val port: Int = decryptedBuf.readUnsignedShort()
+                        // TODO: MSG_OOB(URGENT), RST, FIN, ACCEPT
+                        val tcpFlags: Byte = decryptedBuf.readByte()
                         if (port == 0) { // 端口为 0 表示内部控制类消息
 
                         } else {
@@ -106,7 +159,9 @@ class NATClient(
                 TYPE_DATA_DGRAM.typeId -> {
                     if (size > 3) {
                         val port: Int = decryptedBuf.readUnsignedShort()
-                        if (port > 0) {
+                        if (port == 0) { // 端口为 0 表示 WireGuard 消息 (仅限集成wireguard)
+
+                        } else {
 
                         }
                     }

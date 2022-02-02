@@ -4,36 +4,55 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.InetAddress
 
-enum class PeerCommunicationType(val typeId: Byte) {
-    STATUS_NOT_ENCRYPTED      (0b000_0000),
-    STATUS_ENCRYPTED          (0b001_0000),
-    STATUS_HAS_IV             (0b100_0000),
+typealias PeerCommunicationTypeId = Short
+enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
+    STATUS_ENCRYPTED          (0b001_0000_0000_0000),
+    STATUS_HAS_IV             (0b010_0000_0000_0000),
+    STATUS_COMPRESSED         (0b100_0000_0000_0000),
 
-    TYPE_DATA_DGRAM           (0b000_0000), // 0x0_
-    TYPE_DATA_DGRAM_RAW       (0b000_0000),
-    TYPE_DATA_DGRAM_KCP       (0b000_0001), // KCP without FEC
+    INET_TYPE_4               (0b000_0000_0000_0000),
+    INET_TYPE_6               (0b000_1000_0000_0000),
 
-    TYPE_DATA_STREAM          (0b010_0000), // 0x2_
-    TYPE_DATA_STREAM_KCP      (0b010_0001);
+    INET_ADDR_REMOTE          (0b000_0000_0000_0000),
+    INET_ADDR_LOCALHOST       (0b000_0100_0000_0000),
+
+    TYPE_DATA_DGRAM           (0b000_0000_0001_0000), // 0x0_
+    TYPE_DATA_DGRAM_RAW       (0b000_0000_0001_0000),
+    TYPE_DATA_DGRAM_KCP       (0b000_0000_0001_0001), // KCP without FEC
+
+    TYPE_DATA_STREAM          (0b000_0000_0010_0000), // 0x2_
+    TYPE_DATA_STREAM_KCP      (0b000_0000_0000_0000);
 
     val isEncrypted: Boolean
         get() = isEncrypted(typeId)
 
-    val typeMainClass: Byte
+    val isIpv6: Boolean
+        get() = isIpv6(typeId)
+
+    val isLocalHost: Boolean
+        get() = isLocalHost(typeId)
+
+    val typeMainClass: PeerCommunicationTypeId
         get() = getTypeMainClass(typeId)
 
     val hasIV: Boolean
         get() = hasIV(typeId)
 
     companion object Utils {
-        fun isEncrypted(typeId: Byte) = isEncrypted(typeId.toInt())
-        fun isEncrypted(typeId: Int) = (typeId and 0b001_0000) != 0
+        fun isEncrypted(typeId: PeerCommunicationTypeId) = isEncrypted(typeId.toInt())
+        fun isEncrypted(typeId: Int) = (typeId and STATUS_ENCRYPTED.typeId.toInt()) != 0
 
-        fun getTypeMainClass(typeId: Int): Byte = (typeId and 0b010_0000).toByte()
-        fun getTypeMainClass(typeId: Byte): Byte = getTypeMainClass(typeId.toInt())
+        fun getTypeMainClass(typeId: Int): PeerCommunicationTypeId = (typeId and 0b000_0000_1111_0000).toShort()
+        fun getTypeMainClass(typeId: PeerCommunicationTypeId): PeerCommunicationTypeId = getTypeMainClass(typeId.toInt())
 
-        fun hasIV(typeId: Int): Boolean = (typeId and 0b100_0000) != 0
-        fun hasIV(typeId: Byte): Boolean = hasIV(typeId.toInt())
+        fun hasIV(typeId: Int): Boolean = (typeId and STATUS_HAS_IV.typeId.toInt()) != 0
+        fun hasIV(typeId: PeerCommunicationTypeId): Boolean = hasIV(typeId.toInt())
+
+        fun isIpv6(typeId: Int): Boolean = (typeId and INET_TYPE_6.typeId.toInt()) != 0
+        fun isIpv6(typeId: PeerCommunicationTypeId): Boolean = isIpv6(typeId.toInt())
+
+        fun isLocalHost(typeId: Int): Boolean = (typeId and INET_ADDR_LOCALHOST.typeId.toInt()) != 0
+        fun isLocalHost(typeId: PeerCommunicationTypeId): Boolean = isLocalHost(typeId.toInt())
     }
 }
 
@@ -73,6 +92,13 @@ enum class NATType(val levelId: Int) : Comparable<NATType> {
      */
     FULL_CONE(90),
     PUBLIC(100),
+}
+
+enum class NATTraversalSolution(val levelId: Int) : Comparable<NATTraversalSolution> {
+    IMPOSSIBLE(0),
+    UNKNOWN(10),
+    PORT_GUESSING(20),
+    DIRECT_CLIENT_TO_SERVER(100)
 }
 
 typealias PeerId = Long
