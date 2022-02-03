@@ -27,17 +27,26 @@ class UdpPortRedirectorTest {
             "rt5brtaas4fsdf5gdf55sdf15asd1fdh1rdfg1gh5df51gsd15f15sdgjt68yu4j8rtgherg81"
     val testBytes = testStr.toByteArray()
 
-    fun client(connectPort: Int, connectHost: InetAddress, bindPort: Int = 0): DatagramSocket {
+    fun client(connectPort: Int, connectHost: InetAddress): DatagramSocket {
         val channel = DatagramChannel.open()
         val server = channel.socket()
         server.reuseAddress = true
         server.also {
-            it.bind(InetSocketAddress(bindPort))
-            println("Server bound at port ${it.localPort}")
-
             val connectAddress = InetSocketAddress(connectHost, connectPort)
             it.connect(connectAddress)
-            println("Server connect to $connectHost:${it.port}")
+            println("Client connect to $connectHost:${it.port}")
+        }
+
+        return server
+    }
+
+    fun server(bindPort: Int, bindHost: InetAddress): DatagramSocket {
+        val channel = DatagramChannel.open()
+        val server = channel.socket()
+        server.reuseAddress = true
+        server.also {
+            it.bind(InetSocketAddress(bindHost, bindPort))
+            println("Server bound at port ${it.localPort}")
         }
 
         return server
@@ -53,13 +62,18 @@ class UdpPortRedirectorTest {
         val addr2 = Inet4Address.getByName("127.0.0.4")
         val port1 = 5000
         val port2 = 5001
-        portRedirector.bindUdp(natClient, addr1, port1, addr2, port2)
-        portRedirector.bindUdp(natClient, addr2, port2, addr1, port1)
+        // portRedirector.bindUdp(natClient, addr1, port1, addr2, port2)
+        portRedirector.bindUdp(natClient, InetSocketAddress(addr2, port2), InetSocketAddress(addr1, port1))
 
         runBlocking {
             launch(Dispatchers.IO) {
-                val server = client(port1, addr1)
-
+                val server = server(port1, addr1)
+                for (i in 0 .. 10) {
+                    val buf = ByteArray(1000)
+                    val packet = DatagramPacket(buf, 1000)
+                    server.receive(packet)
+                    println(String(buf, 0, packet.length))
+                }
             }
 
             launch(Dispatchers.IO) {

@@ -108,29 +108,28 @@ class NATClient(
 
     // TODO: ENCRYPT, IV, COMPRESS
     suspend fun handleOutgoingPacket(
-        targetAddr: InetAddress,
-        targetPort: Int,
+        targetAddr: InetSocketAddress,
         data: ByteArray,
         offset: Int,
         size: Int,
         flags: EnumSet<PeerCommunicationType>
     ) {
         var typeId: Int = 0
-        typeId = putTypeFlags(typeId, targetAddr, flags)
+        typeId = putTypeFlags(typeId, targetAddr.address, flags)
 
         sendLock.withLock {
             sendBuffer.clear()
             sendBuffer.order(ByteOrder.BIG_ENDIAN)
 
             sendBuffer.putUnsignedShort(typeId)
-            if (!targetAddr.isLoopbackAddress) {
-                sendBuffer.put(targetAddr.address)
+            if (!targetAddr.address.isLoopbackAddress) {
+                sendBuffer.put(targetAddr.address.address)
             }
-            sendBuffer.putUnsignedShort(targetPort)
+            sendBuffer.putUnsignedShort(targetAddr.port)
             sendBuffer.put(data, offset, size)
 
             sendBuffer.flip()
-            writeRawDatagram(sendBuffer)
+            writeRawDatagram(sendBuffer, targetAddr)
         }
     }
 
@@ -214,6 +213,7 @@ class NATClient(
 
                         } else {
                             portRedirector.writeUdpPacket(
+                                this@NATClient,
                                 decryptedBuf.array(),
                                 decryptedBuf.readerIndexInArrayOffset(),
                                 decryptedBuf.readableBytes(),
