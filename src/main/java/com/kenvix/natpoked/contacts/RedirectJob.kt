@@ -14,6 +14,8 @@ sealed interface RedirectJob<T> {
     val writeJob: Job
     val typeFlags: EnumSet<PeerCommunicationType>
     val client: NATClient
+    val targetAddr: InetAddress
+    val targetPort: Int
     val receiveQueue: Channel<T>
     val sendQueue: Channel<T>
 }
@@ -24,6 +26,8 @@ data class TcpRedirectJob(
     override val writeJob: Job,
     override val typeFlags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java),
     override val client: NATClient,
+    override val targetAddr: InetAddress,
+    override val targetPort: Int,
     override val receiveQueue: Channel<Any> = Channel(),
     override val sendQueue: Channel<Any> = Channel(),
 ): RedirectJob<Any>
@@ -34,8 +38,8 @@ data class UdpRedirectJob(
     override val writeJob: Job,
     override val typeFlags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java),
     override val client: NATClient,
-    val targetAddr: InetAddress,
-    val targetPort: Int,
+    override val targetAddr: InetAddress,
+    override val targetPort: Int,
     override val receiveQueue: Channel<DatagramPacket> = Channel(),
     override val sendQueue: Channel<DatagramPacket> = Channel(),
 ): RedirectJob<DatagramPacket>

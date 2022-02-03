@@ -6,6 +6,7 @@ import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.contacts.PeerCommunicationTypeId
 import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.web.utils.putUnsignedShort
+import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.PooledByteBufAllocator
 import io.netty.buffer.Unpooled
@@ -117,15 +118,19 @@ class NATClient(
             sendBuffer.order(ByteOrder.BIG_ENDIAN)
 
             sendBuffer.putUnsignedShort(typeId)
-            sendBuffer.putUnsignedShort(targetPort)
             if (!targetAddr.isLoopbackAddress) {
                 sendBuffer.put(targetAddr.address)
             }
+            sendBuffer.putUnsignedShort(targetPort)
             sendBuffer.put(data, offset, size)
 
             sendBuffer.flip()
             writeRawDatagram(sendBuffer)
         }
+    }
+
+    suspend fun handleOutgoingPacket(data: ByteArray, offset: Int, size: Int, targetAddr: InetAddress, targetPort: Int) {
+
     }
 
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
@@ -145,12 +150,28 @@ class NATClient(
         }
 
         val decryptedBuf = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
-            Unpooled.wrappedBuffer(aes.decrypt(inArrayBuf, currentIV, inBuf.readerIndex(), inArrayBufLen - inBuf.readerIndex()))
+            Unpooled.wrappedBuffer(aes.decrypt(inArrayBuf, currentIV, inBuf.readerIndexInArrayOffset(), inArrayBufLen - inBuf.readerIndexInArrayOffset()))
         } else {
-            Unpooled.wrappedBuffer(inArrayBuf, inBuf.readerIndex(), inArrayBufLen - inBuf.readerIndex())
+            Unpooled.wrappedBuffer(inArrayBuf, inBuf.readerIndexInArrayOffset(), inArrayBufLen - inBuf.readerIndexInArrayOffset())
         }
 
         val size = decryptedBuf.readableBytes()
+        val targetAddr: InetAddress = if (PeerCommunicationType.isLocalHost(typeIdInt)) {
+            if (PeerCommunicationType.isIpv6(typeIdInt))
+                Inet6Address.getLoopbackAddress()
+            else
+                Inet4Address.getLoopbackAddress()
+        } else {
+            if (PeerCommunicationType.isIpv6(typeIdInt)) {
+                val bytes: ByteArray = ByteArray(16)
+                decryptedBuf.readBytes(bytes, 0, 16)
+                Inet6Address.getByAddress(bytes)
+            } else {
+                val bytes: ByteArray = ByteArray(4)
+                decryptedBuf.readBytes(bytes, 0, 4)
+                Inet4Address.getLoopbackAddress()
+            }
+        }
 
         launch(Dispatchers.IO) {
             when (mainTypeClass) {
@@ -173,7 +194,7 @@ class NATClient(
                         if (port == 0) { // 端口为 0 表示 WireGuard 消息 (仅限集成wireguard)
 
                         } else {
-
+                            portRedirector.writeUdpPacket(decryptedBuf.array(), decryptedBuf.readerIndexInArrayOffset(), decryptedBuf.readableBytes(), targetAddr, port)
                         }
                     }
                 }
@@ -185,7 +206,8 @@ class NATClient(
 
     }
 
-    fun setDefaultTargetAddr(target: InetSocketAddress) {
+    @Deprecated("Never use it")
+    private fun setDefaultTargetAddr(target: InetSocketAddress) {
         if (udpChannel.isConnected)
             udpChannel.disconnect()
 

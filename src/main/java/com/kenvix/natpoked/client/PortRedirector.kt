@@ -43,12 +43,12 @@ class PortRedirector: Closeable, CoroutineScope {
 
     // TODO
     @Throws(IOException::class)
-    fun bindTcp(port: Int): TcpRedirectJob {
+    fun bindTcp(client: NATClient, port: Int, targetAddr: InetAddress, targetPort: Int, flags: EnumSet<PeerCommunicationType>): TcpRedirectJob {
         val channel = AsynchronousServerSocketChannel.open()
         channel.bind(InetSocketAddress(port))
         val job = TcpRedirectJob(
-            channel,
-            launch(Dispatchers.IO) {
+            channel = channel,
+            readJob = launch(Dispatchers.IO) {
                 while (isActive) {
                     try {
                         val accepted = channel.aAccept()
@@ -60,7 +60,7 @@ class PortRedirector: Closeable, CoroutineScope {
                     }
                 }
             },
-            launch(Dispatchers.IO) {
+            writeJob = launch(Dispatchers.IO) {
                 while (isActive) {
                     try {
 
@@ -68,7 +68,11 @@ class PortRedirector: Closeable, CoroutineScope {
                         logger.error("TCP Write failed (Port $port)", e)
                     }
                 }
-            }
+            },
+            client = client,
+            typeFlags = flags,
+            targetAddr = targetAddr,
+            targetPort = targetPort
         )
         boundTcpChannels[port] = job
         return job
@@ -78,7 +82,7 @@ class PortRedirector: Closeable, CoroutineScope {
         TODO()
     }
 
-    private suspend fun receiveUdpLocalPacketAndRedirect(socket: DatagramSocket, client: NATClient, flags: EnumSet<PeerCommunicationType>) = withContext(Dispatchers.IO) {
+    private suspend fun receiveUdpLocalPacketAndRedirect(socket: DatagramSocket, client: NATClient, flags: EnumSet<PeerCommunicationType>, targetAddr: InetAddress, targetPort: Int) = withContext(Dispatchers.IO) {
         try {
             val buffer = ByteArray(1500)
             val packet = DatagramPacket(buffer, 1500)
@@ -88,12 +92,9 @@ class PortRedirector: Closeable, CoroutineScope {
 //            if (!socket.isConnected || socket.remoteSocketAddress != packet.socketAddress)
 //                socket.connect(packet.socketAddress) // 将 Socket AppA连接到Datagram 的源地址
 
-
-
-            // TODO: Dispatch local incoming packet
-
-
-            // TODO: Redirect local incoming packet to remote
+            // Dispatch local incoming packet
+            // Redirect local incoming packet to remote
+            client.handleOutgoingPacket(packet.data, packet.offset, packet.length, targetAddr, targetPort)
         } catch (e: Exception) {
             logger.error("UDP Read failed (Local Bound Port ${socket.localPort})", e)
         }
@@ -108,21 +109,20 @@ class PortRedirector: Closeable, CoroutineScope {
         val udpReadQueue = Channel<DatagramPacket>()
         flags.add(PeerCommunicationType.TYPE_DATA_DGRAM)
         val job = UdpRedirectJob(
-            channel,
+            channel = channel,
             // 接收来自本地端口的数据，发往远端
-            launch(Dispatchers.IO) {
+            readJob = launch(Dispatchers.IO) {
                 while (isActive) {
-                    receiveUdpLocalPacketAndRedirect(socket, client, flags)
+                    receiveUdpLocalPacketAndRedirect(socket, client, flags, targetAddr, targetPort)
                 }
             },
             // 接收从远端来的数据，发往本地App的端口
-            launch(Dispatchers.IO) {
+            writeJob = launch(Dispatchers.IO) {
                 while (isActive) {
                     try {
-                        TODO()
                         val packet = udpWriteQueue.receive()
-                        if (!socket.isConnected || socket.port != packet.port)
-                            socket.connect(packet.socketAddress)
+//                        if (!socket.isConnected || socket.port != packet.port)
+//                            socket.connect(packet.socketAddress)
 
                         socket.send(packet)
                     } catch (e: Exception) {
@@ -130,12 +130,12 @@ class PortRedirector: Closeable, CoroutineScope {
                     }
                 }
             },
-            EnumSet.of(PeerCommunicationType.TYPE_DATA_DGRAM),
-            client,
-            targetAddr,
-            targetPort,
-            udpReadQueue,
-            udpWriteQueue
+            typeFlags = EnumSet.of(PeerCommunicationType.TYPE_DATA_DGRAM),
+            client = client,
+            targetAddr = targetAddr,
+            targetPort = targetPort,
+            receiveQueue = udpReadQueue,
+            sendQueue = udpWriteQueue
         )
         boundUdpChannels[port] = job
         return job
@@ -145,12 +145,14 @@ class PortRedirector: Closeable, CoroutineScope {
 
     }
 
-    suspend fun writeUdpPacket(packet: DatagramPacket) {
-        udpWriteQueue.send(packet)
-    }
-
-    suspend fun writeUdpPacket(data: ByteArray, offset: Int, len: Int) {
-        writeUdpPacket(DatagramPacket(data, offset, len))
+    suspend fun writeUdpPacket(data: ByteArray, offset: Int, len: Int, targetAddr: InetAddress, targetPort: Int) {
+        val boundUdp = boundUdpChannels[targetPort]
+        val packet = DatagramPacket(data, offset, len, targetAddr, targetPort)
+        if (boundUdp != null) { // 已设置转发规则并绑定的端口，使用绑定的源地址
+            boundUdp.sendQueue.send(packet)
+        } else { // 未设置转发规则的端口，但是已连接的端口
+            TODO()
+        } // todo: 未连接的端口
     }
 
 //    @Throws(IOException::class)
