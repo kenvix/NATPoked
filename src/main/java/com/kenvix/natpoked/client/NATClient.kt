@@ -16,6 +16,7 @@ import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
+import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -75,34 +76,41 @@ class NATClient(
         udpChannel.receive(buffer)
     }
 
-    private fun putTypeFlags1(inTypeId: Int, targetAddr: InetAddress, encrypt: Boolean = false, compress: Boolean = false): Int {
+    private fun putTypeFlags(inTypeId: Int, targetAddr: InetAddress, flags: EnumSet<PeerCommunicationType>): Int {
         var typeId: Int = inTypeId
-        if (encrypt) {
-            typeId = typeId or PeerCommunicationType.STATUS_ENCRYPTED.typeId.toInt()
+        if (STATUS_ENCRYPTED in flags) {
+            typeId = typeId or STATUS_ENCRYPTED.typeId.toInt()
             // TODO
         }
 
-        if (compress) {
-            typeId = typeId or PeerCommunicationType.STATUS_COMPRESSED.typeId.toInt()
+        if (STATUS_COMPRESSED in flags) {
+            typeId = typeId or STATUS_COMPRESSED.typeId.toInt()
             // TODO
         }
 
         if (targetAddr is Inet6Address) {
-            typeId = typeId or PeerCommunicationType.INET_TYPE_6.typeId.toInt()
+            typeId = typeId or INET_TYPE_6.typeId.toInt()
         }
 
         if (targetAddr.isLoopbackAddress) {
-            typeId = typeId or PeerCommunicationType.INET_ADDR_LOCALHOST.typeId.toInt()
+            typeId = typeId or INET_ADDR_LOCALHOST.typeId.toInt()
+        }
+
+        if (TYPE_DATA_DGRAM in flags) {
+            typeId = typeId or TYPE_DATA_DGRAM_RAW.typeId.toInt()
+        }
+
+        if (TYPE_DATA_STREAM in flags) {
+            typeId = typeId or TYPE_DATA_STREAM.typeId.toInt()
         }
 
         return typeId
     }
 
     // TODO: ENCRYPT, IV, COMPRESS
-    suspend fun writeUdpRaw(targetPort: Int, targetAddr: InetAddress, data: ByteArray, offset: Int, size: Int, encrypt: Boolean = false, compress: Boolean = false) {
+    suspend fun writeUdp(targetPort: Int, targetAddr: InetAddress, data: ByteArray, offset: Int, size: Int, flags: EnumSet<PeerCommunicationType>) {
         var typeId: Int = 0
-        typeId = putTypeFlags1(typeId, targetAddr, encrypt, compress)
-        typeId = typeId or PeerCommunicationType.TYPE_DATA_DGRAM_RAW.typeId.toInt()
+        typeId = putTypeFlags(typeId, targetAddr, flags)
 
         sendLock.withLock {
             sendBuffer.clear()
@@ -110,6 +118,9 @@ class NATClient(
 
             sendBuffer.putUnsignedShort(typeId)
             sendBuffer.putUnsignedShort(targetPort)
+            if (!targetAddr.isLoopbackAddress) {
+                sendBuffer.put(targetAddr.address)
+            }
             sendBuffer.put(data, offset, size)
 
             sendBuffer.flip()

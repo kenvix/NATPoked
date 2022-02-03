@@ -6,6 +6,7 @@
 
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.RedirectJob
 import com.kenvix.natpoked.contacts.TcpRedirectJob
 import com.kenvix.natpoked.contacts.UdpRedirectJob
@@ -20,13 +21,11 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import org.slf4j.LoggerFactory
 import java.io.Closeable
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetSocketAddress
-import java.net.SocketAddress
+import java.net.*
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.DatagramChannel
+import java.util.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.Throws
 import kotlin.math.log
@@ -79,19 +78,21 @@ class PortRedirector: Closeable, CoroutineScope {
         TODO()
     }
 
-    private suspend fun receiveUdpLocalPacketAndRedirect(socket: DatagramSocket, client: NATClient, udpReadQueue: Channel<DatagramPacket>) = withContext(Dispatchers.IO) {
+    private suspend fun receiveUdpLocalPacketAndRedirect(socket: DatagramSocket, client: NATClient, flags: EnumSet<PeerCommunicationType>) = withContext(Dispatchers.IO) {
         try {
             val buffer = ByteArray(1500)
             val packet = DatagramPacket(buffer, 1500)
             socket.receive(packet)
 
             // Socket AppA 是否已经连接？已经连接的 Socket 目的地址是否和 Datagram 的源地址一致？
-            if (!socket.isConnected || socket.remoteSocketAddress != packet.socketAddress)
-                socket.connect(packet.socketAddress) // 将 Socket AppA连接到Datagram 的源地址
+//            if (!socket.isConnected || socket.remoteSocketAddress != packet.socketAddress)
+//                socket.connect(packet.socketAddress) // 将 Socket AppA连接到Datagram 的源地址
 
 
 
             // TODO: Dispatch local incoming packet
+
+
             // TODO: Redirect local incoming packet to remote
         } catch (e: Exception) {
             logger.error("UDP Read failed (Local Bound Port ${socket.localPort})", e)
@@ -99,18 +100,19 @@ class PortRedirector: Closeable, CoroutineScope {
     }
 
     @Throws(IOException::class)
-    fun bindUdp(client: NATClient, port: Int): UdpRedirectJob {
+    fun bindUdp(client: NATClient, port: Int, targetAddr: InetAddress, targetPort: Int, flags: EnumSet<PeerCommunicationType>): UdpRedirectJob {
         val channel = DatagramChannel.open()
         channel.bind(InetSocketAddress(port))
         val socket = channel.socket()
         val udpWriteQueue = Channel<DatagramPacket>()
         val udpReadQueue = Channel<DatagramPacket>()
+        flags.add(PeerCommunicationType.TYPE_DATA_DGRAM)
         val job = UdpRedirectJob(
             channel,
             // 接收来自本地端口的数据，发往远端
             launch(Dispatchers.IO) {
                 while (isActive) {
-                    receiveUdpLocalPacketAndRedirect(socket, client, udpReadQueue)
+                    receiveUdpLocalPacketAndRedirect(socket, client, flags)
                 }
             },
             // 接收从远端来的数据，发往本地App的端口
@@ -128,7 +130,10 @@ class PortRedirector: Closeable, CoroutineScope {
                     }
                 }
             },
+            EnumSet.of(PeerCommunicationType.TYPE_DATA_DGRAM),
             client,
+            targetAddr,
+            targetPort,
             udpReadQueue,
             udpWriteQueue
         )
