@@ -24,7 +24,6 @@ import kotlin.coroutines.CoroutineContext
  * TODO: Async implement with kotlin coroutine flows
  */
 class NATClient(
-    val useIpv6: Boolean = false,
     val brokerClient: BrokerClient,
     val portRedirector: PortRedirector,
     val encryptionKey: ByteArray
@@ -44,7 +43,7 @@ class NATClient(
     }
 
     val udpChannel: DatagramChannel =
-        DatagramChannel.open(if (useIpv6) StandardProtocolFamily.INET6 else StandardProtocolFamily.INET).apply {
+        DatagramChannel.open().apply {
             setOption(StandardSocketOptions.SO_REUSEADDR, true)
             configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
         }
@@ -53,7 +52,8 @@ class NATClient(
 
     val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
-            val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
+            val buf: ByteArray =
+                ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
             val packet = DatagramPacket(buf, 1500)
             udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
             dispatchIncomingPacket(packet)
@@ -81,12 +81,10 @@ class NATClient(
         var typeId: Int = inTypeId
         if (STATUS_ENCRYPTED in flags) {
             typeId = typeId or STATUS_ENCRYPTED.typeId.toInt()
-            // TODO
         }
 
         if (STATUS_COMPRESSED in flags) {
             typeId = typeId or STATUS_COMPRESSED.typeId.toInt()
-            // TODO
         }
 
         if (targetAddr is Inet6Address) {
@@ -109,7 +107,14 @@ class NATClient(
     }
 
     // TODO: ENCRYPT, IV, COMPRESS
-    suspend fun writeUdp(targetPort: Int, targetAddr: InetAddress, data: ByteArray, offset: Int, size: Int, flags: EnumSet<PeerCommunicationType>) {
+    suspend fun handleOutgoingPacket(
+        targetAddr: InetAddress,
+        targetPort: Int,
+        data: ByteArray,
+        offset: Int,
+        size: Int,
+        flags: EnumSet<PeerCommunicationType>
+    ) {
         var typeId: Int = 0
         typeId = putTypeFlags(typeId, targetAddr, flags)
 
@@ -129,8 +134,26 @@ class NATClient(
         }
     }
 
-    suspend fun handleOutgoingPacket(data: ByteArray, offset: Int, size: Int, targetAddr: InetAddress, targetPort: Int) {
+    private fun readSockAddr(typeIdInt: Int, decryptedBuf: ByteBuf): InetSocketAddress {
+        val targetAddr: InetAddress = if (PeerCommunicationType.isLocalHost(typeIdInt)) {
+            if (PeerCommunicationType.isIpv6(typeIdInt))
+                Inet6Address.getLoopbackAddress()
+            else
+                Inet4Address.getLoopbackAddress()
+        } else {
+            if (PeerCommunicationType.isIpv6(typeIdInt)) {
+                val bytes: ByteArray = ByteArray(16)
+                decryptedBuf.readBytes(bytes, 0, 16)
+                Inet6Address.getByAddress(bytes)
+            } else {
+                val bytes: ByteArray = ByteArray(4)
+                decryptedBuf.readBytes(bytes, 0, 4)
+                Inet4Address.getLoopbackAddress()
+            }
+        }
 
+        val port: Int = decryptedBuf.readUnsignedShort()
+        return InetSocketAddress(targetAddr, port)
     }
 
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
@@ -150,37 +173,32 @@ class NATClient(
         }
 
         val decryptedBuf = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
-            Unpooled.wrappedBuffer(aes.decrypt(inArrayBuf, currentIV, inBuf.readerIndexInArrayOffset(), inArrayBufLen - inBuf.readerIndexInArrayOffset()))
+            Unpooled.wrappedBuffer(
+                aes.decrypt(
+                    inArrayBuf,
+                    currentIV,
+                    inBuf.readerIndexInArrayOffset(),
+                    inArrayBufLen - inBuf.readerIndexInArrayOffset()
+                )
+            )
         } else {
-            Unpooled.wrappedBuffer(inArrayBuf, inBuf.readerIndexInArrayOffset(), inArrayBufLen - inBuf.readerIndexInArrayOffset())
+            Unpooled.wrappedBuffer(
+                inArrayBuf,
+                inBuf.readerIndexInArrayOffset(),
+                inArrayBufLen - inBuf.readerIndexInArrayOffset()
+            )
         }
 
         val size = decryptedBuf.readableBytes()
-        val targetAddr: InetAddress = if (PeerCommunicationType.isLocalHost(typeIdInt)) {
-            if (PeerCommunicationType.isIpv6(typeIdInt))
-                Inet6Address.getLoopbackAddress()
-            else
-                Inet4Address.getLoopbackAddress()
-        } else {
-            if (PeerCommunicationType.isIpv6(typeIdInt)) {
-                val bytes: ByteArray = ByteArray(16)
-                decryptedBuf.readBytes(bytes, 0, 16)
-                Inet6Address.getByAddress(bytes)
-            } else {
-                val bytes: ByteArray = ByteArray(4)
-                decryptedBuf.readBytes(bytes, 0, 4)
-                Inet4Address.getLoopbackAddress()
-            }
-        }
 
         launch(Dispatchers.IO) {
             when (mainTypeClass) {
                 TYPE_DATA_STREAM.typeId -> {
                     if (size > 3) {
-                        val port: Int = decryptedBuf.readUnsignedShort()
+                        val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
                         // TODO: MSG_OOB(URGENT), RST, FIN, ACCEPT
                         val tcpFlags: Byte = decryptedBuf.readByte()
-                        if (port == 0) { // 端口为 0 表示内部控制类消息
+                        if (sockAddr.port == 0) { // 端口为 0 表示内部控制类消息
 
                         } else {
 
@@ -190,11 +208,17 @@ class NATClient(
 
                 TYPE_DATA_DGRAM.typeId -> {
                     if (size > 3) {
+                        val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
                         val port: Int = decryptedBuf.readUnsignedShort()
                         if (port == 0) { // 端口为 0 表示 WireGuard 消息 (仅限集成wireguard)
 
                         } else {
-                            portRedirector.writeUdpPacket(decryptedBuf.array(), decryptedBuf.readerIndexInArrayOffset(), decryptedBuf.readableBytes(), targetAddr, port)
+                            portRedirector.writeUdpPacket(
+                                decryptedBuf.array(),
+                                decryptedBuf.readerIndexInArrayOffset(),
+                                decryptedBuf.readableBytes(),
+                                sockAddr
+                            )
                         }
                     }
                 }
@@ -207,7 +231,7 @@ class NATClient(
     }
 
     @Deprecated("Never use it")
-    private fun setDefaultTargetAddr(target: InetSocketAddress) {
+    private fun connectTo(target: InetSocketAddress) {
         if (udpChannel.isConnected)
             udpChannel.disconnect()
 
