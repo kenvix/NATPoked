@@ -11,11 +11,9 @@ import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.client.PortRedirector
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.natpoked.utils.sha256Of
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.net.*
 import java.nio.channels.DatagramChannel
@@ -58,25 +56,28 @@ class UdpPortRedirectorTest {
         val portRedirector = PortRedirector()
         val natClient = NATClient(brokerClient, portRedirector, testKey)
         natClient.listenUdpSourcePort(4001)
-        val addr1 = Inet4Address.getByName("127.0.0.3")
-        val addr2 = Inet4Address.getByName("127.0.0.4")
+        val addr1 = Inet4Address.getByName("127.0.0.1")
+        val addr2 = addr1
         val port1 = 5000
         val port2 = 5001
         // portRedirector.bindUdp(natClient, addr1, port1, addr2, port2)
+        natClient.connectTo(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 4001))
         portRedirector.bindUdp(natClient, InetSocketAddress(addr2, port2), InetSocketAddress(addr1, port1))
 
         runBlocking {
-            launch(Dispatchers.IO) {
+            val job1 = async(Dispatchers.IO) {
                 val server = server(port1, addr1)
                 for (i in 0 .. 10) {
                     val buf = ByteArray(1000)
                     val packet = DatagramPacket(buf, 1000)
                     server.receive(packet)
-                    println(String(buf, 0, packet.length))
+                    val str = String(buf, 0, packet.length)
+                    println(str)
+                    Assertions.assertEquals(testStr, str)
                 }
             }
 
-            launch(Dispatchers.IO) {
+            val job2 = async(Dispatchers.IO) {
                 val client = client(port2, addr2)
                 delay(100)
 //                client.connect(addr1, port1)
@@ -86,6 +87,9 @@ class UdpPortRedirectorTest {
                     println("Client sent $i")
                 }
             }
+
+            job2.await()
+            job1.await()
         }
     }
 }

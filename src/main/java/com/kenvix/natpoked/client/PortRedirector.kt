@@ -101,6 +101,7 @@ class PortRedirector : Closeable, CoroutineScope {
 //            if (!socket.isConnected || socket.remoteSocketAddress != packet.socketAddress)
 //                socket.connect(packet.socketAddress) // 将 Socket AppA连接到Datagram 的源地址
 
+            logger.trace("Redirector received packet from ${packet.address} to $targetAddr with size ${packet.length}")
             // Dispatch local incoming packet
             // Redirect local incoming packet to remote
             client.handleOutgoingPacket(targetAddr, packet.data, packet.offset, packet.length, flags)

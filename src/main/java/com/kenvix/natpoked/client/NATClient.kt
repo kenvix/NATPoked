@@ -13,7 +13,9 @@ import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.slf4j.LoggerFactory
 import java.net.*
+import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
@@ -40,6 +42,7 @@ class NATClient(
 
     companion object {
         private const val ivSize = 16
+        private val logger = LoggerFactory.getLogger(NATClient::class.java)
     }
 
     val udpChannel: DatagramChannel =
@@ -56,6 +59,7 @@ class NATClient(
                 ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
             val packet = DatagramPacket(buf, 1500)
             udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
+            logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
             dispatchIncomingPacket(packet)
         }
     }
@@ -70,6 +74,7 @@ class NATClient(
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
+
         udpChannel.write(buffer)
     }
 
@@ -128,8 +133,9 @@ class NATClient(
             sendBuffer.putUnsignedShort(targetAddr.port)
             sendBuffer.put(data, offset, size)
 
+            logger.trace("Send peer packet to $targetAddr, size ${sendBuffer.position()}.")
             sendBuffer.flip()
-            writeRawDatagram(sendBuffer, targetAddr)
+            writeRawDatagram(sendBuffer)
         }
     }
 
@@ -208,8 +214,7 @@ class NATClient(
                 TYPE_DATA_DGRAM.typeId -> {
                     if (size > 3) {
                         val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-                        val port: Int = decryptedBuf.readUnsignedShort()
-                        if (port == 0) { // 端口为 0 表示 WireGuard 消息 (仅限集成wireguard)
+                        if (sockAddr.port == 0) { // 端口为 0 表示 WireGuard 消息 (仅限集成wireguard)
 
                         } else {
                             portRedirector.writeUdpPacket(
@@ -230,8 +235,7 @@ class NATClient(
 
     }
 
-    @Deprecated("Never use it")
-    private fun connectTo(target: InetSocketAddress) {
+    fun connectTo(target: InetSocketAddress) {
         if (udpChannel.isConnected)
             udpChannel.disconnect()
 
@@ -239,6 +243,7 @@ class NATClient(
     }
 
     override fun close() {
+        receiveJob.cancel()
         udpChannel.close()
         coroutineContext.cancel()
     }
