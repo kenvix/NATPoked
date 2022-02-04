@@ -36,7 +36,19 @@ class AES256GCM(keyBytes: ByteArray) {
      */
     fun encrypt(plain: ByteArray, iv: ByteArray, inputOffset: Int = 0, inputLen: Int = plain.size, ivOffset: Int = 0): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        val gcmParameterSpec = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv) // Create GCMParameterSpec
+        val gcmParameterSpec = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv, ivOffset, GCM_IV_LENGTH) // Create GCMParameterSpec
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec) // Initialize Cipher for ENCRYPT_MODE
+        val result = ByteArray(cipher.getOutputSize(inputLen))
+
+        cipher.doFinal(plain, inputOffset, inputLen, result, GCM_IV_LENGTH)
+        return result
+    }
+
+    /**
+     * 进行 AES-256-GCM 加密。IV 需要给出
+     */
+    fun encrypt(plain: ByteArray, gcmParameterSpec: GCMParameterSpec, inputOffset: Int = 0, inputLen: Int = plain.size): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmParameterSpec) // Initialize Cipher for ENCRYPT_MODE
         val result = ByteArray(cipher.getOutputSize(inputLen))
 
@@ -64,7 +76,19 @@ class AES256GCM(keyBytes: ByteArray) {
     @Throws(AEADBadTagException::class)
     fun decrypt(cipherBytes: ByteArray, iv: ByteArray, inputOffset: Int = 0, inputLen: Int = cipherBytes.size, ivOffset: Int = 0): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")  // Get Cipher Instance
-        val gcmParameterSpec = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv, ivOffset, ivOffset + GCM_IV_LENGTH) // Create GCMParameterSpec
+        val gcmParameterSpec = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv, ivOffset, GCM_IV_LENGTH) // Create GCMParameterSpec
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec)  // Initialize Cipher for DECRYPT_MODE
+
+        return cipher.doFinal(cipherBytes, inputOffset, inputLen)
+    }
+
+    /**
+     * 进行 AES-256-GCM 解密。IV 需要给出
+     * @throws AEADBadTagException 密钥不正确
+     */
+    @Throws(AEADBadTagException::class)
+    fun decrypt(cipherBytes: ByteArray, gcmParameterSpec: GCMParameterSpec, inputOffset: Int = 0, inputLen: Int = cipherBytes.size, ivOffset: Int = 0): ByteArray {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")  // Get Cipher Instance
         cipher.init(Cipher.DECRYPT_MODE, secretKey, gcmParameterSpec)  // Initialize Cipher for DECRYPT_MODE
 
         return cipher.doFinal(cipherBytes, inputOffset, inputLen)
@@ -93,5 +117,7 @@ class AES256GCM(keyBytes: ByteArray) {
             random.nextBytes(iv)
             return iv
         }
+
+        fun gcmParameterSpecOf(iv: ByteArray, ivOffset: Int = 0) = GCMParameterSpec(GCM_TAG_LENGTH * 8, iv, ivOffset, GCM_IV_LENGTH)
     }
 }
