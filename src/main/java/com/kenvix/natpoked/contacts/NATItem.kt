@@ -11,8 +11,8 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     STATUS_ENCRYPTED_AES      (0b001_0000_0000_0000), // AES-256-GCM Enabled
     STATUS_ENCRYPTED_CHACHA   (0b010_0000_0000_0000), // CHACHA20-IETF-POLY1305 Enabled
     STATUS_HAS_IV             (0b100_0000_0000_0000), // Has IV (AES-256-GCM or CHACHA20-IETF-POLY1305)
-
-    STATUS_COMPRESSED         (0b000_0010_0000_0000),
+    STATUS_ACK_IV             (0b000_0010_0000_0000),
+    STATUS_COMPRESSED         (0b000_0001_0000_0000),
 
     INET_TYPE_4               (0b000_0000_0000_0000),
     INET_TYPE_6               (0b000_1000_0000_0000),
@@ -54,7 +54,7 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
             }
         }
 
-        fun getTypeMainClass(typeId: Int): PeerCommunicationTypeId = (typeId and 0b000_0000_1111_0000).toShort()
+        fun getTypeMainClass(typeId: Int): PeerCommunicationTypeId = (typeId and 0b000_0000_0111_0000).toShort()
         fun getTypeMainClass(typeId: PeerCommunicationTypeId): PeerCommunicationTypeId = getTypeMainClass(typeId.toInt())
 
         fun hasIV(typeId: Int): Boolean = (typeId and STATUS_HAS_IV.typeId.toInt()) != 0
