@@ -1,14 +1,18 @@
 package com.kenvix.natpoked.contacts
 
+import com.kenvix.natpoked.contacts.PeerCommunicationType.STATUS_ENCRYPTED_CHACHA
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.InetAddress
 
 typealias PeerCommunicationTypeId = Short
 enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
-    STATUS_ENCRYPTED          (0b001_0000_0000_0000),
-    STATUS_HAS_IV             (0b010_0000_0000_0000),
-    STATUS_COMPRESSED         (0b100_0000_0000_0000),
+    STATUS_ENCRYPTED          (0b011_0000_0000_0000), // Any encryptor enabled
+    STATUS_ENCRYPTED_AES      (0b001_0000_0000_0000), // AES-256-GCM Enabled
+    STATUS_ENCRYPTED_CHACHA   (0b010_0000_0000_0000), // CHACHA20-IETF-POLY1305 Enabled
+    STATUS_HAS_IV             (0b100_0000_0000_0000), // Has IV (AES-256-GCM or CHACHA20-IETF-POLY1305)
+
+    STATUS_COMPRESSED         (0b000_0010_0000_0000),
 
     INET_TYPE_4               (0b000_0000_0000_0000),
     INET_TYPE_6               (0b000_1000_0000_0000),
@@ -41,6 +45,14 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     companion object Utils {
         fun isEncrypted(typeId: PeerCommunicationTypeId) = isEncrypted(typeId.toInt())
         fun isEncrypted(typeId: Int) = (typeId and STATUS_ENCRYPTED.typeId.toInt()) != 0
+        fun getEncryptionMethod(typeId: PeerCommunicationTypeId) = getEncryptionMethod(typeId.toInt())
+        fun getEncryptionMethod(typeId: Int): PeerCommunicationType {
+            return when (typeId and STATUS_ENCRYPTED.typeId.toInt()) {
+                STATUS_ENCRYPTED_AES.typeId.toInt() -> STATUS_ENCRYPTED_AES
+                STATUS_ENCRYPTED_CHACHA.typeId.toInt() -> STATUS_ENCRYPTED_CHACHA
+                else -> throw IllegalArgumentException("Unknown encryption method: $typeId")
+            }
+        }
 
         fun getTypeMainClass(typeId: Int): PeerCommunicationTypeId = (typeId and 0b000_0000_1111_0000).toShort()
         fun getTypeMainClass(typeId: PeerCommunicationTypeId): PeerCommunicationTypeId = getTypeMainClass(typeId.toInt())

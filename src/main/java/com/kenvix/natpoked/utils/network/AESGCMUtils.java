@@ -16,7 +16,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * @deprecated Use EncryptionUtils instead
+ * @deprecated Use [EncryptionUtils] instead
  */
 @Deprecated
 public class AESGCMUtils {
