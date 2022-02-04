@@ -5,6 +5,9 @@ import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.contacts.PeerCommunicationTypeId
 import com.kenvix.natpoked.utils.AES256GCM
+import com.kenvix.natpoked.utils.isStrictLocalHostAddress
+import com.kenvix.natpoked.utils.strictLocalHostAddress4
+import com.kenvix.natpoked.utils.strictLocalHostAddress6
 import com.kenvix.web.utils.putUnsignedShort
 import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.ByteBuf
@@ -96,7 +99,7 @@ class NATClient(
             typeId = typeId or INET_TYPE_6.typeId.toInt()
         }
 
-        if (targetAddr.isLoopbackAddress) {
+        if (targetAddr.isStrictLocalHostAddress) {
             typeId = typeId or INET_ADDR_LOCALHOST.typeId.toInt()
         }
 
@@ -142,9 +145,9 @@ class NATClient(
     private fun readSockAddr(typeIdInt: Int, decryptedBuf: ByteBuf): InetSocketAddress {
         val targetAddr: InetAddress = if (PeerCommunicationType.isLocalHost(typeIdInt)) {
             if (PeerCommunicationType.isIpv6(typeIdInt))
-                Inet6Address.getLoopbackAddress()
+                strictLocalHostAddress6
             else
-                Inet4Address.getLoopbackAddress()
+                strictLocalHostAddress4
         } else {
             if (PeerCommunicationType.isIpv6(typeIdInt)) {
                 val bytes: ByteArray = ByteArray(16)
@@ -153,7 +156,7 @@ class NATClient(
             } else {
                 val bytes: ByteArray = ByteArray(4)
                 decryptedBuf.readBytes(bytes, 0, 4)
-                Inet4Address.getLoopbackAddress()
+                Inet4Address.getByAddress(bytes)
             }
         }
 

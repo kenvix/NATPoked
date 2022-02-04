@@ -9,9 +9,7 @@ import kotlinx.coroutines.channels.toList
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.time.withTimeout
-import java.net.InetAddress
-import java.net.NetworkInterface
-import java.net.SocketException
+import java.net.*
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalUnit
@@ -80,3 +78,9 @@ suspend fun testNatTypeParallel(inetAddr: InetAddress): StunTestResult {
         StunTestResult(inetAddr, NATType.BLOCKED, null)
     }
 }
+
+val strictLocalHostAddress4: InetAddress = Inet4Address.getByName("127.0.0.1")
+val strictLocalHostAddress6: InetAddress = Inet6Address.getByName("::1")
+
+val InetAddress.isStrictLocalHostAddress: Boolean
+    get() = this == strictLocalHostAddress4 || this == strictLocalHostAddress6

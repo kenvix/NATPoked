@@ -73,6 +73,7 @@ class UdpPortRedirectorTest {
                     server.receive(packet)
                     val str = String(buf, 0, packet.length)
                     println(str)
+                    Assertions.assertEquals(testBytes.size, packet.length)
                     Assertions.assertEquals(testStr, str)
                 }
             }
