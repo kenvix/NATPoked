@@ -130,7 +130,7 @@ class NATClient(
             sendBuffer.order(ByteOrder.BIG_ENDIAN)
 
             sendBuffer.putUnsignedShort(typeId)
-            if (!targetAddr.address.isLoopbackAddress) {
+            if (!PeerCommunicationType.isLocalHost(typeId)) {
                 sendBuffer.put(targetAddr.address.address)
             }
             sendBuffer.putUnsignedShort(targetAddr.port)
