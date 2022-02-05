@@ -4,10 +4,8 @@ import com.kenvix.natpoked.client.traversal.main
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.contacts.PeerCommunicationTypeId
-import com.kenvix.natpoked.utils.AES256GCM
-import com.kenvix.natpoked.utils.isStrictLocalHostAddress
-import com.kenvix.natpoked.utils.strictLocalHostAddress4
-import com.kenvix.natpoked.utils.strictLocalHostAddress6
+import com.kenvix.natpoked.utils.*
+import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.web.utils.putUnsignedShort
 import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.ByteBuf
@@ -38,10 +36,17 @@ class NATClient(
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
-    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
+
+//    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
     val sendLock: Mutex = Mutex()
-    val receiveLock: Mutex = Mutex()
+//    val receiveLock: Mutex = Mutex()
+
+    private val controlMessageARQ = KCPARQProvider(
+        onRawPacketToSendHandler = { buffer: ByteBuf, user: Any? -> handleControlMessageOutgoingPacket(buffer) },
+        user = null,
+        useStreamMode = false,
+    )
 
     companion object {
         private const val ivSize = 16
@@ -51,6 +56,8 @@ class NATClient(
     val udpChannel: DatagramChannel =
         DatagramChannel.open().apply {
             setOption(StandardSocketOptions.SO_REUSEADDR, true)
+            setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.PeerSendBufferSize)
+            setOption(StandardSocketOptions.SO_RCVBUF, AppEnv.PeerReceiveBufferSize)
             configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
         }
 
@@ -67,6 +74,19 @@ class NATClient(
         }
     }
 
+    val controlMessageJob: Job = launch(Dispatchers.IO) {
+        while (isActive) {
+            val message = controlMessageARQ.receive()
+            if (message.size < 3) {
+                logger.warn("Received control message with invalid size ${message.size}")
+                continue
+            } else {
+                val buffer = message.data
+
+            }
+        }
+    }
+
     fun listenUdpSourcePort(sourcePort: Int = 0) {
         val socketAddress = InetSocketAddress(sourcePort)
         udpChannel.bind(socketAddress)
@@ -77,7 +97,6 @@ class NATClient(
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
-
         udpChannel.write(buffer)
     }
 
@@ -112,6 +131,22 @@ class NATClient(
         }
 
         return typeId
+    }
+
+    private suspend fun handleControlMessageOutgoingPacket(buffer: ByteBuf) {
+        val typeIdInt = TYPE_DATA_CONTROL.typeId.toInt()
+
+        // TODO: ENCRYPT
+        sendLock.withLock {
+            sendBuffer.clear()
+            sendBuffer.order(ByteOrder.BIG_ENDIAN)
+            sendBuffer.putUnsignedShort(typeIdInt)
+            buffer.readBytes(sendBuffer)
+
+            logger.trace("Send control packet, size ${sendBuffer.position()}.")
+            sendBuffer.flip()
+            writeRawDatagram(sendBuffer)
+        }
     }
 
     // TODO: ENCRYPT, IV, COMPRESS
@@ -200,36 +235,44 @@ class NATClient(
         val size = decryptedBuf.readableBytes()
 
         launch(Dispatchers.IO) {
-            when (mainTypeClass) {
-                TYPE_DATA_STREAM.typeId -> {
-                    if (size > 3) {
-                        val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-                        // TODO: MSG_OOB(URGENT), RST, FIN, ACCEPT
-                        val tcpFlags: Byte = decryptedBuf.readByte()
-                        if (sockAddr.port == 0) { // 端口为 0 表示内部控制类消息
+            try {
+                when (mainTypeClass) {
+                    TYPE_DATA_STREAM.typeId -> {
+                        if (size > 3) {
+                            val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
+                            // TODO: MSG_OOB(URGENT), RST, FIN, ACCEPT
+                            val tcpFlags: Byte = decryptedBuf.readByte()
+                            if (sockAddr.port == 0) { // 端口为 0 表示内部控制类消息
 
-                        } else {
+                            } else {
 
+                            }
                         }
                     }
-                }
 
-                TYPE_DATA_DGRAM.typeId -> {
-                    if (size > 3) {
-                        val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-                        if (sockAddr.port == 0) { // 端口为 0 表示 WireGuard 消息 (仅限集成wireguard)
-
-                        } else {
-                            portRedirector.writeUdpPacket(
-                                this@NATClient,
-                                decryptedBuf.array(),
-                                decryptedBuf.readerIndexInArrayOffset(),
-                                decryptedBuf.readableBytes(),
-                                sockAddr
-                            )
+                    TYPE_DATA_DGRAM.typeId -> {
+                        if (size > 3) {
+                            val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
+                            if (sockAddr.port != 0) {
+                                portRedirector.writeUdpPacket(
+                                    this@NATClient,
+                                    decryptedBuf.array(),
+                                    decryptedBuf.readerIndexInArrayOffset(),
+                                    decryptedBuf.readableBytes(),
+                                    sockAddr
+                                )
+                            } else {
+                                logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
+                            }
                         }
                     }
+
+                    TYPE_DATA_CONTROL.typeId -> {
+                        controlMessageARQ.onRawPacketIncoming(decryptedBuf)
+                    }
                 }
+            } catch (e: Throwable) {
+                logger.error("Unexpected Error while processing incoming packet from $addr", e)
             }
         }
     }

@@ -67,6 +67,11 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("KCP协议配置：最小RTO")
     val KcpMinRto: Int by envOf(100)
 
+    @Description("对等端发送缓冲区大小，单位是字节")
+    val PeerSendBufferSize: Int by envOf(5 * 1024 * 1024)
+
+    @Description("对等端接收缓冲区大小，单位是字节")
+    val PeerReceiveBufferSize: Int by envOf(4 * 1024 * 1024)
 
     @Description("HTTP 地址")
     val HttpHost: String by envOf( "127.0.0.1")
