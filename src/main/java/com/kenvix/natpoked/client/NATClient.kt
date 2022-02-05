@@ -82,7 +82,8 @@ class NATClient(
                 continue
             } else {
                 val buffer = message.data
-
+                val version = buffer.readUnsignedShort()
+                
             }
         }
     }

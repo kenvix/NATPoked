@@ -38,6 +38,7 @@ import de.javawi.jstun.util.UtilityException;
 public class DiscoveryTest {
 	private static final Logger LOGGER = LoggerFactory.getLogger(DiscoveryTest.class);
 	InetAddress iaddress;
+	int sourcePort = 0;
 	String stunServer;
 	int port;
 	int timeoutInitValue = 300; //ms
@@ -60,6 +61,11 @@ public class DiscoveryTest {
 		this.iaddress = iaddress;
 		this.stunServer = stunServer;
 		this.port = port;
+	}
+
+	public DiscoveryTest(InetAddress iaddress, int sourcePort , String stunServer, int port) {
+		this(iaddress, stunServer, port);
+		this.sourcePort = sourcePort;
 	}
 
 	@NotNull
@@ -89,7 +95,7 @@ public class DiscoveryTest {
 		while (true) {
 			try {
 				// Test 1 including response
-				socketTest1 = new DatagramSocket(new InetSocketAddress(iaddress, 0));
+				socketTest1 = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort));
 				socketTest1.setReuseAddress(true);
 				socketTest1.connect(InetAddress.getByName(stunServer), port);
 				socketTest1.setSoTimeout(timeout);
@@ -157,9 +163,8 @@ public class DiscoveryTest {
 		int timeSinceFirstTransmission = 0;
 		int timeout = timeoutInitValue;
 		while (true) {
-			try {
+			try(DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort))) {
 				// Test 2 including response
-				DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, 0));
 				sendSocket.connect(InetAddress.getByName(stunServer), port);
 				sendSocket.setSoTimeout(timeout);
 				
@@ -181,31 +186,32 @@ public class DiscoveryTest {
 				
 				sendSocket.close();
 				
-				DatagramSocket receiveSocket = new DatagramSocket(localPort, localAddress);
-				receiveSocket.connect(ca.getAddress().getInetAddress(), ca.getPort());
-				receiveSocket.setSoTimeout(timeout);
-				
-				MessageHeader receiveMH = new MessageHeader();
-				while(!(receiveMH.equalTransactionID(sendMH))) {
-					DatagramPacket receive = new DatagramPacket(new byte[200], 200);
-					receiveSocket.receive(receive);
-					receiveMH = MessageHeader.parseHeader(receive.getData());
-					receiveMH.parseAttributes(receive.getData());
-				}
-				ErrorCode ec = (ErrorCode) receiveMH.getMessageAttribute(MessageAttribute.MessageAttributeType.ErrorCode);
-				if (ec != null) {
-					di.setError(ec.getResponseCode(), ec.getReason());
-					LOGGER.debug("Message header contains an Errorcode message attribute.");
+				try(DatagramSocket receiveSocket = new DatagramSocket(localPort, localAddress)) {
+					receiveSocket.connect(ca.getAddress().getInetAddress(), ca.getPort());
+					receiveSocket.setSoTimeout(timeout);
+
+					MessageHeader receiveMH = new MessageHeader();
+					while(!(receiveMH.equalTransactionID(sendMH))) {
+						DatagramPacket receive = new DatagramPacket(new byte[200], 200);
+						receiveSocket.receive(receive);
+						receiveMH = MessageHeader.parseHeader(receive.getData());
+						receiveMH.parseAttributes(receive.getData());
+					}
+					ErrorCode ec = (ErrorCode) receiveMH.getMessageAttribute(MessageAttribute.MessageAttributeType.ErrorCode);
+					if (ec != null) {
+						di.setError(ec.getResponseCode(), ec.getReason());
+						LOGGER.debug("Message header contains an Errorcode message attribute.");
+						return false;
+					}
+					if (!nodeNatted) {
+						di.setOpenAccess();
+						LOGGER.debug("Node has open access to the Internet (or, at least the node is behind a full-cone NAT without translation).");
+					} else {
+						di.setFullCone();
+						LOGGER.debug("Node is behind a full-cone NAT.");
+					}
 					return false;
 				}
-				if (!nodeNatted) {
-					di.setOpenAccess();
-					LOGGER.debug("Node has open access to the Internet (or, at least the node is behind a full-cone NAT without translation).");
-				} else {
-					di.setFullCone();
-					LOGGER.debug("Node is behind a full-cone NAT.");
-				}
-				return false;
 			} catch (SocketTimeoutException ste) {
 				if (timeSinceFirstTransmission < 7900) {
 					LOGGER.debug("Test 2: Socket timeout while receiving the response.");
@@ -295,9 +301,8 @@ public class DiscoveryTest {
 		int timeSinceFirstTransmission = 0;
 		int timeout = timeoutInitValue;
 		while (true) {
-			try {
+			try(DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort))) {
 				// Test 3 including response
-				DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, 0));
 				sendSocket.connect(InetAddress.getByName(stunServer), port);
 				sendSocket.setSoTimeout(timeout);
 				
@@ -318,27 +323,28 @@ public class DiscoveryTest {
 				
 				sendSocket.close();
 				
-				DatagramSocket receiveSocket = new DatagramSocket(localPort, localAddress);
-				receiveSocket.connect(InetAddress.getByName(stunServer), ca.getPort());
-				receiveSocket.setSoTimeout(timeout);
-				
-				MessageHeader receiveMH = new MessageHeader();
-				while (!(receiveMH.equalTransactionID(sendMH))) {
-					DatagramPacket receive = new DatagramPacket(new byte[200], 200);
-					receiveSocket.receive(receive);
-					receiveMH = MessageHeader.parseHeader(receive.getData());
-					receiveMH.parseAttributes(receive.getData());
-				}
-				ErrorCode ec = (ErrorCode) receiveMH.getMessageAttribute(MessageAttribute.MessageAttributeType.ErrorCode);
-				if (ec != null) {
-					di.setError(ec.getResponseCode(), ec.getReason());
-					LOGGER.debug("Message header contains an Errorcode message attribute.");
-					return;
-				}
-				if (nodeNatted) {
-					di.setRestrictedCone();
-					LOGGER.debug("Node is behind a restricted NAT.");
-					return;
+				try(DatagramSocket receiveSocket = new DatagramSocket(localPort, localAddress)) {
+					receiveSocket.connect(InetAddress.getByName(stunServer), ca.getPort());
+					receiveSocket.setSoTimeout(timeout);
+
+					MessageHeader receiveMH = new MessageHeader();
+					while (!(receiveMH.equalTransactionID(sendMH))) {
+						DatagramPacket receive = new DatagramPacket(new byte[200], 200);
+						receiveSocket.receive(receive);
+						receiveMH = MessageHeader.parseHeader(receive.getData());
+						receiveMH.parseAttributes(receive.getData());
+					}
+					ErrorCode ec = (ErrorCode) receiveMH.getMessageAttribute(MessageAttribute.MessageAttributeType.ErrorCode);
+					if (ec != null) {
+						di.setError(ec.getResponseCode(), ec.getReason());
+						LOGGER.debug("Message header contains an Errorcode message attribute.");
+						return;
+					}
+					if (nodeNatted) {
+						di.setRestrictedCone();
+						LOGGER.debug("Node is behind a restricted NAT.");
+						return;
+					}
 				}
 			} catch (SocketTimeoutException ste) {
 				if (timeSinceFirstTransmission < 7900) {
