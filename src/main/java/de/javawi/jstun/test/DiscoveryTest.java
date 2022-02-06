@@ -38,7 +38,8 @@ import de.javawi.jstun.util.UtilityException;
 public class DiscoveryTest {
 	private static final Logger LOGGER = LoggerFactory.getLogger(DiscoveryTest.class);
 	InetAddress iaddress;
-	int sourcePort = 0;
+	int sourcePort1 = 0;
+	int sourcePort2 = 0;
 	String stunServer;
 	int port;
 	int timeoutInitValue = 300; //ms
@@ -63,9 +64,10 @@ public class DiscoveryTest {
 		this.port = port;
 	}
 
-	public DiscoveryTest(InetAddress iaddress, int sourcePort , String stunServer, int port) {
+	public DiscoveryTest(InetAddress iaddress, int sourcePort1, int sourcePort2 , String stunServer, int port) {
 		this(iaddress, stunServer, port);
-		this.sourcePort = sourcePort;
+		this.sourcePort1 = sourcePort1;
+		this.sourcePort2 = sourcePort2;
 	}
 
 	@NotNull
@@ -83,7 +85,7 @@ public class DiscoveryTest {
 				}
 			}
 		}
-		
+
 		socketTest1.close();
 		
 		return di;
@@ -95,7 +97,7 @@ public class DiscoveryTest {
 		while (true) {
 			try {
 				// Test 1 including response
-				socketTest1 = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort));
+				socketTest1 = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort1));
 				socketTest1.setReuseAddress(true);
 				socketTest1.connect(InetAddress.getByName(stunServer), port);
 				socketTest1.setSoTimeout(timeout);
@@ -163,7 +165,7 @@ public class DiscoveryTest {
 		int timeSinceFirstTransmission = 0;
 		int timeout = timeoutInitValue;
 		while (true) {
-			try(DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort))) {
+			try(DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort2))) {
 				// Test 2 including response
 				sendSocket.connect(InetAddress.getByName(stunServer), port);
 				sendSocket.setSoTimeout(timeout);
@@ -301,7 +303,7 @@ public class DiscoveryTest {
 		int timeSinceFirstTransmission = 0;
 		int timeout = timeoutInitValue;
 		while (true) {
-			try(DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort))) {
+			try(DatagramSocket sendSocket = new DatagramSocket(new InetSocketAddress(iaddress, sourcePort2))) {
 				// Test 3 including response
 				sendSocket.connect(InetAddress.getByName(stunServer), port);
 				sendSocket.setSoTimeout(timeout);

@@ -62,12 +62,10 @@ suspend fun testNatTypeParallel(inetAddr: InetAddress): StunTestResult {
         withTimeout(Duration.of(AppEnv.StunQueryTimeout.toLong(), ChronoUnit.MILLIS)) {
             AppEnv.StunServerList.forEach {
                 withContext(Dispatchers.IO) {
-                    for (i in 0 until AppEnv.StunEachServerTestNum) {
-                        launch {
-                            val r = testNatType(inetAddr, it.first, it.second)
-                            if (r.natType != NATType.UNKNOWN && r.natType != NATType.BLOCKED)
-                                resultsChannel.send(r)
-                        }
+                    launch {
+                        val r = testNatType(inetAddr, it.first, it.second)
+                        if (r.natType != NATType.UNKNOWN && r.natType != NATType.BLOCKED)
+                            resultsChannel.send(r)
                     }
                 }
             }

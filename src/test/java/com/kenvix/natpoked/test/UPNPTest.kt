@@ -27,15 +27,17 @@ fun main() {
         val channel = DatagramChannel.open()
         val sock = channel.socket()
         val port = 44000
+        val port2 = 44001
         sock.reuseAddress = true
 
-        if (!UPnP.openPortUDP(port)) {
+        if (!UPnP.openPortUDP(port) || !UPnP.openPortUDP(port2)) {
             logger.error("Failed to open port $port")
             return
         }
         val buffer = ByteArray(1500)
 
-        val stunTest = DiscoveryTest(InetAddress.getByName(internalIp), port, "stun.qq.com", 3478)
+        val stunTest = DiscoveryTest(InetAddress.getByName(internalIp), port, port2, "stun.qq.com", 3478)
+        stunTest.timeoutInitValue = 1000
         println(stunTest.test())
 
         // channel.bind(InetSocketAddress(port))

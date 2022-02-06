@@ -9,16 +9,10 @@ package com.kenvix.natpoked.client
 import com.dosse.upnp.UPnP
 import com.kenvix.natpoked.utils.testNatTypeParallel
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import org.slf4j.LoggerFactory
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.NetworkInterface
-import java.net.SocketAddress
 import java.nio.channels.DatagramChannel
-import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 class NATTraversalKit : CoroutineScope {
@@ -53,13 +47,30 @@ class NATTraversalKit : CoroutineScope {
         channel.bind(InetSocketAddress(port))
     }
 
-    private fun isUPnPSupported() = UPnP.isUPnPAvailable()
-    private fun tryUPnPPort(port: Int): Boolean {
-        if (isUPnPSupported()) {
-            return UPnP.openPortUDP(port)
+    fun runTraversalForPort(port: Int, srcAddr: InetAddress? = null) {
+        bind(port)
+        logger.info("NATTraversalKit started on port $port")
+        val upnp = async { tryUPnPPort(port) }
+        val natType = async {
+            
         }
+    }
 
-        return false
+    private suspend fun isPublicUPnPSupported(): Boolean = withContext(Dispatchers.IO) {
+        if (UPnP.isUPnPAvailable()) {
+            val extAddr = UPnP.getExternalIP()
+            !InetAddress.getByName(extAddr).isSiteLocalAddress
+        } else {
+            false
+        }
+    }
+
+    private suspend fun tryUPnPPort(port: Int): Boolean = withContext(Dispatchers.IO) {
+        if (isPublicUPnPSupported()) {
+            UPnP.openPortUDP(port)
+        } else {
+            false
+        }
     }
 
     companion object {
