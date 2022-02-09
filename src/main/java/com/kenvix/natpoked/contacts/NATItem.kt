@@ -27,7 +27,8 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     TYPE_DATA_STREAM          (0b000_0000_0010_0000), // 0x2_
     TYPE_DATA_STREAM_KCP      (0b000_0000_0000_0000),
 
-    TYPE_DATA_CONTROL         (0b000_0000_0011_0000); // 0x2_
+    TYPE_DATA_CONTROL         (0b000_0000_0011_0000),
+    TYPE_DATA_CONTROL_HELLO   (0b000_0000_0011_0001);
 
     val isEncrypted: Boolean
         get() = isEncrypted(typeId)
@@ -121,12 +122,17 @@ typealias PeerId = Long
 data class NATClientItem(
     val clientId: PeerId,
     val clientPublicIpAddress: ByteArray?,
+    val clientPublicIp6Address: ByteArray? = null,
     val clientPort: Int = 0,
     val clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
+    val isValueChecked: Boolean = false,
 ) {
     val clientInetAddress: InetAddress?
         get() = if (clientPublicIpAddress == null) null else InetAddress.getByAddress(clientPublicIpAddress)
+
+    val clientInet6Address: InetAddress?
+        get() = if (clientPublicIp6Address == null) null else InetAddress.getByAddress(clientPublicIp6Address)
 
     override fun toString(): String {
         return "[NATClientItem] ID: $clientId | $clientInetAddress:$clientPort | Type: $clientNatType | LastContactAt: $clientLastContactTime"
@@ -161,5 +167,8 @@ data class NATClientItem(
         val natTypeComparator: Comparator<NATClientItem> = Comparator { a, b ->
             b.clientNatType.levelId - a.clientNatType.levelId
         }
+
+        @JvmStatic
+        val UNKNOWN = NATClientItem(0, null)
     }
 }

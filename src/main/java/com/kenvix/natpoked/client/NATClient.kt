@@ -1,6 +1,7 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.client.traversal.main
+import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.contacts.PeerCommunicationTypeId
@@ -24,18 +25,22 @@ import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 /**
+ * NATPoked Client
+ * @param brokerClient can be null if no broker is used
  * TODO: Async implement with kotlin coroutine flows
  */
 class NATClient(
-    val brokerClient: BrokerClient,
     val portRedirector: PortRedirector,
-    val encryptionKey: ByteArray
+    val encryptionKey: ByteArray,
+    var selfClientInfo: NATClientItem = NATClientItem.UNKNOWN,
 ) : CoroutineScope, AutoCloseable {
-    private val job = Job() + CoroutineName("NATClient for $brokerClient")
+    private val job = Job() + CoroutineName("NATClient")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
+    var isIp6Supported = false // TODO: Detect if ipv6 is supported
+     // TODO: Detect if ipv6 is supported
 
 //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
@@ -103,6 +108,18 @@ class NATClient(
 
     suspend fun readRawDatagram(buffer: ByteBuffer): SocketAddress = withContext(Dispatchers.IO) {
         udpChannel.receive(buffer)
+    }
+
+    suspend fun sendHelloPacket(target: InetSocketAddress, num: Int = 3) {
+        val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() and STATUS_HAS_IV.typeId.toInt()
+        val buffer = ByteBuffer.allocate(3 + ivSize)
+        buffer.order(ByteOrder.BIG_ENDIAN)
+        buffer.putUnsignedShort(typeIdInt)
+        buffer.put(currentIV)
+        buffer.flip()
+        for (i in 0 until num) {
+            writeRawDatagram(buffer, target)
+        }
     }
 
     private fun putTypeFlags(inTypeId: Int, targetAddr: InetAddress, flags: EnumSet<PeerCommunicationType>): Int {

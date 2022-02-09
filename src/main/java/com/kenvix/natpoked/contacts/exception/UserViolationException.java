@@ -6,21 +6,24 @@
 
 package com.kenvix.natpoked.contacts.exception;
 
-public class UserViolationException extends BusinessLogicException {
-    public UserViolationException() {
-        super();
+import com.kenvix.utils.exception.CommonBusinessException;
+
+public class UserViolationException extends CommonBusinessException {
+
+    public UserViolationException(int code) {
+        super(code);
     }
 
-    public UserViolationException(String message) {
-        super(message);
+    public UserViolationException(String message, int code) {
+        super(message, code);
     }
 
     public UserViolationException(String message, Throwable cause) {
         super(message, cause);
     }
 
-    public UserViolationException(Throwable cause) {
-        super(cause);
+    public UserViolationException(Throwable cause, int code) {
+        super(cause, code);
     }
 
     public UserViolationException(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {

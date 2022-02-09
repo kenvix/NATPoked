@@ -52,9 +52,9 @@ class UdpPortRedirectorTest {
 
     @Test
     fun test() {
-        val brokerClient = BrokerClient("127.0.0.1", 4000, "/")
         val portRedirector = PortRedirector()
-        val natClient = NATClient(brokerClient, portRedirector, testKey)
+        val natClient = NATClient(portRedirector, testKey)
+        val brokerClient = BrokerClient(natClient, "127.0.0.1", 4000, "/")
         natClient.listenUdpSourcePort(4001)
         val addr1 = Inet4Address.getByName("127.0.0.1")
         val addr2 = addr1

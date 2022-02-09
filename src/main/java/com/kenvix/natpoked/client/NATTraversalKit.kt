@@ -7,11 +7,12 @@
 package com.kenvix.natpoked.client
 
 import com.dosse.upnp.UPnP
+import com.kenvix.natpoked.contacts.NATClientItem
+import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.testNatTypeParallel
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
-import java.net.InetAddress
-import java.net.InetSocketAddress
+import java.net.*
 import java.nio.channels.DatagramChannel
 import kotlin.coroutines.CoroutineContext
 
@@ -47,13 +48,49 @@ class NATTraversalKit : CoroutineScope {
         channel.bind(InetSocketAddress(port))
     }
 
-    fun runTraversalForPort(port: Int, srcAddr: InetAddress? = null) {
+    fun runTraversalForPort(port: Int, srcAddr: InetAddress) {
         bind(port)
         logger.info("NATTraversalKit started on port $port")
         val upnp = async { tryUPnPPort(port) }
         val natType = async {
-            
+            testNatTypeParallel(srcAddr)
         }
+
+
+    }
+
+    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem {
+        val upnpJob = async { tryUPnPAnyPort() }
+        val natTypeJob = async {
+            testNatTypeParallel(InetAddress.getLocalHost())
+        }
+
+        val natType = natTypeJob.await()
+        // TODO : IPV6
+        return NATClientItem(
+            clientId = AppEnv.PeerId,
+            clientPublicIpAddress = natType.publicInetAddress?.address,
+            clientPort = upnpJob.await(),
+            clientNatType = natType.natType,
+            isValueChecked = false
+        )
+    }
+
+    fun getAvailableNetworkAddresses() {
+        NetworkInterface
+            .getNetworkInterfaces()
+            .asSequence()
+            .filter {
+                it != null && !it.isLoopback && it.isUp
+            }.map {
+                it.inetAddresses.asSequence().map { inetAddress ->
+                    when (inetAddress) {
+                        is Inet6Address -> !inetAddress.isSiteLocalAddress && !inetAddress.isLinkLocalAddress && !inetAddress.isLoopbackAddress  && !inetAddress.isMulticastAddress
+                        is Inet4Address -> !inetAddress.isLinkLocalAddress && !inetAddress.isLoopbackAddress && !inetAddress.isMulticastAddress
+                        else -> null
+                    }
+                }.filterNotNull()
+            }
     }
 
     private suspend fun isPublicUPnPSupported(): Boolean = withContext(Dispatchers.IO) {
@@ -72,6 +109,22 @@ class NATTraversalKit : CoroutineScope {
             false
         }
     }
+
+    private suspend fun tryUPnPAnyPort(maxTries: Int = 20): Int = withContext(Dispatchers.IO) {
+        if (isPublicUPnPSupported()) {
+            val socket = DatagramSocket(0)
+            val port = socket.localPort
+            var tries = 0
+            while (!UPnP.openPortUDP(port) && tries < maxTries) {
+                tries++
+            }
+
+            port
+        } else {
+            -1
+        }
+    }
+
 
     companion object {
         private val logger = LoggerFactory.getLogger(NATTraversalKit::class.java)

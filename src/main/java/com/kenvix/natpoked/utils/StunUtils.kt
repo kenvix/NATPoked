@@ -82,3 +82,31 @@ val strictLocalHostAddress6: InetAddress = Inet6Address.getByName("::1")
 
 val InetAddress.isStrictLocalHostAddress: Boolean
     get() = this == strictLocalHostAddress4 || this == strictLocalHostAddress6
+
+fun getDefaultGatewayAddress4(): InetAddress {
+    return DatagramSocket().use { s ->
+        s.connect(Inet4Address.getByName("223.5.5.5"), 53)
+        s.localAddress
+    }
+}
+
+fun getDefaultGatewayAddress6(): InetAddress {
+    return DatagramSocket().use { s ->
+        s.connect(Inet4Address.getByName("2402:4e00::"), 53)
+        s.localAddress
+    }
+}
+
+fun getDefaultGatewayInterface4(): NetworkInterface? {
+    return DatagramSocket().use { s ->
+        s.connect(Inet4Address.getByName("223.5.5.5"), 53)
+        NetworkInterface.getByInetAddress(s.localAddress)
+    }
+}
+
+fun getDefaultGatewayInterface6(): NetworkInterface? {
+    return DatagramSocket().use { s ->
+        s.connect(Inet4Address.getByName("2402:4e00::"), 53)
+        NetworkInterface.getByInetAddress(s.localAddress)
+    }
+}

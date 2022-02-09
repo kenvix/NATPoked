@@ -16,6 +16,9 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("与对等端的通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey")
     val PeerKey: String by envOf("114514aaaaaa")
 
+    val PeerId: Long by envOf(100000L)
+    val NetworkTestDomain: String by envOf("www.baidu.com")
+
     @Description("对等端和服务端通信的密钥，两端密钥必须相同才能实现和服务器的沟通。请注意与对等端的通信不使用此密钥，而是使用 PeerKey")
     val ServerKey: String by envOf("1919810bbbbbb")
 

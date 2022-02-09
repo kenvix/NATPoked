@@ -85,7 +85,7 @@ dependencies {
 
     // https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp
     implementation("com.squareup.okhttp3:okhttp:4.9.3")
-
+    implementation("ru.gildor.coroutines:kotlin-coroutines-okhttp:1.0")
 
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
     implementation("org.slf4j:slf4j-api:1.7.33")
@@ -162,6 +162,8 @@ tasks {
 
     withType<JavaCompile> {
         options.encoding = "utf-8"
+        sourceCompatibility = "11"
+        targetCompatibility = "11"
     }
 
     withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
@@ -207,6 +209,7 @@ tasks {
     }
 }
 
+// apply(from = "enableProGuard.gradle")
 apply(from = "enableGRPC.gradle")
 
 nativeBuild {

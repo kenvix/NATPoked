@@ -1,0 +1,28 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.sf.proguard:proguard-gradle:6.2.2'
+        classpath 'net.sf.proguard:proguard-base:6.2.2'
+    }
+}
+
+import proguard.gradle.ProGuardTask
+
+task proguard(type: ProGuardTask, dependsOn: compileJava) {
+    // 输出混淆前->混淆后的映射
+    printmapping "$buildDir/mapping.txt"
+    // 混淆规则文件
+    configuration 'proguard-rules.pro'
+
+    // 混淆时依赖的库
+    libraryjars files(configurations.compile.findAll {}.collect())
+    libraryjars "${System.getProperty('java.home')}/lib/rt.jar"
+    libraryjars "${System.getProperty('java.home')}/lib/jce.jar"
+
+    // 混淆输入
+    injars sourceSets.main.output
+    // 混淆输出
+    outjars "$buildDir/classes-pro"
+}

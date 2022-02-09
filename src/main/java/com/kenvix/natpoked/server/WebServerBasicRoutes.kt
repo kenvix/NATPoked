@@ -55,8 +55,8 @@ internal object WebServerBasicRoutes : KtorModule {
                 route("/peers") {
                     /**
                      * 添加或更新 Peer 信息
-                     * 请求信息可以使用 AES-256-GCM 加密的 Protobuf（根据设置决定是否加密）
-                     * Content-Type: application/octet-stream
+                     * Content-Type: application/octet-stream IF USES PROTOBUF
+                     * Content-Type: application/json IF USES JSON
                      */
                     post("/") {
                         val data: NATClientItem = call.receiveInternalData()

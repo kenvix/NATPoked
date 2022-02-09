@@ -34,9 +34,9 @@ class SerializationTest {
         val testItem = NATClientItem(
             0x1145141919810L,
             ip4.address,
-            1919,
-            System.currentTimeMillis(),
-            NATType.FULL_CONE
+            clientPort = 1919,
+            clientLastContactTime = System.currentTimeMillis(),
+            clientNatType = NATType.FULL_CONE
         )
 
         println(Json.encodeToString(testItem))
