@@ -78,6 +78,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     @Description("HTTP 地址")
     val HttpHost: String by envOf( "127.0.0.1")
+
     @Description("HTTP 端口")
     val HttpPort: Int by envOf(6449)
 

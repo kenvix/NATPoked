@@ -9,6 +9,8 @@ package com.kenvix.natpoked.client
 import com.dosse.upnp.UPnP
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.getDefaultGatewayAddress4
+import com.kenvix.natpoked.utils.getDefaultGatewayAddress6
 import com.kenvix.natpoked.utils.testNatTypeParallel
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -59,17 +61,21 @@ class NATTraversalKit : CoroutineScope {
 
     }
 
-    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem {
+    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem = withContext(Dispatchers.IO) {
         val upnpJob = async { tryUPnPAnyPort() }
+        val v4Addr = getDefaultGatewayAddress4()
         val natTypeJob = async {
-            testNatTypeParallel(InetAddress.getLocalHost())
+            testNatTypeParallel(v4Addr)
         }
 
         val natType = natTypeJob.await()
-        // TODO : IPV6
-        return NATClientItem(
+
+        NATClientItem(
             clientId = AppEnv.PeerId,
             clientPublicIpAddress = natType.publicInetAddress?.address,
+            clientPublicIp6Address = getDefaultGatewayAddress6().run {
+                if (!isLoopbackAddress || !isLinkLocalAddress || !isSiteLocalAddress) address else null
+            },
             clientPort = upnpJob.await(),
             clientNatType = natType.natType,
             isValueChecked = false

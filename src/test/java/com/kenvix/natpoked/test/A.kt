@@ -1,9 +1,6 @@
 package com.kenvix.natpoked.test
 
-import com.kenvix.natpoked.utils.getDefaultGatewayAddress4
-import com.kenvix.natpoked.utils.getDefaultGatewayAddress6
-import com.kenvix.natpoked.utils.getDefaultGatewayInterface4
-import com.kenvix.natpoked.utils.getDefaultGatewayInterface6
+import com.kenvix.natpoked.utils.*
 import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.channels.Channel
@@ -23,6 +20,11 @@ fun main() {
 
     println("Default gateway ipv4 address: ${getDefaultGatewayAddress4()}")
     println("Default gateway ipv6 address: ${getDefaultGatewayAddress6()}")
+
+    runBlocking {
+        println("Default gateway ipv4 NAT Type: ${testNatTypeParallel(getDefaultGatewayAddress4())}")
+        println("Default gateway ipv6 NAT Type: ${testNatTypeParallel(getDefaultGatewayAddress6())}")
+    }
 
 
     val array = ByteArray(16)

@@ -39,8 +39,8 @@ class NATClient(
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
-    var isIp6Supported = false // TODO: Detect if ipv6 is supported
-     // TODO: Detect if ipv6 is supported
+    val isIp6Supported
+        get() = selfClientInfo.clientPublicIp6Address != null
 
 //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
