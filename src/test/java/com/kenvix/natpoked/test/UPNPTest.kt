@@ -36,9 +36,9 @@ fun main() {
         }
         val buffer = ByteArray(1500)
 
-        val stunTest = DiscoveryTest(InetAddress.getByName(internalIp), port, port2, "stun.qq.com", 3478)
-        stunTest.timeoutInitValue = 1000
-        println(stunTest.test())
+//        val stunTest = DiscoveryTest(InetAddress.getByName(internalIp), port, port2, "stun.qq.com", 3478)
+//        stunTest.timeoutInitValue = 1000
+//        println(stunTest.test())
 
         // channel.bind(InetSocketAddress(port))
         while (true) {

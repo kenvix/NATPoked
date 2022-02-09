@@ -8,10 +8,7 @@ package com.kenvix.natpoked.client
 
 import com.dosse.upnp.UPnP
 import com.kenvix.natpoked.contacts.NATClientItem
-import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.getDefaultGatewayAddress4
-import com.kenvix.natpoked.utils.getDefaultGatewayAddress6
-import com.kenvix.natpoked.utils.testNatTypeParallel
+import com.kenvix.natpoked.utils.*
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.net.*
@@ -55,7 +52,7 @@ class NATTraversalKit : CoroutineScope {
         logger.info("NATTraversalKit started on port $port")
         val upnp = async { tryUPnPPort(port) }
         val natType = async {
-            testNatTypeParallel(srcAddr)
+            testNatType(srcAddr)
         }
 
 
@@ -65,7 +62,7 @@ class NATTraversalKit : CoroutineScope {
         val upnpJob = async { tryUPnPAnyPort() }
         val v4Addr = getDefaultGatewayAddress4()
         val natTypeJob = async {
-            testNatTypeParallel(v4Addr)
+            testNatType(v4Addr)
         }
 
         val natType = natTypeJob.await()

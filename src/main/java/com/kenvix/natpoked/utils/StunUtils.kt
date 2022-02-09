@@ -54,6 +54,36 @@ fun testNatType(inetAddr: InetAddress, stunServer: String, stunPort: Int): StunT
     }
 }
 
+fun testNatType(inetAddr: InetAddress): StunTestResult {
+    var exceptions: Exception? = null
+    for (stunServer in AppEnv.StunServerList) {
+        try {
+            val test = DiscoveryTest(inetAddr, stunServer.first, stunServer.second)
+            test.timeoutInitValue = AppEnv.StunQueryTimeout / 2
+            val result = test.test().toStunTestResult()
+            if (result.natType != NATType.BLOCKED) {
+                return result
+            }
+        } catch (e: Exception) {
+            if (exceptions == null) {
+                exceptions = e
+            } else {
+                exceptions.addSuppressed(e)
+            }
+        }
+    }
+
+    if (exceptions != null) {
+        throw exceptions
+    }
+
+    return StunTestResult(inetAddr, NATType.BLOCKED, null)
+}
+
+
+/**
+ * WARNING: NOT IMPLEMENTED, Currently Test result is unstable and cannot be trusted
+ */
 suspend fun testNatTypeParallel(inetAddr: InetAddress): StunTestResult {
     // TODO: Limit concurrent
     val resultsChannel = Channel<StunTestResult>(minOf(AppEnv.StunMaxConcurrentQueryNum, AppEnv.StunServerList.size))

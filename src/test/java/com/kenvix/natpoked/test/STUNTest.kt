@@ -6,6 +6,7 @@
 
 package com.kenvix.natpoked.test
 
+import com.kenvix.natpoked.utils.testNatType
 import com.kenvix.natpoked.utils.testNatTypeParallel
 import kotlinx.coroutines.runBlocking
 import java.net.InetAddress
@@ -28,7 +29,7 @@ object STUNTest {
                     if (inetAddr.address.size == 4 && addr0 != 127 && (addr0 != -2 && addr1 != -128) && (addr0 != -87 && addr1 != -2)) {
                         println("Iface #${iface.index} ${iface.displayName} | Addr: $inetAddr")
                         runBlocking {
-                            println(testNatTypeParallel(inetAddr))
+                            println(testNatType(inetAddr))
                         }
                     }
                 }
