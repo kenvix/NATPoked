@@ -9,11 +9,15 @@ import kotlinx.coroutines.channels.toList
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.time.withTimeout
+import org.slf4j.LoggerFactory
 import java.net.*
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalUnit
+import kotlin.math.log
 import kotlin.time.DurationUnit
+
+private val logger = LoggerFactory.getLogger("StunUtils")
 
 data class StunTestResult(
     val localInetAddress: InetAddress,
@@ -65,6 +69,7 @@ fun testNatType(inetAddr: InetAddress): StunTestResult {
                 return result
             }
         } catch (e: Exception) {
+            logger.warn("Stun test failed with server ${stunServer.first}:${stunServer.second}", e)
             if (exceptions == null) {
                 exceptions = e
             } else {

@@ -32,7 +32,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val StunMaxConcurrentQueryNum: Int by envOf(4)
 
     @Description("STUN 查询超时时间（毫秒）")
-    val StunQueryTimeout: Int by envOf(3000)
+    val StunQueryTimeout: Int by envOf(1000)
 
     val StunWaitNum: Int by envOf(2)
     val StunEachServerTestNum: Int by envOf(1)
