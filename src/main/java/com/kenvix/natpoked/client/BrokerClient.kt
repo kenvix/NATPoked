@@ -29,28 +29,35 @@ import kotlin.coroutines.CoroutineContext
 @Suppress("CAST_NEVER_SUCCEEDS")
 @OptIn(ExperimentalSerializationApi::class)
 class BrokerClient(
-    val natClient: NATClient,
     val brokerHost: String,
     val brokerPort: Int,
     val brokerPath: String = "/",
-    val brokerUseSsl: Boolean = false
+    val brokerUseSsl: Boolean = false,
+    var defaultIfaceId: Int = -1,
 ) : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName("BrokerClient: $this")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val client = OkHttpClient()
-    private val websocket: WebSocket by lazy {
-        val brokerWebSocketListener = BrokerWebSocketListener()
-        val request = Request.Builder()
-            .url("${brokerUseSsl.run { if (brokerUseSsl) "wss" else "ws" }}://$brokerHost:$brokerPort${brokerPath}api/v1/")
-            .build()
-        client.newWebSocket(request, listener = brokerWebSocketListener)
-    }
+    private lateinit var websocket: WebSocket
     private val networkOperationLock: Mutex = Mutex()
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
     private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
+    }
+
+    suspend fun connect() = withContext(Dispatchers.IO) {
+        if (::websocket.isInitialized) {
+            websocket.close(0, "Reconnecting")
+        }
+
+        val brokerWebSocketListener = BrokerWebSocketListener()
+        val request = Request.Builder()
+            .url("${brokerUseSsl.run { if (brokerUseSsl) "wss" else "ws" }}://$brokerHost:$brokerPort${brokerPath}api/v1/")
+            .build()
+        websocket = client.newWebSocket(request, listener = brokerWebSocketListener)
+        registerPeer()
     }
 
     private suspend fun send(byteArray: ByteArray) = withContext(Dispatchers.IO) {
@@ -70,6 +77,8 @@ class BrokerClient(
         val rsp = client.newCall(req).await()
         return getRequestResult<Unit?>(rsp)
     }
+
+    suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(getLocalNatClientItem(ifaceId))
 
     suspend fun unregisterPeer(clientId: PeerId): CommonJsonResult<*> {
         val req = Request.Builder()
@@ -132,7 +141,10 @@ class BrokerClient(
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             super.onFailure(webSocket, t, response)
-            logger.debug("$this failure : $t")
+            logger.debug("$this failed. reconnect: $t")
+            launch {
+                connect()
+            }
         }
 
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {

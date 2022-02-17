@@ -15,8 +15,9 @@ import java.net.*
 import java.nio.channels.DatagramChannel
 import kotlin.coroutines.CoroutineContext
 
-class NATTraversalKit : CoroutineScope {
+object NATTraversalKit : CoroutineScope {
     private val job = Job() + CoroutineName("NATTraversalKit")
+    private val logger = LoggerFactory.getLogger(NATTraversalKit::class.java)
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     lateinit var channel: DatagramChannel
         private set
@@ -66,6 +67,7 @@ class NATTraversalKit : CoroutineScope {
         }
 
         val natType = natTypeJob.await()
+        val upnp = upnpJob.await()
 
         NATClientItem(
             clientId = AppEnv.PeerId,
@@ -73,9 +75,10 @@ class NATTraversalKit : CoroutineScope {
             clientPublicIp6Address = getDefaultGatewayAddress6().run {
                 if (!isLoopbackAddress || !isLinkLocalAddress || !isSiteLocalAddress) address else null
             },
-            clientPort = upnpJob.await(),
+            clientPort = upnp,
             clientNatType = natType.natType,
-            isValueChecked = false
+            isValueChecked = false,
+            isUpnpSupported = upnp > 0,
         )
     }
 
@@ -115,21 +118,17 @@ class NATTraversalKit : CoroutineScope {
 
     private suspend fun tryUPnPAnyPort(maxTries: Int = 20): Int = withContext(Dispatchers.IO) {
         if (isPublicUPnPSupported()) {
-            val socket = DatagramSocket(0)
-            val port = socket.localPort
-            var tries = 0
-            while (!UPnP.openPortUDP(port) && tries < maxTries) {
-                tries++
-            }
+            DatagramSocket(0).use { socket ->
+                val port = socket.localPort
+                var tries = 0
+                while (!UPnP.openPortUDP(port) && tries < maxTries) {
+                    tries++
+                }
 
-            port
+                port
+            }
         } else {
             -1
         }
-    }
-
-
-    companion object {
-        private val logger = LoggerFactory.getLogger(NATTraversalKit::class.java)
     }
 }

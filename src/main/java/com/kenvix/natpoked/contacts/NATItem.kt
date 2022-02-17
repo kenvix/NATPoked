@@ -127,6 +127,7 @@ data class NATClientItem(
     val clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
     val isValueChecked: Boolean = false,
+    val isUpnpSupported: Boolean = false,
 ) {
     val clientInetAddress: InetAddress?
         get() = if (clientPublicIpAddress == null) null else InetAddress.getByAddress(clientPublicIpAddress)

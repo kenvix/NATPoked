@@ -32,15 +32,16 @@ import kotlin.coroutines.CoroutineContext
 class NATClient(
     val portRedirector: PortRedirector,
     val encryptionKey: ByteArray,
-    var selfClientInfo: NATClientItem = NATClientItem.UNKNOWN,
+    val traversalKit: NATTraversalKit = NATTraversalKit()
 ) : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName("NATClient")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
+    var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
     val isIp6Supported
-        get() = selfClientInfo.clientPublicIp6Address != null
+        get() = lastSelfClientInfo.clientPublicIp6Address != null
 
 //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
@@ -96,6 +97,11 @@ class NATClient(
     fun listenUdpSourcePort(sourcePort: Int = 0) {
         val socketAddress = InetSocketAddress(sourcePort)
         udpChannel.bind(socketAddress)
+    }
+
+    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem {
+        lastSelfClientInfo = traversalKit.getLocalNatClientItem(ifaceId)
+        return lastSelfClientInfo
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
