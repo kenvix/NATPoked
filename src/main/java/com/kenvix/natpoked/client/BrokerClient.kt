@@ -25,6 +25,7 @@ import okio.ByteString
 import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.log
 
 @Suppress("CAST_NEVER_SUCCEEDS")
 @OptIn(ExperimentalSerializationApi::class)
@@ -172,8 +173,17 @@ class BrokerClient(
                     RequestTypes.MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
                         val peerInfo = (data as CommonJsonResult<NATClientItem>).data
                         if (peerInfo != null) {
+                            logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: received peer info: $peerInfo")
                             if (peerInfo.clientInet6Address != null && isIp6Supported) {
-
+                                launch {
+                                    logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
+                                    sendUdpPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
+                                }
+                            } else {
+                                launch {
+                                    logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
+                                    sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
+                                }
                             }
                         }
                     }

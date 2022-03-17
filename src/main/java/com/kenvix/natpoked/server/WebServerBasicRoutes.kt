@@ -74,38 +74,39 @@ internal object WebServerBasicRoutes : KtorModule {
                     }
 
                     post("/connect") {
-                        val targetPeerId = peerId.id
-                        val my: NATPeerToBrokerConnection = NATServer.peerWebsocketSessionMap.getOrFail(this)
+                        val (myPeerId, targetPeerId) = call.receiveInternalData<PeerConnectRequest>()
+                        val my: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
                         my.wantToConnect[targetPeerId] = NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER
 
                         val targetPeer = NATServer.peerConnections[targetPeerId]
                         if (targetPeer != null) {
-                            if (my.client.clientId !in targetPeer.wantToConnect) {
-                                call.respondSuccess("Waiting target peer accept connection")
-                            } else {
-                                val serverRolePeer: NATPeerToBrokerConnection = maxOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
-                                val clientRolePeer: NATPeerToBrokerConnection = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                            val serverRolePeer: NATPeerToBrokerConnection = maxOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                            val clientRolePeer: NATPeerToBrokerConnection = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
 
-                                when (serverRolePeer.client.clientNatType) {
-                                    NATType.PUBLIC, NATType.FULL_CONE -> {
-                                        requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
-                                        clientRolePeer.wantToConnect[serverRolePeer.client.clientId] =
-                                            NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
+                            when (serverRolePeer.client.clientNatType) {
+                                NATType.PUBLIC, NATType.FULL_CONE -> {
+                                    requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
+                                    clientRolePeer.wantToConnect[serverRolePeer.client.clientId] =
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
 
-                                    }
-
-                                    NATType.RESTRICTED_CONE -> {
-                                        requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
-                                        serverRolePeer.wantToConnect[clientRolePeer.client.clientId] =
-                                            NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER
-
-
-                                        requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
-                                    }
+                                    call.respondSuccess("Requested to connect. One of Network type is " +
+                                            "FullCone/Public. Server is ${serverRolePeer.client.clientId}")
                                 }
+
+                                NATType.RESTRICTED_CONE -> {
+                                    requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
+                                    serverRolePeer.wantToConnect[clientRolePeer.client.clientId] =
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER
+
+                                    requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
+                                    call.respondSuccess("Requested to connect each other. One of Network type is " +
+                                            "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId}")
+                                }
+
+                                // TODO: 其他类型的 NAT
                             }
                         } else {
-                            call.respondSuccess("Waiting target peer online")
+                            call.respondData(code = 30001, info = "Target offline. Wait target peer online and try again")
                         }
                     }
 
