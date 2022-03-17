@@ -42,6 +42,9 @@ class BrokerClient(
     private val networkOperationLock: Mutex = Mutex()
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
     private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
+    var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
+    val isIp6Supported
+        get() = lastSelfClientInfo.clientPublicIp6Address != null
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
@@ -76,6 +79,11 @@ class BrokerClient(
 
         val rsp = client.newCall(req).await()
         return getRequestResult<Unit?>(rsp)
+    }
+
+    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem {
+        lastSelfClientInfo = NATTraversalKit.getLocalNatClientItem(ifaceId)
+        return lastSelfClientInfo
     }
 
     suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(getLocalNatClientItem(ifaceId))
@@ -155,11 +163,21 @@ class BrokerClient(
                     RequestTypes.ACTION_CONNECT_PEER.typeId -> {
                         val peerInfo = (data as CommonJsonResult<NATClientItem>).data
                         if (peerInfo != null) {
-                            if (peerInfo.clientInet6Address != null && natClient.isIp6Supported) {
+                            if (peerInfo.clientInet6Address != null && isIp6Supported) {
 
                             }
                         }
                     }
+
+                    RequestTypes.MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
+                        val peerInfo = (data as CommonJsonResult<NATClientItem>).data
+                        if (peerInfo != null) {
+                            if (peerInfo.clientInet6Address != null && isIp6Supported) {
+
+                            }
+                        }
+                    }
+
                     else -> logger.warn("Received unknown message type: ${data.type}")
                 }
             } catch (e: Throwable) {
