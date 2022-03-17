@@ -1,23 +1,19 @@
 package com.kenvix.natpoked.client
 
-import com.kenvix.natpoked.client.traversal.main
-import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
-import com.kenvix.natpoked.contacts.PeerCommunicationTypeId
+import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.web.utils.putUnsignedShort
 import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.PooledByteBufAllocator
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.net.*
-import java.nio.Buffer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
@@ -25,16 +21,17 @@ import java.util.*
 import kotlin.coroutines.CoroutineContext
 
 /**
- * NATPoked Client
+ * NATPoked Peer
  * @param brokerClient can be null if no broker is used
  * TODO: Async implement with kotlin coroutine flows
  */
-class NATClient(
+class NATPeer(
+    val targetPeer: PeerId,
     val portRedirector: PortRedirector,
     val encryptionKey: ByteArray,
     val brokerClient: BrokerClient? = null,
 ) : CoroutineScope, AutoCloseable {
-    private val job = Job() + CoroutineName("NATClient")
+    private val job = Job() + CoroutineName("NATPeer: Target: $targetPeer")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(encryptionKey)
@@ -53,7 +50,7 @@ class NATClient(
 
     companion object {
         private const val ivSize = 16
-        private val logger = LoggerFactory.getLogger(NATClient::class.java)
+        private val logger = LoggerFactory.getLogger(NATPeer::class.java)
     }
 
     val udpChannel: DatagramChannel =
@@ -271,7 +268,7 @@ class NATClient(
                             val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
                             if (sockAddr.port != 0) {
                                 portRedirector.writeUdpPacket(
-                                    this@NATClient,
+                                    this@NATPeer,
                                     decryptedBuf.array(),
                                     decryptedBuf.readerIndexInArrayOffset(),
                                     decryptedBuf.readableBytes(),

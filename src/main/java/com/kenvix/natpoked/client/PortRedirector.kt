@@ -19,7 +19,6 @@ import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.net.DatagramPacket
 import java.net.DatagramSocket
-import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.DatagramChannel
@@ -43,7 +42,7 @@ class PortRedirector : Closeable, CoroutineScope {
     // TODO
     @Throws(IOException::class)
     fun bindTcp(
-        client: NATClient,
+        client: NATPeer,
         port: Int,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType>
@@ -88,7 +87,7 @@ class PortRedirector : Closeable, CoroutineScope {
 
     private suspend fun receiveUdpLocalPacketAndRedirect(
         socket: DatagramSocket,
-        client: NATClient,
+        client: NATPeer,
         flags: EnumSet<PeerCommunicationType>,
         targetAddr: InetSocketAddress
     ) = withContext(Dispatchers.IO) {
@@ -112,7 +111,7 @@ class PortRedirector : Closeable, CoroutineScope {
 
     @Throws(IOException::class)
     fun bindUdp(
-        client: NATClient,
+        client: NATPeer,
         bindAddr: InetSocketAddress,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java)
@@ -129,7 +128,7 @@ class PortRedirector : Closeable, CoroutineScope {
     }
 
     fun connectUdp(
-        client: NATClient,
+        client: NATPeer,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java),
         bindAddr: InetSocketAddress? = null,
@@ -148,7 +147,7 @@ class PortRedirector : Closeable, CoroutineScope {
     }
 
     private fun createUdpRedirectJob(
-        client: NATClient,
+        client: NATPeer,
         targetAddr: InetSocketAddress,
         channel: DatagramChannel,
         flags: EnumSet<PeerCommunicationType>,
@@ -194,7 +193,7 @@ class PortRedirector : Closeable, CoroutineScope {
 
     }
 
-    suspend fun writeUdpPacket(client: NATClient, data: ByteArray, offset: Int, len: Int, addr: InetSocketAddress) {
+    suspend fun writeUdpPacket(client: NATPeer, data: ByteArray, offset: Int, len: Int, addr: InetSocketAddress) {
         val boundUdp = boundUdpChannels[addr.port]
         val packet = DatagramPacket(data, offset, len, addr)
         if (boundUdp != null) { // 已设置转发规则并绑定的端口，使用绑定的源地址
