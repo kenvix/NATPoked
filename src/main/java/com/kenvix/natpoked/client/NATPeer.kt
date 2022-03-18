@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.contacts.PeerId
@@ -22,19 +23,16 @@ import kotlin.coroutines.CoroutineContext
 
 /**
  * NATPoked Peer
- * @param brokerClient can be null if no broker is used
  * TODO: Async implement with kotlin coroutine flows
  */
 class NATPeer(
-    val targetPeer: PeerId,
-    val portRedirector: PortRedirector,
-    val encryptionKey: ByteArray,
-    val brokerClient: BrokerClient? = null,
+    val targetPeerId: PeerId,
+    encryptionKey: ByteArray? = null
 ) : CoroutineScope, AutoCloseable {
-    private val job = Job() + CoroutineName("NATPeer: Target: $targetPeer")
+    private val job = Job() + CoroutineName(this.toString())
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
-    private val aes = AES256GCM(encryptionKey)
+    private val aes = AES256GCM(encryptionKey ?: AppEnv.PeerDefaultPSK)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
 
 //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
@@ -299,6 +297,10 @@ class NATPeer(
             udpChannel.disconnect()
 
         udpChannel.connect(target)
+    }
+
+    override fun toString(): String {
+        return "NATPeer(targetPeerId=$targetPeerId)"
     }
 
     override fun close() {

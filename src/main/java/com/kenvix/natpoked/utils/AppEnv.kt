@@ -13,8 +13,11 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("是否启用调试模式，生成环境务必为 false")
     val DebugMode: Boolean by envOf(false)
 
-    @Description("与对等端的通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey")
-    val PeerKey: String by envOf("114514aaaaaa")
+    @Description("中介端地址，例如 https://example.kenvix.com/path")
+    val BrokerUrl: String by envOf("https://example.kenvix.com/path")
+
+    @Description("与对等端的默认通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey。此外，可以为 Peer 单独设置不同的 Key")
+    val PeerDefaultKey: String by envOf("114514aaaaaa")
 
     val PeerId: Long by envOf(100000L)
     val NetworkTestDomain: String by envOf("www.baidu.com")
@@ -113,7 +116,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     }
 
     // Pre shared key (256bits)
-    val PeerPSK: ByteArray = sha256Of(PeerKey)
+    val PeerDefaultPSK: ByteArray = sha256Of(PeerDefaultKey)
     val ServerPSK: ByteArray = sha256Of(ServerKey)
 
     val PeerToBrokenPingIntervalDuration = PeerToBrokenPingInterval.toDuration(DurationUnit.MILLISECONDS)

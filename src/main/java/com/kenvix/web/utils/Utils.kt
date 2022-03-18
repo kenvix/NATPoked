@@ -207,6 +207,13 @@ inline fun <R> String?.ifNotNullOrBlank(then: ((String) -> R?)): R? {
     return null
 }
 
+inline fun String?.default(defaultValue: String): String {
+    return if (this == null || this.isBlank())
+        defaultValue
+    else
+        this
+}
+
 inline fun <T, U, R> T?.ifNotNull(par: U?, then: ((T, U) -> R?)): R? {
     if (this != null && par != null)
         return then(this, par)
