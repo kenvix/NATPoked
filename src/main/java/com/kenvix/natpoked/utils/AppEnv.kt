@@ -1,6 +1,7 @@
 package com.kenvix.natpoked.utils
 
 import com.kenvix.natpoked.AppConstants
+import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.utils.annotation.Description
 import com.kenvix.utils.preferences.ManagedEnvFile
 import java.security.MessageDigest
@@ -19,7 +20,12 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("与对等端的默认通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey。此外，可以为 Peer 单独设置不同的 Key")
     val PeerDefaultKey: String by envOf("114514aaaaaa")
 
+    @Description("信任的 Peer 列表，用空格 分隔，格式为 peerid:key 或者 peerid。例如 123456:password 987654:abcdef")
+    val PeerTrusts: String by envOf("")
+
+    @Description("我的 PeerID，必须全局唯一。建议随机生成一个64位正整数。不能为空")
     val PeerId: Long by envOf(100000L)
+
     val NetworkTestDomain: String by envOf("www.baidu.com")
 
     @Description("对等端和服务端通信的密钥，两端密钥必须相同才能实现和服务器的沟通。请注意与对等端的通信不使用此密钥，而是使用 PeerKey")
@@ -118,6 +124,11 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     // Pre shared key (256bits)
     val PeerDefaultPSK: ByteArray = sha256Of(PeerDefaultKey)
     val ServerPSK: ByteArray = sha256Of(ServerKey)
+    val PeerTrustList: Map<PeerId, ByteArray> = PeerTrusts.split(' ').associate {
+        it.split(':').run {
+            this[0].toLong() to (this.getOrNull(1)?.run { sha256Of(this) } ?: PeerDefaultPSK)
+        }
+    }
 
     val PeerToBrokenPingIntervalDuration = PeerToBrokenPingInterval.toDuration(DurationUnit.MILLISECONDS)
     val PeerToBrokenTimeoutDuration = PeerToBrokenTimeout.toDuration(DurationUnit.MILLISECONDS)

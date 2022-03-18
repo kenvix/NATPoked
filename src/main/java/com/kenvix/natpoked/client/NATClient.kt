@@ -1,9 +1,12 @@
 package com.kenvix.natpoked.client
 
+import com.google.common.cache.CacheStats
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.web.server.Cached
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.ifNotNullOrBlank
+import com.kenvix.web.utils.noException
 import java.net.URL
 
 object NATClient {
@@ -23,6 +26,28 @@ object NATClient {
             },
             url.path.default("/"), url.protocol == "https"
         )
+    }
+
+    fun addPeer(targetPeerId: PeerId, key: ByteArray? = null) {
+        if (peersImpl.containsKey(targetPeerId))
+            return
+
+        val peer = NATPeer(targetPeerId, key)
+        addPeer(peer)
+    }
+
+    fun addPeer(peer: NATPeer) {
+        peersImpl[peer.targetPeerId] = peer
+    }
+
+    fun removePeer(targetPeerId: PeerId) {
+        if (peersImpl.containsKey(targetPeerId)) {
+            noException {
+                peersImpl[targetPeerId]?.close()
+            }
+
+            peersImpl.remove(targetPeerId)
+        }
     }
 
     override fun toString(): String {

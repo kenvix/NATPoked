@@ -4,7 +4,6 @@ package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.RequestTypes.*
-import com.kenvix.natpoked.server.WebServerBasicRoutes.handlePeerControlSocketFrame
 import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.lang.toUnit
@@ -15,6 +14,7 @@ import io.ktor.features.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.http.content.*
 import io.ktor.locations.*
+import io.ktor.locations.post
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
@@ -22,7 +22,6 @@ import io.ktor.sessions.*
 import io.ktor.websocket.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.slf4j.LoggerFactory
-import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
 @Suppress("unused", "DuplicatedCode", "UNCHECKED_CAST") // Referenced in application.conf
@@ -57,10 +56,11 @@ internal object WebServerBasicRoutes : KtorModule {
                      * 添加或更新 Peer 信息
                      * Content-Type: application/octet-stream IF USES PROTOBUF
                      * Content-Type: application/json IF USES JSON
+                     * /peers
                      */
                     post("/") {
                         val data: NATClientItem = call.receiveInternalData()
-                        NATServer.peerConnections[data.clientId] = NATPeerToBrokerConnection(data)
+                        NATServer.addPeerConnection(data)
                         call.respondSuccess()
                     }
 
@@ -69,14 +69,38 @@ internal object WebServerBasicRoutes : KtorModule {
                     }
 
                     delete<PeerIDLocation> { peerId ->
-                        NATServer.peerConnections.remove(peerId.id)
+                        NATServer.removePeerConnection(peerId.id)
                         call.respondSuccess()
+                    }
+
+                    /**
+                     * 对某个 Peer，添加 PeerId-Port 端口映射
+                     * /peers/:peerId/connections
+                     */
+                    post<PeerIDLocation.Connections> { peerId ->
+                        call.respondSuccess()
+                    }
+
+                    /**
+                     * 对某个 Peer，删除 PeerId-Port 端口映射
+                     * /peers/:peerId/connections/:targetPeerId
+                     */
+                    delete<PeerIDLocation.Connections.TargetPeer> { peerId ->
+                        call.respondSuccess()
+                    }
+
+                    /**
+                     * 对某个 Peer，获取 PeerId-Port 端口映射
+                     * /peers/:peerId/connections
+                     */
+                    get<PeerIDLocation.Connections.TargetPeer> { peerId ->
+
                     }
 
                     post("/connect") {
                         val (myPeerId, targetPeerId) = call.receiveInternalData<PeerConnectRequest>()
                         val my: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
-                        my.wantToConnect[targetPeerId] = NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER
+                        my.connections[targetPeerId] = NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER
 
                         val targetPeer = NATServer.peerConnections[targetPeerId]
                         if (targetPeer != null) {
@@ -86,7 +110,7 @@ internal object WebServerBasicRoutes : KtorModule {
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {
                                     requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
-                                    clientRolePeer.wantToConnect[serverRolePeer.client.clientId] =
+                                    clientRolePeer.connections[serverRolePeer.client.clientId] =
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
 
                                     call.respondSuccess("Requested to connect. One of Network type is " +
@@ -95,7 +119,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                                 NATType.RESTRICTED_CONE -> {
                                     requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
-                                    serverRolePeer.wantToConnect[clientRolePeer.client.clientId] =
+                                    serverRolePeer.connections[clientRolePeer.client.clientId] =
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER
 
                                     requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)

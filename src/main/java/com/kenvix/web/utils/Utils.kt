@@ -4,6 +4,7 @@
 package com.kenvix.web.utils
 
 import org.apache.commons.lang3.math.NumberUtils
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.net.URI
@@ -19,6 +20,7 @@ import java.util.*
 import kotlin.math.ln
 import kotlin.math.pow
 
+private val logger = LoggerFactory.getLogger("Utils")
 
 typealias DateTime = OffsetDateTime
 fun DateTime.toEpochMilli() = toInstant().toEpochMilli()
@@ -354,4 +356,12 @@ fun ByteBuffer.getUnsignedInt(position: Int): Long {
 
 fun ByteBuffer.putUnsignedInt(position: Int, value: Long) {
     this.putInt(position, (value and 0xffffffffL).toInt())
+}
+
+fun noException(block: () -> Unit) {
+    try {
+        block()
+    } catch (e: Exception) {
+        logger.debug("Suppressed internal exception", e)
+    }
 }

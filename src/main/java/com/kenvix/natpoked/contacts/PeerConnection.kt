@@ -1,8 +1,6 @@
 package com.kenvix.natpoked.contacts
 
-import com.google.common.collect.Sets
 import io.ktor.http.cio.websocket.*
-import io.ktor.util.collections.*
 import java.util.concurrent.ConcurrentHashMap
 
 enum class NATPeerToBrokerConnectionStage {
@@ -26,7 +24,7 @@ data class NATPeerToBrokerConnection(
     /**
      * State machine for peer to peer connection
      */
-    val wantToConnect: MutableMap<PeerId, NATPeerToPeerConnectionStage> = ConcurrentHashMap()
+    val connections: MutableMap<PeerId, Connection> = ConcurrentHashMap()
 ) {
     companion object {
         @JvmStatic
@@ -34,4 +32,9 @@ data class NATPeerToBrokerConnection(
             b.client.clientNatType.levelId - a.client.clientNatType.levelId
         }
     }
+
+    data class Connection(
+        val port: Int,
+        val stage: NATPeerToPeerConnectionStage
+    )
 }

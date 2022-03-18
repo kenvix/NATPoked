@@ -20,8 +20,31 @@ import java.util.concurrent.ConcurrentHashMap
 
 object NATServer {
     internal val logger = LoggerFactory.getLogger(javaClass)
-    val peerConnections: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
+    private val peerConnectionsImpl: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
+    val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
+        get() = peerConnectionsImpl
+
     val peerWebsocketSessionMap: MutableMap<DefaultWebSocketSession, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
+
+    fun addPeerConnection(peerId: PeerId, connection: NATPeerToBrokerConnection) {
+        peerConnectionsImpl[peerId] = connection
+    }
+
+    fun addPeerConnection(clientItem: NATClientItem) {
+        addPeerConnection(clientItem.clientId, NATPeerToBrokerConnection(clientItem))
+    }
+
+    fun addPeerWebsocketSession(session: DefaultWebSocketSession, connection: NATPeerToBrokerConnection) {
+        peerWebsocketSessionMap[session] = connection
+    }
+
+    fun removePeerWebsocketSession(session: DefaultWebSocketSession) {
+        peerWebsocketSessionMap.remove(session)
+    }
+
+    fun removePeerConnection(peerId: PeerId) {
+        peerConnectionsImpl.remove(peerId)
+    }
 
     val ktorEmbeddedServer = embeddedServer(CIO, port = AppEnv.HttpPort, host = AppEnv.HttpHost, watchPaths = run {
         if (AppEnv.DebugMode && System.getProperty("hotReloadSupported")?.toBoolean() == true) {

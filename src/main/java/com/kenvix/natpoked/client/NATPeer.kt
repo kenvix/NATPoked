@@ -115,6 +115,8 @@ class NATPeer(
         }
     }
 
+    fun getLocalPort(): Int = udpSocket.localPort
+
     private fun putTypeFlags(inTypeId: Int, targetAddr: InetAddress, flags: EnumSet<PeerCommunicationType>): Int {
         var typeId: Int = inTypeId
         if (STATUS_ENCRYPTED in flags) {
