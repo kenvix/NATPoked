@@ -13,7 +13,7 @@ import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
 import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.HttpClient
+import com.kenvix.natpoked.utils.httpClient
 import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.*
 import kotlinx.coroutines.*
@@ -65,7 +65,7 @@ class BrokerClient(
         val request = Request.Builder()
             .url("${brokerUseSsl.run { if (brokerUseSsl) "wss" else "ws" }}://$brokerHost:$brokerPort${brokerPath}api/v1/")
             .build()
-        websocket = HttpClient.newWebSocket(request, listener = brokerWebSocketListener)
+        websocket = httpClient.newWebSocket(request, listener = brokerWebSocketListener)
         registerPeer()
     }
 
@@ -73,13 +73,13 @@ class BrokerClient(
         val request = Request.Builder()
             .url("$baseHttpUrl$url")
             .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
+            .header("Content-Type", "application/json; charset=utf-8")
             .header("User-Agent", "NATPoked/1.0")
             .header("X-Key", encodedServerKey)
             .method(method, data?.let { Json.encodeToString(it).toRequestBody() })
             .build()
 
-        return HttpClient.newCall(request).await()
+        return httpClient.newCall(request).await()
     }
 
     private suspend fun send(byteArray: ByteArray) = withContext(Dispatchers.IO) {
@@ -87,7 +87,7 @@ class BrokerClient(
     }
 
     private suspend fun send(data: CommonRequest<*>) {
-        send(ProtoBuf.encodeToByteArray(data))
+        websocket.send(Json.encodeToString(data))
     }
 
     suspend fun registerPeer(clientItem: NATClientItem): CommonJsonResult<*> {
@@ -97,6 +97,11 @@ class BrokerClient(
 
     suspend fun registerPeerToPeerPort(myPeerId: PeerId, targetPeerId: PeerId, port: Int): CommonJsonResult<*> {
         val rsp = requestAPI("/peers/$myPeerId/connections/", "POST", PeerAddPortMapRequest(targetPeerId, port))
+        return getRequestResult<Unit?>(rsp)
+    }
+
+    suspend fun unregisterPeerToPeerPort(myPeerId: PeerId, targetPeerId: PeerId): CommonJsonResult<*> {
+        val rsp = requestAPI("/peers/$myPeerId/connections/$targetPeerId", "DELETE")
         return getRequestResult<Unit?>(rsp)
     }
 
