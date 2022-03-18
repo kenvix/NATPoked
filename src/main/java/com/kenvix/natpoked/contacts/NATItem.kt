@@ -123,7 +123,7 @@ data class NATClientItem(
     val clientId: PeerId,
     val clientPublicIpAddress: ByteArray?,
     val clientPublicIp6Address: ByteArray? = null,
-    val clientPort: Int = 0,
+    @Deprecated("Each p2p connection should has their own port") val clientPort: Int = 0,
     val clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
     val isValueChecked: Boolean = false,

@@ -24,8 +24,23 @@ data class NATPeerToBrokerConnection(
     /**
      * State machine for peer to peer connection
      */
-    val connections: MutableMap<PeerId, Connection> = ConcurrentHashMap()
+    private val connectionsImpl: MutableMap<PeerId, Connection> = ConcurrentHashMap()
 ) {
+    val connections: Map<PeerId, Connection>
+        get() = connectionsImpl
+
+    fun addConnection(peerId: PeerId, connection: Connection = Connection(-1, NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER)) {
+        connectionsImpl[peerId] = connection
+    }
+
+    fun removeConnection(peerId: PeerId) {
+        connectionsImpl.remove(peerId)
+    }
+
+    fun setConnectionStage(peerId: PeerId, stage: NATPeerToPeerConnectionStage) {
+        connectionsImpl[peerId]?.stage = stage
+    }
+
     companion object {
         @JvmStatic
         val natTypeComparator: Comparator<NATPeerToBrokerConnection> = Comparator { a, b ->
@@ -34,7 +49,7 @@ data class NATPeerToBrokerConnection(
     }
 
     data class Connection(
-        val port: Int,
-        val stage: NATPeerToPeerConnectionStage
+        var port: Int,
+        var stage: NATPeerToPeerConnectionStage
     )
 }

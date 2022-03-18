@@ -7,10 +7,14 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.contacts.NATClientItem
+import com.kenvix.natpoked.contacts.PeerAddPortMapRequest
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
+import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.HttpClient
+import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -38,7 +42,6 @@ class BrokerClient(
 ) : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName("BrokerClient: $this")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
-    private val client = OkHttpClient()
     private lateinit var websocket: WebSocket
     private val networkOperationLock: Mutex = Mutex()
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
@@ -46,6 +49,8 @@ class BrokerClient(
     var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
     val isIp6Supported
         get() = lastSelfClientInfo.clientPublicIp6Address != null
+    private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
+
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
@@ -60,8 +65,21 @@ class BrokerClient(
         val request = Request.Builder()
             .url("${brokerUseSsl.run { if (brokerUseSsl) "wss" else "ws" }}://$brokerHost:$brokerPort${brokerPath}api/v1/")
             .build()
-        websocket = client.newWebSocket(request, listener = brokerWebSocketListener)
+        websocket = HttpClient.newWebSocket(request, listener = brokerWebSocketListener)
         registerPeer()
+    }
+
+    private suspend fun requestAPI(url: String, method: String, data: Any? = null): Response {
+        val request = Request.Builder()
+            .url("$baseHttpUrl$url")
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("User-Agent", "NATPoked/1.0")
+            .header("X-Key", encodedServerKey)
+            .method(method, data?.let { Json.encodeToString(it).toRequestBody() })
+            .build()
+
+        return HttpClient.newCall(request).await()
     }
 
     private suspend fun send(byteArray: ByteArray) = withContext(Dispatchers.IO) {
@@ -73,12 +91,12 @@ class BrokerClient(
     }
 
     suspend fun registerPeer(clientItem: NATClientItem): CommonJsonResult<*> {
-        val req = Request.Builder()
-            .url("$baseHttpUrl/peers/")
-            .post(Json.encodeToString(clientItem).toRequestBody())
-            .build()
+        val rsp = requestAPI("/peers/", "POST", clientItem)
+        return getRequestResult<Unit?>(rsp)
+    }
 
-        val rsp = client.newCall(req).await()
+    suspend fun registerPeerToPeerPort(myPeerId: PeerId, targetPeerId: PeerId, port: Int): CommonJsonResult<*> {
+        val rsp = requestAPI("/peers/$myPeerId/connections/", "POST", PeerAddPortMapRequest(targetPeerId, port))
         return getRequestResult<Unit?>(rsp)
     }
 
@@ -90,22 +108,12 @@ class BrokerClient(
     suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(getLocalNatClientItem(ifaceId))
 
     suspend fun unregisterPeer(clientId: PeerId): CommonJsonResult<*> {
-        val req = Request.Builder()
-            .url("$baseHttpUrl/peers/$clientId")
-            .delete()
-            .build()
-
-        val rsp = client.newCall(req).await()
+        val rsp = requestAPI("/peers/$clientId", "DELETE")
         return getRequestResult<Unit?>(rsp)
     }
 
     suspend fun getPeerInfo(clientId: PeerId): NATClientItem {
-        val req = Request.Builder()
-            .url("$baseHttpUrl/peers/$clientId")
-            .get()
-            .build()
-
-        val rsp = client.newCall(req).await()
+        val rsp = requestAPI("/peers/$clientId", "GET")
         return getRequestResult<NATClientItem>(rsp).data!!
     }
 
@@ -138,7 +146,6 @@ class BrokerClient(
     }
 
     override fun close() {
-        client.dispatcher.executorService.shutdown()
         coroutineContext.cancel()
     }
 

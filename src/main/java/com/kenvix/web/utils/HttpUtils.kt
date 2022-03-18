@@ -186,16 +186,16 @@ inline fun <T: Any> T?.validateValue(passCondition: (check: T) -> Boolean): T
         = validateValue("Illegal input data: $this", passCondition)
 
 
-fun <T: Any> T?.assertNotNull(): T {
+fun <T: Any> T?.assertNotNull(msg: String = "Illegal input data: Required data is null"): T {
     if (this == null)
-        throw BadRequestException("Illegal input data: Required data is null")
+        throw BadRequestException(msg)
 
     return this
 }
 
-fun <T: Any> T?.assertExist(): T {
+fun <T: Any> T?.assertExist(msg: String = "Specified data not exist"): T {
     if (this == null)
-        throw NotFoundException("Specified data not exist")
+        throw NotFoundException(msg)
 
     return this
 }

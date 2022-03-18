@@ -25,7 +25,7 @@ import kotlin.coroutines.CoroutineContext
  * NATPoked Peer
  * TODO: Async implement with kotlin coroutine flows
  */
-class NATPeer(
+class NATPeerToPeer(
     val targetPeerId: PeerId,
     encryptionKey: ByteArray? = null
 ) : CoroutineScope, AutoCloseable {
@@ -48,7 +48,7 @@ class NATPeer(
 
     companion object {
         private const val ivSize = 16
-        private val logger = LoggerFactory.getLogger(NATPeer::class.java)
+        private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
     }
 
     val udpChannel: DatagramChannel =
@@ -268,7 +268,7 @@ class NATPeer(
                             val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
                             if (sockAddr.port != 0) {
                                 portRedirector.writeUdpPacket(
-                                    this@NATPeer,
+                                    this@NATPeerToPeer,
                                     decryptedBuf.array(),
                                     decryptedBuf.readerIndexInArrayOffset(),
                                     decryptedBuf.readableBytes(),

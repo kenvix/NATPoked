@@ -42,7 +42,7 @@ class PortRedirector : Closeable, CoroutineScope {
     // TODO
     @Throws(IOException::class)
     fun bindTcp(
-        client: NATPeer,
+        client: NATPeerToPeer,
         port: Int,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType>
@@ -87,7 +87,7 @@ class PortRedirector : Closeable, CoroutineScope {
 
     private suspend fun receiveUdpLocalPacketAndRedirect(
         socket: DatagramSocket,
-        client: NATPeer,
+        client: NATPeerToPeer,
         flags: EnumSet<PeerCommunicationType>,
         targetAddr: InetSocketAddress
     ) = withContext(Dispatchers.IO) {
@@ -111,7 +111,7 @@ class PortRedirector : Closeable, CoroutineScope {
 
     @Throws(IOException::class)
     fun bindUdp(
-        client: NATPeer,
+        client: NATPeerToPeer,
         bindAddr: InetSocketAddress,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java)
@@ -128,7 +128,7 @@ class PortRedirector : Closeable, CoroutineScope {
     }
 
     fun connectUdp(
-        client: NATPeer,
+        client: NATPeerToPeer,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java),
         bindAddr: InetSocketAddress? = null,
@@ -147,7 +147,7 @@ class PortRedirector : Closeable, CoroutineScope {
     }
 
     private fun createUdpRedirectJob(
-        client: NATPeer,
+        client: NATPeerToPeer,
         targetAddr: InetSocketAddress,
         channel: DatagramChannel,
         flags: EnumSet<PeerCommunicationType>,
@@ -193,7 +193,7 @@ class PortRedirector : Closeable, CoroutineScope {
 
     }
 
-    suspend fun writeUdpPacket(client: NATPeer, data: ByteArray, offset: Int, len: Int, addr: InetSocketAddress) {
+    suspend fun writeUdpPacket(client: NATPeerToPeer, data: ByteArray, offset: Int, len: Int, addr: InetSocketAddress) {
         val boundUdp = boundUdpChannels[addr.port]
         val packet = DatagramPacket(data, offset, len, addr)
         if (boundUdp != null) { // 已设置转发规则并绑定的端口，使用绑定的源地址

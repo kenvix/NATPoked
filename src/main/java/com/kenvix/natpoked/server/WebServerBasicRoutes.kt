@@ -74,10 +74,17 @@ internal object WebServerBasicRoutes : KtorModule {
                     }
 
                     /**
-                     * 对某个 Peer，添加 PeerId-Port 端口映射
+                     * 对某个 Peer，设置 PeerId-Port 端口映射
                      * /peers/:peerId/connections
                      */
                     post<PeerIDLocation.Connections> { peerId ->
+                        val req: PeerAddPortMapRequest = call.receiveInternalData()
+                        NATServer
+                            .peerConnections[peerId.parent.id]
+                            .assertExist("Peer ${peerId.parent.id} not found")
+                            .connections[req.targetPeerId]
+                            .assertExist("Peer connections ${req.targetPeerId} not found")
+                            .port = req.port
                         call.respondSuccess()
                     }
 
@@ -86,6 +93,12 @@ internal object WebServerBasicRoutes : KtorModule {
                      * /peers/:peerId/connections/:targetPeerId
                      */
                     delete<PeerIDLocation.Connections.TargetPeer> { peerId ->
+                        NATServer
+                            .peerConnections[peerId.parent.id]
+                            .assertExist("Peer ${peerId.parent.id} not found")
+                            .connections[peerId.targetPeerId]
+                            .assertExist("Peer connections ${peerId.targetPeerId} not found")
+                            .port = -1
                         call.respondSuccess()
                     }
 
@@ -94,13 +107,19 @@ internal object WebServerBasicRoutes : KtorModule {
                      * /peers/:peerId/connections
                      */
                     get<PeerIDLocation.Connections.TargetPeer> { peerId ->
-
+                        val port = NATServer
+                            .peerConnections[peerId.parent.id]
+                            .assertExist("Peer ${peerId.parent.id} not found")
+                            .connections[peerId.targetPeerId]
+                            .assertExist("Peer connections ${peerId.targetPeerId} not found")
+                            .port
+                        call.respondSuccess(data = "port" to port)
                     }
 
                     post("/connect") {
                         val (myPeerId, targetPeerId) = call.receiveInternalData<PeerConnectRequest>()
                         val my: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
-                        my.connections[targetPeerId] = NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER
+                        my.addConnection(targetPeerId)
 
                         val targetPeer = NATServer.peerConnections[targetPeerId]
                         if (targetPeer != null) {
@@ -110,8 +129,8 @@ internal object WebServerBasicRoutes : KtorModule {
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {
                                     requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
-                                    clientRolePeer.connections[serverRolePeer.client.clientId] =
-                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
+                                    clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
                                     call.respondSuccess("Requested to connect. One of Network type is " +
                                             "FullCone/Public. Server is ${serverRolePeer.client.clientId}")
@@ -119,15 +138,15 @@ internal object WebServerBasicRoutes : KtorModule {
 
                                 NATType.RESTRICTED_CONE -> {
                                     requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
-                                    serverRolePeer.connections[clientRolePeer.client.clientId] =
-                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER
+                                    clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
                                     requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
                                             "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId}")
                                 }
 
-                                // TODO: 其他类型的 NAT
+                                else -> TODO("其他类型的 NAT")
                             }
                         } else {
                             call.respondData(code = 30001, info = "Target offline. Wait target peer online and try again")
@@ -205,7 +224,7 @@ internal object WebServerBasicRoutes : KtorModule {
             is Frame.Close -> {
                 try {
                     NATServer.peerWebsocketSessionMap[this]?.apply {
-                        NATServer.peerConnections.remove(client.clientId)
+                        NATServer.removePeerConnection(client.clientId)
                     }
 
                     NATServer.peerWebsocketSessionMap.remove(this)

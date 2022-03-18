@@ -1,17 +1,14 @@
 package com.kenvix.natpoked.client
 
-import com.google.common.cache.CacheStats
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.web.server.Cached
 import com.kenvix.web.utils.default
-import com.kenvix.web.utils.ifNotNullOrBlank
 import com.kenvix.web.utils.noException
 import java.net.URL
 
 object NATClient {
-    private val peersImpl: MutableMap<PeerId, NATPeer> = mutableMapOf()
-    val peers: Map<PeerId, NATPeer>
+    private val peersImpl: MutableMap<PeerId, NATPeerToPeer> = mutableMapOf()
+    val peers: Map<PeerId, NATPeerToPeer>
         get() = peersImpl
 
     val portRedirector: PortRedirector = PortRedirector()
@@ -32,11 +29,11 @@ object NATClient {
         if (peersImpl.containsKey(targetPeerId))
             return
 
-        val peer = NATPeer(targetPeerId, key)
+        val peer = NATPeerToPeer(targetPeerId, key)
         addPeer(peer)
     }
 
-    fun addPeer(peer: NATPeer) {
+    fun addPeer(peer: NATPeerToPeer) {
         peersImpl[peer.targetPeerId] = peer
     }
 

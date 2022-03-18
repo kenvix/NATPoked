@@ -1,6 +1,6 @@
 package com.kenvix.natpoked.contacts
 
-import com.kenvix.natpoked.client.NATPeer
+import com.kenvix.natpoked.client.NATPeerToPeer
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import java.net.DatagramPacket
@@ -13,7 +13,7 @@ sealed interface RedirectJob<T> {
     val readJob: Job
     val writeJob: Job
     val typeFlags: EnumSet<PeerCommunicationType>
-    val client: NATPeer
+    val client: NATPeerToPeer
     val targetAddr: InetSocketAddress
     val receiveQueue: Channel<T>
     val sendQueue: Channel<T>
@@ -24,7 +24,7 @@ data class TcpRedirectJob(
     override val readJob: Job,
     override val writeJob: Job,
     override val typeFlags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java),
-    override val client: NATPeer,
+    override val client: NATPeerToPeer,
     override val targetAddr: InetSocketAddress,
     override val receiveQueue: Channel<Any> = Channel(),
     override val sendQueue: Channel<Any> = Channel(),
@@ -35,7 +35,7 @@ data class UdpRedirectJob(
     override val readJob: Job,
     override val writeJob: Job,
     override val typeFlags: EnumSet<PeerCommunicationType> = EnumSet.noneOf(PeerCommunicationType::class.java),
-    override val client: NATPeer,
+    override val client: NATPeerToPeer,
     override val targetAddr: InetSocketAddress,
     override val receiveQueue: Channel<DatagramPacket> = Channel(),
     override val sendQueue: Channel<DatagramPacket> = Channel(),

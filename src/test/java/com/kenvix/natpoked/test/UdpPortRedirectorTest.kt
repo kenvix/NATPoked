@@ -7,7 +7,7 @@
 package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.client.BrokerClient
-import com.kenvix.natpoked.client.NATPeer
+import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.PortRedirector
 import com.kenvix.natpoked.utils.sha256Of
 import kotlinx.coroutines.*
@@ -50,16 +50,16 @@ class UdpPortRedirectorTest {
     @Test
     fun test() {
         val portRedirector = PortRedirector()
-        val natPeer = NATPeer(0, portRedirector = portRedirector, encryptionKey = testKey)
-        val brokerClient = BrokerClient(natPeer, "127.0.0.1", 4000, "/")
-        natPeer.listenUdpSourcePort(4001)
+        val natPeerToPeer = NATPeerToPeer(0, portRedirector = portRedirector, encryptionKey = testKey)
+        val brokerClient = BrokerClient(natPeerToPeer, "127.0.0.1", 4000, "/")
+        natPeerToPeer.listenUdpSourcePort(4001)
         val addr1 = Inet4Address.getByName("127.0.0.1")
         val addr2 = addr1
         val port1 = 5000
         val port2 = 5001
         // portRedirector.bindUdp(natClient, addr1, port1, addr2, port2)
-        natPeer.connectTo(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 4001))
-        portRedirector.bindUdp(natPeer, InetSocketAddress(addr2, port2), InetSocketAddress(addr1, port1))
+        natPeerToPeer.connectTo(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 4001))
+        portRedirector.bindUdp(natPeerToPeer, InetSocketAddress(addr2, port2), InetSocketAddress(addr1, port1))
 
         runBlocking {
             val job1 = async(Dispatchers.IO) {
