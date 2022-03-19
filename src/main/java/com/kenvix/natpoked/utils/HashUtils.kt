@@ -13,3 +13,8 @@ fun sha256Of(str: String): ByteArray = str.let { strText ->
     sha256MessageDigest.update(strText.toByteArray())
     sha256MessageDigest.digest()
 }
+
+fun sha256Of(str: ByteArray): ByteArray = str.let { strText ->
+    sha256MessageDigest.update(strText)
+    sha256MessageDigest.digest()
+}

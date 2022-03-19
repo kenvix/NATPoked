@@ -1,0 +1,33 @@
+peers:
+  peer001:
+    id: 200000
+    key: passwordpasswordpasswordpassword
+    # 端口转发配置（可选）
+    ports:
+      https:
+        # 协议：TCP | UDP
+        protocol: TCP
+        # 源主机（由NATPoked侦听）
+        srcHost: 127.0.0.1
+        # 源端口（由NATPoked侦听）
+        srcPort: 50001
+        # 目标主机
+        dstHost: 127.0.0.1
+        # 目标端口
+        dstPort: 443
+    # WireGuard 配置（可选）
+    # 本功能可以让 NATPoked 自动进行简单的 WireGuard 配置，如果需要更高级的 WireGuard 功能，则请使用上面的端口转发功能
+    wireguard:
+      enabled: true
+      # 我的私钥
+      privateKey:
+      # 我的地址（CIDR表示法）
+      address:
+      # 允许的 IP （CIDR表示法）
+      allowedIPs:
+      # 监听的端口
+      listenPort:
+      # MTU
+      mtu: 1400
+      # DNS
+      dns:

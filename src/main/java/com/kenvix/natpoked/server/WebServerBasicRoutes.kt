@@ -162,10 +162,6 @@ internal object WebServerBasicRoutes : KtorModule {
                             handlePeerControlSocketFrame(frame, call)
                         }
                     }
-
-                    get("/events") {
-
-                    }
                 }
             }
         }
@@ -236,6 +232,6 @@ internal object WebServerBasicRoutes : KtorModule {
     }
 
     private suspend fun requestPeerMakeConnection(requestedPeer: DefaultWebSocketSession, targetPeerClientInfo: NATClientItem) {
-        requestedPeer.sendProtobuf(ACTION_CONNECT_PEER, targetPeerClientInfo)
+        requestedPeer.sendInternalJson(ACTION_CONNECT_PEER, targetPeerClientInfo.clientId, targetPeerClientInfo)
     }
 }

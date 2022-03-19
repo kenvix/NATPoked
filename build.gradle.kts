@@ -63,8 +63,10 @@ dependencies {
     // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-serialization-protobuf
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.3.2")
 
+    implementation("net.mamoe.yamlkt:yamlkt:0.10.2")
+
     // https://mvnrepository.com/artifact/com.google.guava/guava
-    implementation("com.google.guava:guava:31.0.1-jre")
+    implementation("com.google.guava:guava:31.1-jre")
 
 
     /* Ktor server things */
@@ -88,7 +90,7 @@ dependencies {
     implementation("ru.gildor.coroutines:kotlin-coroutines-okhttp:1.0")
 
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
-    implementation("org.slf4j:slf4j-api:1.7.33")
+    implementation("org.slf4j:slf4j-api:1.7.36")
 
     // https://mvnrepository.com/artifact/io.github.cdimascio/java-dotenv
     implementation("io.github.cdimascio:java-dotenv:5.2.2")

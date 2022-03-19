@@ -246,8 +246,8 @@ suspend inline fun <reified T> ApplicationCall.receiveData(): T {
 }
 
 
-suspend fun <T> DefaultWebSocketSession.sendProtobuf(typeId: Int, data: T) {
-    send(ProtoBuf.encodeToByteArray(CommonRequest<T>(typeId, data)))
-}
-
-suspend fun <T> DefaultWebSocketSession.sendProtobuf(typeId: RequestTypes, data: T) = sendProtobuf(typeId.typeId, data)
+//suspend fun <T> DefaultWebSocketSession.sendProtobuf(typeId: Int, data: T) {
+//    send(ProtoBuf.encodeToByteArray(CommonRequest<T>(typeId, data)))
+//}
+//
+//suspend fun <T> DefaultWebSocketSession.sendProtobuf(typeId: RequestTypes, data: T) = sendProtobuf(typeId.typeId, data)

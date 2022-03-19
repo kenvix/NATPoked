@@ -50,8 +50,8 @@ class UdpPortRedirectorTest {
     @Test
     fun test() {
         val portRedirector = PortRedirector()
-        val natPeerToPeer = NATPeerToPeer(0, portRedirector = portRedirector, encryptionKey = testKey)
-        val brokerClient = BrokerClient(natPeerToPeer, "127.0.0.1", 4000, "/")
+        val natPeerToPeer = NATPeerToPeer(0, encryptionKey = testKey)
+        val brokerClient = BrokerClient("127.0.0.1", 4000, "/")
         natPeerToPeer.listenUdpSourcePort(4001)
         val addr1 = Inet4Address.getByName("127.0.0.1")
         val addr2 = addr1
