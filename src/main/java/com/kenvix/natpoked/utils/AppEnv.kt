@@ -1,6 +1,7 @@
 package com.kenvix.natpoked.utils
 
 import com.kenvix.natpoked.AppConstants
+import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.utils.annotation.Description
 import com.kenvix.utils.preferences.ManagedEnvFile
@@ -11,11 +12,21 @@ import kotlin.time.toDuration
 
 
 object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
-    @Description("是否启用调试模式，生成环境务必为 false")
+    @Description("是否启用调试模式，生产环境务必为 false")
     val DebugMode: Boolean by envOf(false)
 
     @Description("中介端地址，例如 https://example.kenvix.com/path")
     val BrokerUrl: String by envOf("https://example.kenvix.com/path")
+
+    @Description("本地网络的 NAT 类型。强烈建议服务器等网络环境恒定不变时设置此项以避免浪费时间检测，相反，" +
+            "网络环境会改变时则应保持 AUTO。可选值: AUTO, PUBLIC, FULL_CONE, RESTRICTED_CONE, PORT_RESTRICTED_CONE, SYMMETRIC")
+    val NATType: String by envOf("AUTO")
+
+    @Description("是否启用 UPnP 功能")
+    val UPnPEnabled: Boolean by envOf(true)
+
+    @Description("通信使用的网卡编号，auto 表示使用默认网关")
+    val NetworkInterface: String by envOf("auto")
 
     @Description("与对等端的默认通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey。此外，可以为 Peer 单独设置不同的 Key")
     val PeerDefaultKey: String by envOf("114514aaaaaa")

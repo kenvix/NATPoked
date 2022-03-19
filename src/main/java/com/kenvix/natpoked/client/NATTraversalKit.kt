@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory
 import java.net.*
 import java.nio.channels.DatagramChannel
 import kotlin.coroutines.CoroutineContext
+import kotlin.reflect.KVisibility
 
 object NATTraversalKit {
     private val logger = LoggerFactory.getLogger(NATTraversalKit::class.java)
@@ -47,8 +48,10 @@ object NATTraversalKit {
         return channel
     }
 
-    suspend fun detectNatTypeAndTryUpnp(channel: DatagramChannel, srcAddr: InetAddress): StunTestResult = withContext(Dispatchers.IO) {
+    suspend fun detectNatTypeAndTryUpnp(channel: DatagramChannel, srcAddr: InetAddress = getDefaultGatewayAddress4()):
+            StunTestResult = withContext(Dispatchers.IO) {
         val port = channel.localAddress.port
+
         if (port <= 0)
             throw IllegalStateException("Local Port is not bound")
 
@@ -57,10 +60,12 @@ object NATTraversalKit {
         @Suppress("BlockingMethodInNonBlockingContext")
         val upnpTask: Deferred<StunTestResult?> = async {
             if (isPublicUPnPSupported()) {
+                val localIp = UPnP.getLocalIP()
+                val externalIp = UPnP.getExternalIP()
                 val result = StunTestResult(
-                    InetAddress.getByName(UPnP.getLocalIP()),
-                    NATType.PUBLIC,
-                    InetAddress.getByName(UPnP.getExternalIP())
+                    InetAddress.getByName(localIp),
+                    if (externalIp == localIp) NATType.PUBLIC else NATType.FULL_CONE,
+                    InetAddress.getByName(externalIp)
                 )
                 logger.info("$channel: Public UPnP supported: $result")
 
@@ -90,15 +95,11 @@ object NATTraversalKit {
         }
     }
 
-    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem = withContext(Dispatchers.IO) {
-        val upnpJob = async { tryUPnPAnyPort() }
-        val v4Addr = getDefaultGatewayAddress4()
-        val natTypeJob = async {
-            testNatType(v4Addr)
-        }
-
-        val natType = natTypeJob.await()
-        val upnp = upnpJob.await()
+    /**
+     * todo: interface should be configurable
+     */
+    suspend fun getLocalNatClientItem(channel: DatagramChannel, ifaceId: Int = -1): NATClientItem = withContext(Dispatchers.IO) {
+        val natType = detectNatTypeAndTryUpnp(channel)
 
         NATClientItem(
             clientId = AppEnv.PeerId,
@@ -106,10 +107,8 @@ object NATTraversalKit {
             clientPublicIp6Address = getDefaultGatewayAddress6().run {
                 if (!isLoopbackAddress || !isLinkLocalAddress || !isSiteLocalAddress) address else null
             },
-            clientPort = upnp,
             clientNatType = natType.natType,
-            isValueChecked = false,
-            isUpnpSupported = upnp > 0,
+            isValueChecked = false
         )
     }
 

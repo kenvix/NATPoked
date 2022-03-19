@@ -121,9 +121,8 @@ typealias PeerId = Long
 @Serializable
 data class NATClientItem(
     val clientId: PeerId,
-    val clientPublicIpAddress: ByteArray?,
+    val clientPublicIpAddress: ByteArray? = null,
     val clientPublicIp6Address: ByteArray? = null,
-    @Deprecated("Each p2p connection should has their own port") val clientPort: Int = 0,
     val clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
     val isValueChecked: Boolean = false,
@@ -135,34 +134,6 @@ data class NATClientItem(
     val clientInet6Address: InetAddress?
         get() = if (clientPublicIp6Address == null) null else InetAddress.getByAddress(clientPublicIp6Address)
 
-    override fun toString(): String {
-        return "[NATClientItem] ID: $clientId | $clientInetAddress:$clientPort | Type: $clientNatType | LastContactAt: $clientLastContactTime"
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as NATClientItem
-
-        if (clientId != other.clientId) return false
-        if (!clientPublicIpAddress.contentEquals(other.clientPublicIpAddress)) return false
-        if (clientPort != other.clientPort) return false
-        if (clientLastContactTime != other.clientLastContactTime) return false
-        if (clientNatType != other.clientNatType) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = clientId.hashCode()
-        result = 31 * result + clientPublicIpAddress.contentHashCode()
-        result = 31 * result + clientPort
-        result = 31 * result + clientLastContactTime.hashCode()
-        result = 31 * result + clientNatType.hashCode()
-        return result
-    }
-
     companion object {
         @JvmStatic
         val natTypeComparator: Comparator<NATClientItem> = Comparator { a, b ->
@@ -172,4 +143,44 @@ data class NATClientItem(
         @JvmStatic
         val UNKNOWN = NATClientItem(0, null)
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as NATClientItem
+
+        if (clientId != other.clientId) return false
+        if (clientPublicIpAddress != null) {
+            if (other.clientPublicIpAddress == null) return false
+            if (!clientPublicIpAddress.contentEquals(other.clientPublicIpAddress)) return false
+        } else if (other.clientPublicIpAddress != null) return false
+        if (clientPublicIp6Address != null) {
+            if (other.clientPublicIp6Address == null) return false
+            if (!clientPublicIp6Address.contentEquals(other.clientPublicIp6Address)) return false
+        } else if (other.clientPublicIp6Address != null) return false
+        if (clientLastContactTime != other.clientLastContactTime) return false
+        if (clientNatType != other.clientNatType) return false
+        if (isValueChecked != other.isValueChecked) return false
+        if (isUpnpSupported != other.isUpnpSupported) return false
+        if (clientInetAddress != other.clientInetAddress) return false
+        if (clientInet6Address != other.clientInet6Address) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = clientId.hashCode()
+        result = 31 * result + (clientPublicIpAddress?.contentHashCode() ?: 0)
+        result = 31 * result + (clientPublicIp6Address?.contentHashCode() ?: 0)
+        result = 31 * result + clientLastContactTime.hashCode()
+        result = 31 * result + clientNatType.hashCode()
+        result = 31 * result + isValueChecked.hashCode()
+        result = 31 * result + isUpnpSupported.hashCode()
+        result = 31 * result + (clientInetAddress?.hashCode() ?: 0)
+        result = 31 * result + (clientInet6Address?.hashCode() ?: 0)
+        return result
+    }
+
+
 }
