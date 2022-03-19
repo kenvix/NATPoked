@@ -17,17 +17,17 @@ peers:
         dstPort: 443
     # WireGuard 配置（可选）
     # 本功能可以让 NATPoked 自动进行简单的 WireGuard 配置，如果需要更高级的 WireGuard 功能，则请使用上面的端口转发功能
-    wireguard:
+    wireGuard:
       enabled: true
       # 我的私钥
       privateKey:
       # 我的地址（CIDR表示法）
-      address:
+      address: 172.25.0.2/24
       # 允许的 IP （CIDR表示法）
-      allowedIPs:
+      allowedIPs: 172.25.0.0/24
       # 监听的端口
-      listenPort:
-      # MTU
-      mtu: 1400
+      listenPort: 51000
       # DNS
       dns:
+      # MTU
+      mtu: 1400

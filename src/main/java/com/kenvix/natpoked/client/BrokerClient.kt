@@ -10,6 +10,7 @@ import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.PeerAddPortMapRequest
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.contacts.RequestTypes
+import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
 import com.kenvix.natpoked.utils.AppEnv
@@ -46,9 +47,6 @@ class BrokerClient(
     private val networkOperationLock: Mutex = Mutex()
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
     private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
-    var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
-    val isIp6Supported
-        get() = lastSelfClientInfo.clientPublicIp6Address != null
     private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
 
 
@@ -105,12 +103,7 @@ class BrokerClient(
         return getRequestResult<Unit?>(rsp)
     }
 
-    suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem {
-        lastSelfClientInfo = NATTraversalKit.getLocalNatClientItem(ifaceId)
-        return lastSelfClientInfo
-    }
-
-    suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(getLocalNatClientItem(ifaceId))
+    suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(NATClient.getLocalNatClientItem(ifaceId))
 
     suspend fun unregisterPeer(clientId: PeerId): CommonJsonResult<*> {
         val rsp = requestAPI("/peers/$clientId", "DELETE")
@@ -154,7 +147,7 @@ class BrokerClient(
         coroutineContext.cancel()
     }
 
-    inner class BrokerWebSocketListener : WebSocketListener() {
+    private inner class BrokerWebSocketListener : WebSocketListener() {
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             super.onClosed(webSocket, code, reason)
             logger.debug("$this closed : $code $reason")
@@ -171,39 +164,10 @@ class BrokerClient(
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
             super.onMessage(webSocket, bytes)
             try {
-                val data: CommonRequest<*> = ProtoBuf.decodeFromByteArray(bytes.toByteArray())
-                when (data.type) {
-                    RequestTypes.ACTION_CONNECT_PEER.typeId -> {
-                        val peerInfo = (data as CommonJsonResult<NATClientItem>).data
-                        if (peerInfo != null) {
-                            if (peerInfo.clientInet6Address != null && isIp6Supported) {
-
-                            }
-                        }
-                    }
-
-                    RequestTypes.MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
-                        val peerInfo = (data as CommonJsonResult<NATClientItem>).data
-                        if (peerInfo != null) {
-                            logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: received peer info: $peerInfo")
-                            if (peerInfo.clientInet6Address != null && isIp6Supported) {
-                                launch {
-                                    logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
-                                    sendUdpPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
-                                }
-                            } else {
-                                launch {
-                                    logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
-                                    sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
-                                }
-                            }
-                        }
-                    }
-
-                    else -> logger.warn("Received unknown message type: ${data.type}")
-                }
+                val data: BrokerMessage<*> = Json.decodeFromString(bytes.string(Charsets.UTF_8))
+                NATClient.onBrokerMessage(data)
             } catch (e: Throwable) {
-                logger.warn("Unable to parse&handle message from broker", e)
+                logger.error("Unable to parse or handle message from broker", e)
             }
         }
 

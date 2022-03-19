@@ -8,19 +8,17 @@ package com.kenvix.natpoked.client
 
 import com.dosse.upnp.UPnP
 import com.kenvix.natpoked.contacts.NATClientItem
+import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.utils.*
+import io.ktor.util.network.*
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.net.*
 import java.nio.channels.DatagramChannel
 import kotlin.coroutines.CoroutineContext
 
-object NATTraversalKit : CoroutineScope {
-    private val job = Job() + CoroutineName("NATTraversalKit")
+object NATTraversalKit {
     private val logger = LoggerFactory.getLogger(NATTraversalKit::class.java)
-    override val coroutineContext: CoroutineContext = job + Dispatchers.IO
-    lateinit var channel: DatagramChannel
-        private set
 
 //    fun getOutboundInterface() {
 //        val ifaces: Enumeration<NetworkInterface> = NetworkInterface.getNetworkInterfaces()
@@ -43,20 +41,53 @@ object NATTraversalKit : CoroutineScope {
 //        }.collect()
 //    }
 
-    private fun bind(port: Int) {
-        channel = DatagramChannel.open()
+    fun newUdpChannel(port: Int): DatagramChannel {
+        val channel = DatagramChannel.open()
         channel.bind(InetSocketAddress(port))
+        return channel
     }
 
-    fun runTraversalForPort(port: Int, srcAddr: InetAddress) {
-        bind(port)
+    suspend fun detectNatTypeAndTryUpnp(channel: DatagramChannel, srcAddr: InetAddress): StunTestResult = withContext(Dispatchers.IO) {
+        val port = channel.localAddress.port
+        if (port <= 0)
+            throw IllegalStateException("Local Port is not bound")
+
         logger.info("NATTraversalKit started on port $port")
-        val upnp = async { tryUPnPPort(port) }
-        val natType = async {
-            testNatType(srcAddr)
+
+        @Suppress("BlockingMethodInNonBlockingContext")
+        val upnpTask: Deferred<StunTestResult?> = async {
+            if (isPublicUPnPSupported()) {
+                val result = StunTestResult(
+                    InetAddress.getByName(UPnP.getLocalIP()),
+                    NATType.PUBLIC,
+                    InetAddress.getByName(UPnP.getExternalIP())
+                )
+                logger.info("$channel: Public UPnP supported: $result")
+
+                if (tryUPnPPort(port)) {
+                    logger.info("$channel: UPnP port mapping succeeded")
+                    result
+                } else {
+                    null
+                }
+            } else {
+                logger.info("$channel: Public UPnP not supported")
+                null
+            }
         }
 
+        val natTypeTask = async {
+            testNatType(srcAddr).also { logger.info("$channel: NAT Type: $it") }
+        }
 
+        val upnp: StunTestResult? = upnpTask.await()
+        val natType: StunTestResult = natTypeTask.await()
+
+        if (upnp != null) {
+            maxOf(natType, upnp)
+        } else {
+            natType
+        }
     }
 
     suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem = withContext(Dispatchers.IO) {
