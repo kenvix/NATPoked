@@ -22,10 +22,16 @@ private val logger = LoggerFactory.getLogger("StunUtils")
 data class StunTestResult(
     val localInetAddress: InetAddress,
     val natType: NATType,
-    val publicInetAddress: InetAddress?
+    val publicInetAddress: InetAddress?,
+    val testedBy: TestedBy = StunTestResult.TestedBy.NAT
 ) : Comparable<StunTestResult> {
     override fun compareTo(other: StunTestResult): Int {
         return this.natType.compareTo(other.natType)
+    }
+
+    enum class TestedBy {
+        NAT,
+        UPNP
     }
 }
 

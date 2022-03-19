@@ -127,6 +127,7 @@ data class NATClientItem(
     val clientNatType: NATType = NATType.UNKNOWN,
     val isValueChecked: Boolean = false,
     val isUpnpSupported: Boolean = false,
+    val peersConfig: PeersConfig? = null
 ) {
     val clientInetAddress: InetAddress?
         get() = if (clientPublicIpAddress == null) null else InetAddress.getByAddress(clientPublicIpAddress)
@@ -163,6 +164,7 @@ data class NATClientItem(
         if (clientNatType != other.clientNatType) return false
         if (isValueChecked != other.isValueChecked) return false
         if (isUpnpSupported != other.isUpnpSupported) return false
+        if (peersConfig != other.peersConfig) return false
         if (clientInetAddress != other.clientInetAddress) return false
         if (clientInet6Address != other.clientInet6Address) return false
 
@@ -177,6 +179,7 @@ data class NATClientItem(
         result = 31 * result + clientNatType.hashCode()
         result = 31 * result + isValueChecked.hashCode()
         result = 31 * result + isUpnpSupported.hashCode()
+        result = 31 * result + (peersConfig?.hashCode() ?: 0)
         result = 31 * result + (clientInetAddress?.hashCode() ?: 0)
         result = 31 * result + (clientInet6Address?.hashCode() ?: 0)
         return result

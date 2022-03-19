@@ -22,6 +22,9 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
             "网络环境会改变时则应保持 AUTO。可选值: AUTO, PUBLIC, FULL_CONE, RESTRICTED_CONE, PORT_RESTRICTED_CONE, SYMMETRIC")
     val NATType: String by envOf("AUTO")
 
+    @Description("每隔多长时间强制刷新并上报当前网络情况，单位为秒。默认为 5 分钟。-1 表示停用")
+    val PeerReportToBrokerDelay: Int by envOf(5 * 60)
+
     @Description("是否启用 UPnP 功能")
     val UPnPEnabled: Boolean by envOf(true)
 

@@ -2,8 +2,10 @@
 package com.kenvix.natpoked.utils
 
 import okhttp3.OkHttpClient
+import kotlin.time.toJavaDuration
 
 val httpClient: OkHttpClient = OkHttpClient.Builder()
     .retryOnConnectionFailure(true)
-    .connectTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+    .connectTimeout(AppEnv.PeerToBrokenTimeoutDuration.toJavaDuration())
+    .pingInterval(AppEnv.PeerToBrokenPingIntervalDuration.toJavaDuration())
     .build()

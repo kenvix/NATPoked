@@ -145,19 +145,27 @@ class BrokerClient(
 
     override fun close() {
         coroutineContext.cancel()
+        websocket.close(1000, "Closed by NATPoked client")
     }
 
     private inner class BrokerWebSocketListener : WebSocketListener() {
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             super.onClosed(webSocket, code, reason)
             logger.debug("$this closed : $code $reason")
+
+            if (isActive) {
+                logger.warn("Unexpected close. reconnecting")
+                launch { connect() }
+            }
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
             super.onFailure(webSocket, t, response)
-            logger.debug("$this failed. reconnect: $t")
-            launch {
-                connect()
+            logger.warn("$this failed : ${t.message}")
+
+            if (isActive) {
+                logger.warn("Unexpected fail. reconnecting")
+                launch { connect() }
             }
         }
 

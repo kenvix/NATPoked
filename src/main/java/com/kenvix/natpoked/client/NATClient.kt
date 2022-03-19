@@ -2,6 +2,7 @@ package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.PeerId
+import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
@@ -9,8 +10,13 @@ import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
 import kotlinx.coroutines.*
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import net.mamoe.yamlkt.Yaml
 import org.slf4j.LoggerFactory
 import java.net.URL
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 
 object NATClient : CoroutineScope, AutoCloseable {
@@ -20,6 +26,9 @@ object NATClient : CoroutineScope, AutoCloseable {
     private val peersImpl: MutableMap<PeerId, NATPeerToPeer> = mutableMapOf()
     val peers: Map<PeerId, NATPeerToPeer>
         get() = peersImpl
+
+    lateinit var peersConfig: PeersConfig
+        private set
 
     val portRedirector: PortRedirector = PortRedirector()
     private val logger = LoggerFactory.getLogger(NATClient::class.java)
@@ -39,6 +48,32 @@ object NATClient : CoroutineScope, AutoCloseable {
             url.path.default("/"), url.protocol == "https"
         )
     }
+
+    private lateinit var reportLoopJob: Job
+
+    suspend fun start() = withContext(Dispatchers.IO) {
+        logger.info("NATPoked Client Starting")
+        logger.info("NATPoked Client Broker Client Connecting")
+        brokerClient.connect()
+
+        if (AppEnv.PeerReportToBrokerDelay >= 0) {
+            reportLoopJob = launch {
+                while (isActive) {
+                    registerPeerToBroker()
+                    delay(AppEnv.PeerReportToBrokerDelay * 1000L)
+                }
+            }
+        }
+
+        peersConfig = Files.readString(Path.of(AppEnv.PeerTrustsFile)).let {
+            if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
+        }
+
+        logger.info("NATPoked Client Broker Client Connected")
+    }
+
+    // todo: iface id
+    suspend fun registerPeerToBroker() = brokerClient.registerPeer()
 
     fun addPeer(targetPeerId: PeerId, key: ByteArray? = null) {
         if (peersImpl.containsKey(targetPeerId))
@@ -85,12 +120,12 @@ object NATClient : CoroutineScope, AutoCloseable {
                     if (peerInfo.clientInet6Address != null && isIp6Supported) {
                         launch {
                             logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
-                            sendUdpPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
+//                            sendUdpPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
                         }
                     } else {
                         launch {
                             logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
-                            sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
+//                            sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
                         }
                     }
                 }
@@ -101,6 +136,10 @@ object NATClient : CoroutineScope, AutoCloseable {
     }
 
     override fun close() {
+        if (this::reportLoopJob.isInitialized && reportLoopJob.isActive) {
+            reportLoopJob.cancel()
+        }
+
         coroutineContext.cancel()
     }
 

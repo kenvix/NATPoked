@@ -8,23 +8,30 @@ package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType
+import com.kenvix.natpoked.contacts.PeersConfig
+import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.toHexString
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
+import net.mamoe.yamlkt.Yaml
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.nio.file.Files
+import java.nio.file.Path
 
 class SerializationTest {
     @OptIn(ExperimentalSerializationApi::class)
     @Test
-    fun test() {
+    fun testGenericSerialization() {
         val ip4: InetAddress = Inet4Address.getByName("127.0.0.1")
         println("IP address in byte array: " + ip4.address.toHexString())
         val ip6: InetAddress = Inet6Address.getByName("fe00::1")
@@ -43,8 +50,35 @@ class SerializationTest {
     }
 
     @Test
-    fun bindTest() {
-        val socket = DatagramSocket(12666, Inet4Address.getByName("127.0.0.2"))
+    fun testPeerConfig() {
+        println("ConfigParserTest")
+        val configFile = Files.readString(Path.of(AppEnv.PeerTrustsFile))
+        val peers = Yaml.decodeFromString<PeersConfig>(configFile)
+        println(peers)
+    }
 
+    interface ITestDataPartial {
+        val str: String
+        val integer: Int
+    }
+
+    @Serializable
+    data class TestData(
+        val num: Double,
+        override val str: String,
+        override val integer: Int
+    ) : ITestDataPartial
+
+    @Test
+    fun testInterfaceSerialization() {
+        val json = """
+            {
+                "num": 114.514,
+                "str": "Hello",
+                "integer": 1919810
+            }
+        """.trimIndent()
+        val part: TestData = Json.decodeFromString(json)
+        println(part)
     }
 }
