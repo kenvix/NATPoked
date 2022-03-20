@@ -1,17 +1,31 @@
-# NATPoked: 跨平台P2P内网穿透工具
+# NATPoked: A Cross-platform Peer-To-Peer NAT Traversal Toolkit
 
-## 构建
+[🇨🇳 中文文档 🇨🇳](README.zh.md)
 
-为确保兼容性，应使用 Java11 编译，但应在 Java17 平台上运行，就像 `Dockerfile` 里写的一样。
+**WARNING**: THIS PROJECT IS STILL IN DEVELOPMENT AND CANNOT BE USED IN PRODUCTION. PLEASE WATCH and STAR IT AND WAIT A RELEASE BEFORE USING IT.
 
-### 普通构建
+## Install
+
+### Linux
+
+It is strongly to use [Docker Image](https://hub.docker.com/r/kenvix/natpoked) for the installation.
+
+```shell
+docker pull kenvix/natpoked
+```
+
+## Build
+
+To ensure compatibility, it should be compiled with Java11, but should run on the Java17 platform, as written in the `Dockerfile`.
+
+### Normal Build
 ```shell
 git submodule update --init --recursive
 chmod +x ./gradlew
 ./gradlew shadowJar
 ```
 
-### Docker 构建
+### Docker Build
 ```shell
 git submodule update --init --recursive
 chmod +x ./DockerBuild.sh
