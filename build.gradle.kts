@@ -119,6 +119,10 @@ dependencies {
 
     // https://mvnrepository.com/artifact/io.netty/netty-buffer
     implementation("io.netty:netty-buffer:4.1.73.Final")
+
+    // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
+    implementation("org.apache.commons:commons-lang3:3.12.0")
+
 }
 
 tasks.getByName<Test>("test") {

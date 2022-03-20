@@ -13,7 +13,7 @@ import kotlinx.serialization.Transient
 @Suppress("unused", "ArrayInDataClass")
 @Serializable
 data class PeersConfig(
-    val peers: MutableMap<Long, Peer> = hashMapOf()
+    var peers: MutableMap<Long, Peer> = hashMapOf()
 ) {
     @Serializable
     data class Peer(

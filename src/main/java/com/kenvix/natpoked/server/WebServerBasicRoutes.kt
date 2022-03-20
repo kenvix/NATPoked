@@ -6,6 +6,8 @@ import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.RequestTypes.*
 import com.kenvix.natpoked.utils.AES256GCM
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.emptyByteArray
+import com.kenvix.utils.exception.NotFoundException
 import com.kenvix.utils.lang.toUnit
 import com.kenvix.web.server.KtorModule
 import com.kenvix.web.utils.*
@@ -14,7 +16,6 @@ import io.ktor.features.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.http.content.*
 import io.ktor.locations.*
-import io.ktor.locations.post
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
@@ -22,6 +23,7 @@ import io.ktor.sessions.*
 import io.ktor.websocket.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.slf4j.LoggerFactory
+import java.util.Collections
 import kotlin.time.toJavaDuration
 
 @Suppress("unused", "DuplicatedCode", "UNCHECKED_CAST") // Referenced in application.conf
@@ -128,7 +130,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {
-                                    requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
+                                    requestPeerMakeConnection(clientRolePeer.session!!, myPeerId, serverRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -137,11 +139,11 @@ internal object WebServerBasicRoutes : KtorModule {
                                 }
 
                                 NATType.RESTRICTED_CONE -> {
-                                    requestPeerMakeConnection(serverRolePeer.session!!, clientRolePeer.client)
+                                    requestPeerMakeConnection(serverRolePeer.session!!, myPeerId, clientRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
-                                    requestPeerMakeConnection(clientRolePeer.session!!, serverRolePeer.client)
+                                    requestPeerMakeConnection(clientRolePeer.session!!, myPeerId, serverRolePeer.client)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
                                             "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId}")
                                 }
@@ -207,7 +209,7 @@ internal object WebServerBasicRoutes : KtorModule {
                         // deprecated
                     }
 
-                    MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
+                    MESSAGE_SEND_PACKET_TO_CLIENT_PEER.typeId -> {
 
                     }
 
@@ -231,7 +233,15 @@ internal object WebServerBasicRoutes : KtorModule {
         }
     }
 
-    private suspend fun requestPeerMakeConnection(requestedPeer: DefaultWebSocketSession, targetPeerClientInfo: NATClientItem) {
-        requestedPeer.sendInternalJson(ACTION_CONNECT_PEER, targetPeerClientInfo.clientId, targetPeerClientInfo)
+    private suspend fun requestPeerMakeConnection(requestedPeer: DefaultWebSocketSession, myPeerId: PeerId, targetPeerClientInfo: NATClientItem) {
+        val infoCopy = targetPeerClientInfo.copy()
+        infoCopy.peersConfig = targetPeerClientInfo.peersConfig!!.copy()
+
+        val peerConfigCopy = infoCopy.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
+        peerConfigCopy.key = ""
+        peerConfigCopy.keySha = emptyByteArray()
+        infoCopy.peersConfig!!.peers = Collections.singletonMap(myPeerId, peerConfigCopy)
+
+        requestedPeer.sendInternalJson(ACTION_CONNECT_PEER, targetPeerClientInfo.clientId, peerConfigCopy)
     }
 }

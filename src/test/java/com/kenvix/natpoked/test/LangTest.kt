@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.net.Inet4Address
 import java.net.InetSocketAddress
+import java.util.*
 
 class LangTest {
     @Test
@@ -20,5 +21,10 @@ class LangTest {
         Assertions.assertEquals(addr1.hashCode(), addr2.hashCode())
         val map = hashMapOf(addr1 to 114514)
         assert(addr2 in map)
+    }
+
+    @Test
+    fun collectionsTest() {
+        val map: MutableMap<Int, Int> = Collections.singletonMap(114, 514)
     }
 }

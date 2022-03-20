@@ -4,6 +4,7 @@ peers:
     key: passwordpasswordpasswordpassword
     # NATPoked 用于打洞 P2P 通信的端口（可选，必须唯一，若不填则随机绑定）
     pokedPort: 57000
+
     # 端口服务转发配置（可选）
     ports:
       # "https" 为服务名称（名称任取），具有相同服务名称的服务将被连接在一起

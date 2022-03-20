@@ -7,6 +7,7 @@ import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
+import com.kenvix.web.utils.getOrFail
 import com.kenvix.web.utils.putUnsignedShort
 import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.ByteBuf
@@ -307,23 +308,32 @@ class NATPeerToPeer(
                 }
             }
 
-            RequestTypes.MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
+            RequestTypes.MESSAGE_SEND_PACKET_TO_CLIENT_PEER.typeId -> {
                 val peerInfo = (data as CommonJsonResult<NATClientItem>).data
                 if (peerInfo != null) {
+                    val targetPeerConfig: PeersConfig.Peer = peerInfo.peersConfig!!.peers.getOrFail(targetPeerId)
                     logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: received peer info: $peerInfo")
+
                     if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
                         launch {
                             logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
-//                            val addr = InetSocketAddress(peerInfo.clientInet6Address, )
-//                            sendHelloPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
+                            val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPeerConfig.pokedPort)
+                            sendHelloPacket(addr, num = 10)
                         }
-                    } else {
+                    }
+
+                    if (peerInfo.clientInetAddress != null) {
                         launch {
                             logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
-//                            sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
+                            val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPeerConfig.pokedPort)
+                            sendHelloPacket(addr, num = 10)
                         }
                     }
                 }
+            }
+
+            RequestTypes.MESSAGE_SEND_PACKET_TO_CLIENT_PEER_WITH_PORT_GUESS.typeId -> {
+
             }
 
             else -> logger.warn("Received unknown message type: ${data.type}")
