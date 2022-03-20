@@ -8,7 +8,7 @@ RUN echo "Begin docker image build ..." \
     ca-certificates \
     curl \
     software-properties-common \
-    openjdk-17-jre-headless \
+    openjdk-11-jre-headless \
     mosquitto \
     && cd /root/build \
     && rm -rf ./out ./build \
