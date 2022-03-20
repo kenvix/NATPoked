@@ -216,7 +216,7 @@ tasks {
 }
 
 // apply(from = "enableProGuard.gradle")
-apply(from = "enableGRPC.gradle")
+// apply(from = "enableGRPC.gradle")
 
 nativeBuild {
     mainClass.set(appMainClass)
