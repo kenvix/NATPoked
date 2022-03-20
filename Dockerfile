@@ -13,7 +13,7 @@ RUN echo "Begin docker image build ..." \
     && cd /root/build \
     && rm -rf ./out ./build \
     && chmod +x ./gradlew \
-    && ./gradlew shadowJar \
+    && ./gradlew --info --stacktrace shadowJar \
     && mkdir -p /data/app \
     && mkdir -p /data/config \
     && mv ./build/output/*.jar /data/app/app.jar \
