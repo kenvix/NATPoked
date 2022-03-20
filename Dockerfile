@@ -1,4 +1,4 @@
-FROM debian:11 as intermediate
+FROM debian:11.2 as intermediate
 
 ADD . /root/build
 RUN echo "Begin docker image build ..." \
@@ -26,7 +26,7 @@ RUN echo "Begin docker image build ..." \
     && echo "Dockerfile build success"
 
 
-FROM debian:11
+FROM debian:11.2
 LABEL maintainer="kenvix <i@kenvix.com>"
 LABEL description="NATPoked: A Cross-platform Peer-To-Peer NAT Traversal Toolkit - Official docker image"
 LABEL homepage="https://kenvix.com"
@@ -39,6 +39,9 @@ RUN echo "Begin docker image build ..." \
     ca-certificates \
     openjdk-17-jre-headless \
     mosquitto \
+    wireguard \
+    iproute2 \
+    net-tools \
     && echo "Cleaning build cache ..." \
     && cd /data/config \
     && apt-get clean \
