@@ -1,13 +1,7 @@
-# syntax=docker/dockerfile:experimental
-FROM ubuntu:21.10
-LABEL maintainer="kenvix <i@kenvix.com>"
-LABEL description="NATPoked official docker image"
-LABEL homepage="https://kenvix.com"
+FROM ubuntu:21.10 as intermediate
 
-RUN --mount=type=bind,target=/root/resources,id=resources,source=resources,ro \
-    echo "Copying resources..." \
-    && cp -r /root/resources /root/build \
-    && echo "Begin docker image build ..." \
+ADD . /root/build
+RUN echo "Begin docker image build ..." \
     && apt-get update \
     && apt-get install -y \
     apt-transport-https \
@@ -29,6 +23,27 @@ RUN --mount=type=bind,target=/root/resources,id=resources,source=resources,ro \
     && rm -rf /tmp/* \
     && rm -rf /root/build \
     && echo "Dockerfile build success"
+
+
+FROM ubuntu:21.10
+LABEL maintainer="kenvix <i@kenvix.com>"
+LABEL description="NATPoked: A Cross-platform Peer-To-Peer NAT Traversal Toolkit - Official docker image"
+LABEL homepage="https://kenvix.com"
+
+COPY --from=intermediate /data /data
+
+RUN echo "Begin docker image build ..." \
+    && apt-get update \
+    && apt-get install -y \
+    ca-certificates \
+    openjdk-17-jre-headless \
+    mosquitto \
+    && echo "Cleaning build cache ..." \
+    && cd /data/config \
+    && apt-get clean \
+    && rm -rf /tmp/* \
+    && echo "Dockerfile build success"
+
 
 WORKDIR /data/config
 ENV LANG en_US.UTF-8
