@@ -29,7 +29,7 @@ data class NATPeerToBrokerConnection(
     val connections: Map<PeerId, Connection>
         get() = connectionsImpl
 
-    fun addConnection(peerId: PeerId, connection: Connection = Connection(-1, NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER)) {
+    fun addConnection(peerId: PeerId, connection: Connection = Connection(NATPeerToPeerConnectionStage.HANDSHAKE_TO_BROKER)) {
         connectionsImpl[peerId] = connection
     }
 
@@ -49,7 +49,6 @@ data class NATPeerToBrokerConnection(
     }
 
     data class Connection(
-        var port: Int,
         var stage: NATPeerToPeerConnectionStage
     )
 }

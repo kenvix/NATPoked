@@ -1,9 +1,12 @@
 peers:
-  - id: 200000
+  # peer id (64位整数)
+  200000:
     key: passwordpasswordpasswordpassword
-    # 端口转发配置（可选）
+    # NATPoked 用于打洞 P2P 通信的端口（可选，必须唯一，若不填则随机绑定）
+    pokedPort: 57000
+    # 端口服务转发配置（可选）
     ports:
-      # "https" 为服务名称（名称任取），具有相同服务名称的服务将被打洞并连接在一起
+      # "https" 为服务名称（名称任取），具有相同服务名称的服务将被连接在一起
       https:
         # 协议：TCP | UDP
         protocol: TCP
@@ -15,8 +18,8 @@ peers:
         dstHost: 127.0.0.1
         # 目标端口
         dstPort: 443
-      # WireGuard 配置（可选）
-      # 本功能可以让 NATPoked 自动进行简单的 WireGuard 配置，如果需要更高级的 WireGuard 功能，则请使用上面的端口转发功能
+    # WireGuard 配置（可选）
+    # 本功能可以让 NATPoked 自动进行简单的 WireGuard 配置，如果需要更高级的 WireGuard 功能，则请使用上面的端口转发功能
     wireGuard:
       enabled: true
       # 我的私钥

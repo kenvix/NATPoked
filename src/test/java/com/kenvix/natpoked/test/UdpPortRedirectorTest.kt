@@ -9,6 +9,7 @@ package com.kenvix.natpoked.test
 import com.kenvix.natpoked.client.BrokerClient
 import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.PortRedirector
+import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.sha256Of
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions
@@ -50,7 +51,7 @@ class UdpPortRedirectorTest {
     @Test
     fun test() {
         val portRedirector = PortRedirector()
-        val natPeerToPeer = NATPeerToPeer(0, encryptionKey = testKey)
+        val natPeerToPeer = NATPeerToPeer(0, config=PeersConfig.Peer(key = "114514"))
         val brokerClient = BrokerClient("127.0.0.1", 4000, "/")
         natPeerToPeer.listenUdpSourcePort(4001)
         val addr1 = Inet4Address.getByName("127.0.0.1")

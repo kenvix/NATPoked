@@ -1,9 +1,10 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.client.NATClient.portRedirector
-import com.kenvix.natpoked.contacts.PeerCommunicationType
+import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
-import com.kenvix.natpoked.contacts.PeerId
+import com.kenvix.natpoked.server.BrokerMessage
+import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.web.utils.putUnsignedShort
@@ -27,12 +28,13 @@ import kotlin.coroutines.CoroutineContext
  */
 class NATPeerToPeer(
     val targetPeerId: PeerId,
-    encryptionKey: ByteArray? = null
+    private val config: PeersConfig.Peer
 ) : CoroutineScope, AutoCloseable {
+
     private val job = Job() + CoroutineName(this.toString())
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentIV: ByteArray = ByteArray(ivSize)
-    private val aes = AES256GCM(encryptionKey ?: AppEnv.PeerDefaultPSK)
+    private val aes = AES256GCM(if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
 
 //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
@@ -86,7 +88,7 @@ class NATPeerToPeer(
         }
     }
 
-    fun listenUdpSourcePort(sourcePort: Int = 0) {
+    fun listenUdpSourcePort(sourcePort: Int = config.pokedPort) {
         val socketAddress = InetSocketAddress(sourcePort)
         udpChannel.bind(socketAddress)
     }
@@ -292,6 +294,40 @@ class NATPeerToPeer(
 
     fun registerPeer() {
 
+    }
+
+    internal fun onBrokerMessage(data: BrokerMessage<*>) {
+        when (data.type) {
+            RequestTypes.ACTION_CONNECT_PEER.typeId -> {
+                val peerInfo = (data as CommonJsonResult<NATClientItem>).data
+                if (peerInfo != null) {
+                    if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
+
+                    }
+                }
+            }
+
+            RequestTypes.MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
+                val peerInfo = (data as CommonJsonResult<NATClientItem>).data
+                if (peerInfo != null) {
+                    logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: received peer info: $peerInfo")
+                    if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
+                        launch {
+                            logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
+//                            val addr = InetSocketAddress(peerInfo.clientInet6Address, )
+//                            sendHelloPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
+                        }
+                    } else {
+                        launch {
+                            logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
+//                            sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
+                        }
+                    }
+                }
+            }
+
+            else -> logger.warn("Received unknown message type: ${data.type}")
+        }
     }
 
     fun connectTo(target: InetSocketAddress) {

@@ -27,9 +27,6 @@ object NATClient : CoroutineScope, AutoCloseable {
     val peers: Map<PeerId, NATPeerToPeer>
         get() = peersImpl
 
-    lateinit var peersConfig: PeersConfig
-        private set
-
     val portRedirector: PortRedirector = PortRedirector()
     private val logger = LoggerFactory.getLogger(NATClient::class.java)
 
@@ -65,9 +62,11 @@ object NATClient : CoroutineScope, AutoCloseable {
             }
         }
 
-        peersConfig = Files.readString(Path.of(AppEnv.PeerTrustsFile)).let {
+        val peersConfig = Files.readString(Path.of(AppEnv.PeerTrustsFile)).let {
             if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
         }
+
+        peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
 
         logger.info("NATPoked Client Broker Client Connected")
     }
@@ -75,11 +74,11 @@ object NATClient : CoroutineScope, AutoCloseable {
     // todo: iface id
     suspend fun registerPeerToBroker() = brokerClient.registerPeer()
 
-    fun addPeer(targetPeerId: PeerId, key: ByteArray? = null) {
-        if (peersImpl.containsKey(targetPeerId))
+    fun addPeerIfNotExist(peerId: PeerId, targetPeerConfig: PeersConfig.Peer) {
+        if (peersImpl.containsKey(peerId))
             return
 
-        val peer = NATPeerToPeer(targetPeerId, key)
+        val peer = NATPeerToPeer(peerId, targetPeerConfig)
         addPeer(peer)
     }
 
@@ -103,35 +102,11 @@ object NATClient : CoroutineScope, AutoCloseable {
     }
 
     internal fun onBrokerMessage(data: BrokerMessage<*>) {
-        when (data.type) {
-            RequestTypes.ACTION_CONNECT_PEER.typeId -> {
-                val peerInfo = (data as CommonJsonResult<NATClientItem>).data
-                if (peerInfo != null) {
-                    if (peerInfo.clientInet6Address != null && isIp6Supported) {
-
-                    }
-                }
-            }
-
-            RequestTypes.MESSAGE_SENT_PACKET_TO_CLIENT_PEER.typeId -> {
-                val peerInfo = (data as CommonJsonResult<NATClientItem>).data
-                if (peerInfo != null) {
-                    logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: received peer info: $peerInfo")
-                    if (peerInfo.clientInet6Address != null && isIp6Supported) {
-                        launch {
-                            logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
-//                            sendUdpPacket(peerInfo.clientInet6Address!!, peerInfo.clientPort, packetNum = 10)
-                        }
-                    } else {
-                        launch {
-                            logger.debug("MESSAGE_SENT_PACKET_TO_CLIENT_PEER: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
-//                            sendUdpPacket(peerInfo.clientInetAddress!!, peerInfo.clientPort, packetNum = 10)
-                        }
-                    }
-                }
-            }
-
-            else -> logger.warn("Received unknown message type: ${data.type}")
+        if (data.peerId >= 0) {
+            peersImpl[data.peerId]?.onBrokerMessage(data)
+                ?: logger.warn("Received a broker message with unknown peer id: ${data.peerId}")
+        } else {
+            TODO("Not implemented")
         }
     }
 

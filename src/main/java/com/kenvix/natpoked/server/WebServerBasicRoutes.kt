@@ -77,44 +77,44 @@ internal object WebServerBasicRoutes : KtorModule {
                      * 对某个 Peer，设置 PeerId-Port 端口映射
                      * /peers/:peerId/connections
                      */
-                    post<PeerIDLocation.Connections> { peerId ->
-                        val req: PeerAddPortMapRequest = call.receiveInternalData()
-                        NATServer
-                            .peerConnections[peerId.parent.id]
-                            .assertExist("Peer ${peerId.parent.id} not found")
-                            .connections[req.targetPeerId]
-                            .assertExist("Peer connections ${req.targetPeerId} not found")
-                            .port = req.port
-                        call.respondSuccess()
-                    }
+//                    post<PeerIDLocation.Connections> { peerId ->
+//                        val req: PeerAddPortMapRequest = call.receiveInternalData()
+//                        NATServer
+//                            .peerConnections[peerId.parent.id]
+//                            .assertExist("Peer ${peerId.parent.id} not found")
+//                            .connections[req.targetPeerId]
+//                            .assertExist("Peer connections ${req.targetPeerId} not found")
+//                            .port = req.port
+//                        call.respondSuccess()
+//                    }
 
                     /**
                      * 对某个 Peer，删除 PeerId-Port 端口映射
                      * /peers/:peerId/connections/:targetPeerId
                      */
-                    delete<PeerIDLocation.Connections.TargetPeer> { peerId ->
-                        NATServer
-                            .peerConnections[peerId.parent.id]
-                            .assertExist("Peer ${peerId.parent.id} not found")
-                            .connections[peerId.targetPeerId]
-                            .assertExist("Peer connections ${peerId.targetPeerId} not found")
-                            .port = -1
-                        call.respondSuccess()
-                    }
+//                    delete<PeerIDLocation.Connections.TargetPeer> { peerId ->
+//                        NATServer
+//                            .peerConnections[peerId.parent.id]
+//                            .assertExist("Peer ${peerId.parent.id} not found")
+//                            .connections[peerId.targetPeerId]
+//                            .assertExist("Peer connections ${peerId.targetPeerId} not found")
+//                            .port = -1
+//                        call.respondSuccess()
+//                    }
 
                     /**
                      * 对某个 Peer，获取 PeerId-Port 端口映射
                      * /peers/:peerId/connections
                      */
-                    get<PeerIDLocation.Connections.TargetPeer> { peerId ->
-                        val port = NATServer
-                            .peerConnections[peerId.parent.id]
-                            .assertExist("Peer ${peerId.parent.id} not found")
-                            .connections[peerId.targetPeerId]
-                            .assertExist("Peer connections ${peerId.targetPeerId} not found")
-                            .port
-                        call.respondSuccess(data = "port" to port)
-                    }
+//                    get<PeerIDLocation.Connections.TargetPeer> { peerId ->
+//                        val port = NATServer
+//                            .peerConnections[peerId.parent.id]
+//                            .assertExist("Peer ${peerId.parent.id} not found")
+//                            .connections[peerId.targetPeerId]
+//                            .assertExist("Peer connections ${peerId.targetPeerId} not found")
+//                            .port
+//                        call.respondSuccess(data = "port" to port)
+//                    }
 
                     post("/connect") {
                         val (myPeerId, targetPeerId) = call.receiveInternalData<PeerConnectRequest>()

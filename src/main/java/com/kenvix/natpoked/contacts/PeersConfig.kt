@@ -13,12 +13,18 @@ import kotlinx.serialization.Transient
 @Suppress("unused", "ArrayInDataClass")
 @Serializable
 data class PeersConfig(
-    var peers: ArrayList<Peer> = ArrayList()
+    val peers: MutableMap<Long, Peer> = hashMapOf()
 ) {
     @Serializable
     data class Peer(
-        val id: PeerId,
         var key: String,
+        /**
+         * NATPoked 用于打洞 P2P 通信的端口（可选，若不填则随机绑定）
+         */
+        var pokedPort: Int = 0,
+        /**
+         * 端口服务转发配置（可选）
+         */
         var ports: HashMap<String, Port> = hashMapOf(),
         var wireGuard: WireGuard = WireGuard(),
         @Transient var keySha: ByteArray = sha256Of(key)
