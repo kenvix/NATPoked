@@ -12,6 +12,7 @@ RUN echo "Begin docker image build ..." \
     mosquitto \
     && cd /root/build \
     && rm -rf ./out ./build \
+    && chmod +x ./gradlew \
     && ./gradlew shadowJar \
     && mkdir -p /data/app \
     && mkdir -p /data/config \
