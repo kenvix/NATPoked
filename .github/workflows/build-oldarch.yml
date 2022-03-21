@@ -1,4 +1,4 @@
-name: Build Docker Image - Linux New Arch
+name: Build Docker Image - Linux Old Arch
 
 on:
   workflow_dispatch:
@@ -48,6 +48,6 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64,linux/arm64/v8,linux/arm/v7
+          platforms: linux/mips64le,linux/386
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
