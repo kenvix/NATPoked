@@ -32,6 +32,13 @@ jobs:
       
     - name: submodules-init
       uses: snickerbockers/submodules-init@v4
+      
+      # Runs a set of commands using the runners shell
+    - name: Run Prebuild shell
+      run: |
+        echo "Prebuild shell"
+        ls -al
+        chmod +x ./gradlew
         
     - name: Build with Gradle
       uses: gradle/gradle-build-action@937999e9cc2425eddc7fd62d1053baf041147db7
