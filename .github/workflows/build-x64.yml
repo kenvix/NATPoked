@@ -1,4 +1,4 @@
-name: Build Docker Image - Linux New Arch
+name: Docker - Linux x64
 
 on:
   workflow_dispatch:
@@ -6,9 +6,9 @@ on:
     branches:
       - master
 
-#concurrency:
-#  group: ${{ github.ref }}
-#  cancel-in-progress: true
+concurrency:
+  group: linux-x64-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   IMAGE_NAME: natpoked

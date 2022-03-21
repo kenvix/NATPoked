@@ -1,4 +1,4 @@
-name: Build Docker Image - Linux Old Arch
+name: Docker - Linux x86
 
 on:
   workflow_dispatch:
@@ -6,9 +6,9 @@ on:
     branches:
       - master
 
-#concurrency:
-#  group: ${{ github.ref }}
-#  cancel-in-progress: true
+concurrency:
+  group: linux-x86-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   IMAGE_NAME: natpoked
@@ -48,6 +48,6 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/mips64le,linux/386
+          platforms: linux/386
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
