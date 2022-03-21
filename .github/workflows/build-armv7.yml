@@ -50,4 +50,5 @@ jobs:
           file: Dockerfile
           platforms: linux/arm/v7
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7
+      
