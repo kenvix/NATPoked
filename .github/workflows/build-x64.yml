@@ -1,4 +1,4 @@
-name: Build Linux Docker Image
+name: Docker - Linux x64
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ on:
       - master
 
 concurrency:
-  group: ${{ github.ref }}
+  group: linux-x64-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -17,7 +17,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Build Linux Docker Image
-    timeout-minutes: 200
     steps:
       - name: Checkout
         uses: actions/checkout@master
@@ -49,6 +48,6 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64,linux/arm64/v8,linux/arm/v7,linux/mips64le,linux/386
+          platforms: linux/amd64,linux/arm64/v8,linux/arm/v7
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x64
