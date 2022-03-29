@@ -3,26 +3,31 @@ package com.kenvix.natpoked.server
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.PlatformDetection
 import com.kenvix.web.server.CachedClasses
-import com.kenvix.web.server.KtorModule
-import io.ktor.application.*
-import io.ktor.server.cio.*
-import io.ktor.util.*
+import com.kenvix.web.utils.ProcessUtils
 import io.ktor.application.Application
 import io.ktor.http.cio.websocket.*
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
+import java.io.Closeable
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.path.exists
 
-object NATServer {
+object NATServer : Closeable {
     internal val logger = LoggerFactory.getLogger(javaClass)
     private val peerConnectionsImpl: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
     val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
         get() = peerConnectionsImpl
+
+    init {
+        Runtime.getRuntime().addShutdownHook(Thread {
+            close()
+        })
+    }
 
     val peerWebsocketSessionMap: MutableMap<DefaultWebSocketSession, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
 
@@ -90,9 +95,48 @@ object NATServer {
     }, module = Application::module)
 
     suspend fun start() = withContext(Dispatchers.IO) {
-        logger.info("Starting web server")
-        preload()
-        startHttpServer()
+        logger.info("Starting NATServer...")
+
+        val tempPath = AppConstants.workingPath.resolve("Temp")
+        if (!tempPath.exists()) {
+            tempPath.toFile().mkdirs()
+        }
+
+        var mqttBrokerConfig = """
+listener ${AppEnv.BrokerMqttPort}
+protocol websockets
+allow_anonymous true
+    """.trimIndent()
+
+        if (PlatformDetection.OS_LINUX == ProcessUtils.platform.os) {
+            mqttBrokerConfig = "listener 0 \"${tempPath.resolve("mqtt.sock").toAbsolutePath()}\"\n$this"
+        }
+
+        val web = async {
+            logger.info("Starting web server")
+            preload()
+            startHttpServer()
+        }
+
+        fun launchMqttBrokerAsync() = async {
+            logger.info("Starting MQTT Broker")
+
+            val mqttConf = tempPath.resolve("mqtt.conf")
+            mqttConf.toFile().writeText(mqttBrokerConfig)
+
+            ProcessUtils.runProcess(
+                "mqtt", ProcessBuilder().command(
+                    "mosquitto",
+                    "-c", "\"${mqttConf.toAbsolutePath()}\"",
+                    "-v"
+                ), keepAlive = true
+            )
+        }
+
+        val mqtt = launchMqttBrokerAsync()
+
+        web.await()
+        mqtt.await()
     }
 
     internal suspend fun preload() {
@@ -126,5 +170,17 @@ object NATServer {
 //                logger.warn("Invalid route class: ${module.name}")
 //            }
 //        }
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        logger.info("NATPoked Broker -- Standalone Mode")
+        runBlocking {
+            start()
+        }
+    }
+
+    override fun close() {
+
     }
 }

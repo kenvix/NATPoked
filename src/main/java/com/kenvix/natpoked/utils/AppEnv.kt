@@ -18,6 +18,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("中介端地址，例如 https://example.kenvix.com/path")
     val BrokerUrl: String by envOf("https://example.kenvix.com/path")
 
+    val BrokerMqttPort: Int by envOf(1883)
+
     @Description("本地网络的 NAT 类型。强烈建议服务器等网络环境恒定不变时设置此项以避免浪费时间检测，相反，" +
             "网络环境会改变时则应保持 AUTO。可选值: AUTO, PUBLIC, FULL_CONE, RESTRICTED_CONE, PORT_RESTRICTED_CONE, SYMMETRIC")
     val NATType: String by envOf("AUTO")

@@ -1,1 +1,1 @@
--XX:+UseShenandoahGC -Djava.net.preferIPv4Stack=true -Djava.net.preferIPv6Addresses=false -Dkenvix.natpoked.fastboot=true
+-Djava.net.useSystemProxies=true -Djava.net.preferIPv4Stack=true -Dkenvix.natpoked.fastboot=true
