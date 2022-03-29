@@ -58,7 +58,7 @@ object NATTraversalKit {
                 val externalIp = UPnP.getExternalIP()
                 val result = StunTestResult(
                     InetAddress.getByName(localIp),
-                    if (externalIp == localIp) NATType.PUBLIC else NATType.FULL_CONE,
+                    NATType.RESTRICTED_CONE,
                     InetAddress.getByName(externalIp),
                     StunTestResult.TestedBy.UPNP
                 )

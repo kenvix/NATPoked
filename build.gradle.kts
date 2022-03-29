@@ -123,6 +123,8 @@ dependencies {
     // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
     implementation("org.apache.commons:commons-lang3:3.12.0")
 
+    // https://mvnrepository.com/artifact/org.eclipse.paho/org.eclipse.paho.mqttv5.client
+    implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
 }
 
 tasks.getByName<Test>("test") {

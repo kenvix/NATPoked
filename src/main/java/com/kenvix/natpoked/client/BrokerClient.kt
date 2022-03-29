@@ -13,10 +13,9 @@ import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
-import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.httpClient
-import com.kenvix.natpoked.utils.toBase64String
+import com.kenvix.natpoked.utils.*
 import com.kenvix.utils.exception.*
+import com.kenvix.web.utils.ProcessUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -26,7 +25,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import okhttp3.*
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.internal.toHexString
 import okio.ByteString
+import org.eclipse.paho.mqttv5.client.*
+import org.eclipse.paho.mqttv5.common.MqttException
+import org.eclipse.paho.mqttv5.common.MqttMessage
+import org.eclipse.paho.mqttv5.common.packet.MqttProperties
 import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
 import kotlin.coroutines.CoroutineContext
@@ -39,8 +43,13 @@ class BrokerClient(
     val brokerPort: Int,
     val brokerPath: String = "/",
     val brokerUseSsl: Boolean = false,
+    val mqttHost: String = brokerHost,
+    val mqttPort: Int = brokerPort,
+    val mqttPath: String = brokerPath,
+    val mqttUseSsl: Boolean = brokerUseSsl,
     var defaultIfaceId: Int = -1,
 ) : CoroutineScope, AutoCloseable {
+    private val logger = LoggerFactory.getLogger(BrokerClient::class.java)
     private val job = Job() + CoroutineName("BrokerClient: $this")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private lateinit var websocket: WebSocket
@@ -48,23 +57,61 @@ class BrokerClient(
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
     private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
     private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
-
+    private lateinit var mqttClient: MqttClient
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
     }
 
     suspend fun connect() = withContext(Dispatchers.IO) {
-        if (::websocket.isInitialized) {
-            websocket.close(0, "Reconnecting")
-        }
+//        if (::websocket.isInitialized) {
+//            websocket.close(1000, "Reconnecting")
+//        }
+//
+//        val brokerWebSocketListener = BrokerWebSocketListener()
+//        val request = Request.Builder()
+//            .url("${brokerUseSsl.run { if (brokerUseSsl) "wss" else "ws" }}://$brokerHost:$brokerPort${brokerPath}/api/v1/")
+//            .build()
+//        websocket = httpClient.newWebSocket(request, listener = brokerWebSocketListener)
 
-        val brokerWebSocketListener = BrokerWebSocketListener()
-        val request = Request.Builder()
-            .url("${brokerUseSsl.run { if (brokerUseSsl) "wss" else "ws" }}://$brokerHost:$brokerPort${brokerPath}api/v1/")
-            .build()
-        websocket = httpClient.newWebSocket(request, listener = brokerWebSocketListener)
         registerPeer()
+
+        val serverURI = "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
+        mqttClient = MqttClient(serverURI, AppEnv.PeerId.toHexString())
+        mqttClient.setCallback(object : MqttCallback {
+            override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
+                logger.info("MQTT Disconnected")
+            }
+
+            override fun mqttErrorOccurred(exception: MqttException?) {
+                logger.error("MQTT Error Occurred", exception)
+            }
+
+            override fun messageArrived(topic: String?, message: MqttMessage?) {
+                logger.info("Message arrived: $topic, ${message?.payload}")
+            }
+
+            override fun deliveryComplete(token: IMqttToken?) {
+                logger.info("Delivery complete: $token")
+            }
+
+            override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+                logger.info("Connect complete: $reconnect, $serverURI")
+            }
+
+            override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
+                logger.info("Auth packet arrived: $reasonCode, $properties")
+            }
+        })
+
+        val options = MqttConnectionOptionsBuilder()
+            .automaticReconnectDelay(0, 1)
+            .username("broker")
+            .password(sha256Of(AppEnv.ServerPSK).toBase64String().toByteArray())
+            .automaticReconnect(true)
+            .build()
+
+        mqttClient.connect(options)
     }
 
     private suspend fun requestAPI(url: String, method: String, data: Any? = null): Response {
@@ -72,7 +119,7 @@ class BrokerClient(
             .url("$baseHttpUrl$url")
             .header("Accept", "application/json")
             .header("Content-Type", "application/json; charset=utf-8")
-            .header("User-Agent", "NATPoked/1.0")
+            .header("User-Agent", "NATPoked/1.0 (HTTP). ${PlatformDetection.getInstance()}")
             .header("X-Key", encodedServerKey)
             .method(method, data?.let { Json.encodeToString(it).toRequestBody() })
             .build()
@@ -187,9 +234,5 @@ class BrokerClient(
         override fun toString(): String {
             return "Connection to ${this@BrokerClient}"
         }
-    }
-
-    companion object {
-        private val logger = LoggerFactory.getLogger(BrokerClient::class.java)
     }
 }

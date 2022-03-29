@@ -23,7 +23,13 @@ public class PlatformDetection {
     public static String ARCH_X86_64 = "x86_64";
     public static String ARCH_AARCH_64 = "aarch64";
 
-    public PlatformDetection() {
+    private static final PlatformDetection instance = new PlatformDetection();
+
+    public static PlatformDetection getInstance() {
+        return instance;
+    }
+
+    private PlatformDetection() {
         // resolve OS
         if (SystemUtils.IS_OS_WINDOWS) {
             this.os = OS_WINDOWS;
@@ -71,7 +77,6 @@ public class PlatformDetection {
     }
 
     public String toString() {
-
-        return os + "_" + arch;
+        return arch + "/" + os;
     }
 }

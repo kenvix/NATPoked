@@ -4,6 +4,8 @@ import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.PlatformDetection
+import com.kenvix.natpoked.utils.sha256Of
+import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.web.server.CachedClasses
 import com.kenvix.web.utils.ProcessUtils
 import io.ktor.application.Application
@@ -16,6 +18,7 @@ import java.io.Closeable
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
+import kotlin.math.log
 
 object NATServer : Closeable {
     internal val logger = LoggerFactory.getLogger(javaClass)
@@ -51,7 +54,7 @@ object NATServer : Closeable {
         peerConnectionsImpl.remove(peerId)
     }
 
-    val ktorEmbeddedServer = embeddedServer(CIO, port = AppEnv.HttpPort, host = AppEnv.HttpHost, watchPaths = run {
+    val ktorEmbeddedServer = embeddedServer(CIO, port = AppEnv.ServerHttpPort, host = AppEnv.ServerHttpHost, watchPaths = run {
         if (AppEnv.DebugMode && System.getProperty("hotReloadSupported")?.toBoolean() == true) {
             listOf( // Substring match rules for classpath
                 "${AppConstants.workingFolder.replace('\\', '/')}out",
@@ -102,24 +105,38 @@ object NATServer : Closeable {
             tempPath.toFile().mkdirs()
         }
 
-        var mqttBrokerConfig = """
-listener ${AppEnv.BrokerMqttPort}
-protocol websockets
-allow_anonymous true
-    """.trimIndent()
-
-        if (PlatformDetection.OS_LINUX == ProcessUtils.platform.os) {
-            mqttBrokerConfig = "listener 0 \"${tempPath.resolve("mqtt.sock").toAbsolutePath()}\"\n$this"
-        }
-
         val web = async {
             logger.info("Starting web server")
             preload()
             startHttpServer()
         }
 
+        val mqttConfig = async(Dispatchers.IO) {
+            logger.info("Pre-Configuring MQTT broker")
+            val mqttPasswd =  tempPath.resolve("mqtt.passwd")
+            mqttPasswd.toFile().writeText("broker:" + sha256Of(AppEnv.ServerPSK).toBase64String())
+
+            ProcessUtils.runProcess("mqtt_passwd", ProcessBuilder().command(
+                "mosquitto_passwd", "-U", "\"${mqttPasswd.toAbsolutePath()}\"",
+            ))
+
+            ProcessUtils["mqtt_passwd"]!!.waitFor()
+        }
+
         fun launchMqttBrokerAsync() = async {
+            mqttConfig.await()
             logger.info("Starting MQTT Broker")
+
+            var mqttBrokerConfig = """
+listener ${AppEnv.ServerMqttPort}
+protocol websockets
+allow_anonymous false
+password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
+    """.trimIndent()
+
+            if (PlatformDetection.getInstance().os in arrayOf(PlatformDetection.OS_LINUX, PlatformDetection.OS_OSX, PlatformDetection.OS_SOLARIS)) {
+                mqttBrokerConfig = "listener 0 \"${tempPath.resolve("mqtt.sock").toAbsolutePath()}\"\n$this"
+            }
 
             val mqttConf = tempPath.resolve("mqtt.conf")
             mqttConf.toFile().writeText(mqttBrokerConfig)
@@ -175,6 +192,7 @@ allow_anonymous true
     @JvmStatic
     fun main(args: Array<String>) {
         logger.info("NATPoked Broker -- Standalone Mode")
+        logger.warn("Stand-alone mode is not recommended for production use")
         runBlocking {
             start()
         }

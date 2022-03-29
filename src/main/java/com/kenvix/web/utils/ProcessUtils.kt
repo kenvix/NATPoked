@@ -12,7 +12,7 @@ import kotlin.io.path.exists
 
 object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val processes: MutableMap<String, Process> = mutableMapOf()
-    val platform: PlatformDetection = PlatformDetection()
+    private val platform: PlatformDetection = PlatformDetection.getInstance()
     private val extraPath: String
     private val extraPathFile: File
     private val logger = LoggerFactory.getLogger(ProcessUtils::class.java)
@@ -79,24 +79,26 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
 
         val process = builder.start()
         processes[key] = process
-        val processLogger = LoggerFactory.getLogger("Process.$key")
+        val processLoggerControl = LoggerFactory.getLogger("Process.$key.control")
+        val processLoggerStdout = LoggerFactory.getLogger("Process.$key.out")
+        val processLoggerStdErr = LoggerFactory.getLogger("Process.$key.err")
         // logger.debug("ENV: ${builder.environment()}")
 
-        logger.debug("EXEC$ " + builder.command().joinToString(" "))
-        logger.info("Started process $key: PID #${process.pid()}: $process")
+        processLoggerControl.debug("EXEC$ " + builder.command().joinToString(" "))
+        processLoggerControl.info("Started process $key: PID #${process.pid()}: $process")
 
         launch(Dispatchers.IO) {
             process.inputStream.bufferedReader().use {
                 while (process.isAlive) {
                     val line = it.readLine() ?: break
-                    processLogger.info(line)
+                    processLoggerStdout.info(line)
                 }
             }
 
-            processLogger.info("Process $key: PID #${process.pid()} exited with code ${process.exitValue()}")
+            processLoggerControl.info("Process $key: PID #${process.pid()} exited with code ${process.exitValue()}")
 
             if (this@ProcessUtils.isActive && keepAlive) {
-                logger.error("Process $key exited unexpectedly: PID #${process.pid()} exited with code ${process.exitValue()}")
+                processLoggerControl.error("Process $key exited unexpectedly: PID #${process.pid()} exited with code ${process.exitValue()}")
                 stopProcess(key)
                 runProcess(key, builder, redirectDir, true)
             }
@@ -106,7 +108,7 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
             process.errorStream.bufferedReader().use {
                 while (process.isAlive) {
                     val line = it.readLine() ?: break
-                    processLogger.warn(line)
+                    processLoggerStdErr.info(line)
                 }
             }
         }

@@ -6,6 +6,7 @@ import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
+import com.kenvix.natpoked.server.NATServer
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
@@ -34,16 +35,25 @@ object NATClient : CoroutineScope, AutoCloseable {
     val isIp6Supported
         get() = lastSelfClientInfo.clientPublicIp6Address != null
 
-    val brokerClient: BrokerClient = AppEnv.BrokerUrl.let {
+    val brokerClient: BrokerClient = kotlin.run {
+        val http = parseUrl(AppEnv.BrokerUrl)
+        val mqtt = parseUrl(AppEnv.BrokerMqttUrl.default(AppEnv.BrokerUrl))
+        BrokerClient(http.host, http.port, http.path, http.ssl, mqtt.host, mqtt.port, mqtt.path, mqtt.ssl)
+    }
+
+    private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
+
+    private fun parseUrl(it: String): UrlParseResult {
         val url = URL(it)
-        BrokerClient(url.host, url.port.run {
-                if (this == -1)
-                    if (url.protocol == "https") 443 else 80
-                else
-                    this
-            },
-            url.path.default("/"), url.protocol == "https"
-        )
+        val port = url.port.run {
+            if (this == -1)
+                if (url.protocol == "https") 443 else 80
+            else
+                this
+        }
+        val path = url.path.default("/")
+        val ssl = url.protocol == "https"
+        return UrlParseResult(url.host, port, path, ssl)
     }
 
     private lateinit var reportLoopJob: Job
@@ -120,5 +130,14 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     override fun toString(): String {
         return "NATClient(peers=$peers)"
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        logger.info("NATPoked Client -- Standalone Mode")
+        logger.warn("Stand-alone mode is not recommended for production use")
+        runBlocking {
+            start()
+        }
     }
 }
