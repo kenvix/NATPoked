@@ -44,18 +44,18 @@ data class Result3<T, U, V>(val component1: T, val component2: U, val component3
 data class Result4<T, U, V, W>(val component1: T, val component2: U, val component3: V, val component4: W)
 data class Result5<T, U, V, W, X>(val component1: T, val component2: U, val component3: V, val component4: W, val component5: X)
 
-suspend fun ApplicationCall.respondJson(data: Any? = null, info: String? = null,
-                                                            code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend fun <T> ApplicationCall.respondJson(data: T? = null, info: String? = null,
+                                               code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
     this.respond(Json.encodeToString(CommonJsonResult(status.value, info = info ?: status.description, code = code, data = data)))
 }
 
-suspend fun ApplicationCall.respondProtobuf(data: Any? = null, info: String? = null,
+suspend fun <T> ApplicationCall.respondProtobuf(data: T? = null, info: String? = null,
                                                                 code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
     this.respond(ProtoBuf.encodeToByteArray(CommonJsonResult(status.value, info = info ?: status.description, code = code, data = data)))
 }
 
-suspend fun ApplicationCall.respondData(data: Any? = null, info: String? = null,
-                                                                code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend fun <T> ApplicationCall.respondData(data: T? = null, info: String? = null,
+                                            code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
     val type = this.request.contentType().contentSubtype
     if (type.contains("json")) {
         respondJson(data, info, code, status)
@@ -67,6 +67,11 @@ suspend fun ApplicationCall.respondData(data: Any? = null, info: String? = null,
         else
             respondProtobuf(data, info, code, status)
     }
+}
+
+suspend fun ApplicationCall.respondInfo(info: String? = null,
+                                            code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+    respondData<Unit>(null, info, code, status)
 }
 
 suspend fun ApplicationCall.respondJsonText(jsonText: String,

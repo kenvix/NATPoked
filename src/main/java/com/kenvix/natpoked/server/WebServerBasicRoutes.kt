@@ -151,7 +151,7 @@ internal object WebServerBasicRoutes : KtorModule {
                                 else -> TODO("其他类型的 NAT")
                             }
                         } else {
-                            call.respondData(code = 30001, info = "Target offline. Wait target peer online and try again")
+                            call.respondInfo(code = 30001, info = "Target offline. Wait target peer online and try again")
                         }
                     }
 

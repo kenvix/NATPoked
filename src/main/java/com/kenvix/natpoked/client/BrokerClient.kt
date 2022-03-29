@@ -114,7 +114,7 @@ class BrokerClient(
         mqttClient.connect(options)
     }
 
-    private suspend fun requestAPI(url: String, method: String, data: Any? = null): Response {
+    private suspend inline fun <reified T: Any> requestAPI(url: String, method: String, data: T? = null): Response {
         val request = Request.Builder()
             .url("$baseHttpUrl$url")
             .header("Accept", "application/json")
@@ -146,19 +146,19 @@ class BrokerClient(
     }
 
     suspend fun unregisterPeerToPeerPort(myPeerId: PeerId, targetPeerId: PeerId): CommonJsonResult<*> {
-        val rsp = requestAPI("/peers/$myPeerId/connections/$targetPeerId", "DELETE")
+        val rsp = requestAPI<Unit>("/peers/$myPeerId/connections/$targetPeerId", "DELETE")
         return getRequestResult<Unit?>(rsp)
     }
 
     suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(NATClient.getLocalNatClientItem(ifaceId))
 
     suspend fun unregisterPeer(clientId: PeerId): CommonJsonResult<*> {
-        val rsp = requestAPI("/peers/$clientId", "DELETE")
+        val rsp = requestAPI<Unit>("/peers/$clientId", "DELETE")
         return getRequestResult<Unit?>(rsp)
     }
 
     suspend fun getPeerInfo(clientId: PeerId): NATClientItem {
-        val rsp = requestAPI("/peers/$clientId", "GET")
+        val rsp = requestAPI<Unit>("/peers/$clientId", "GET")
         return getRequestResult<NATClientItem>(rsp).data!!
     }
 
