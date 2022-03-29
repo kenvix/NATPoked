@@ -5,17 +5,11 @@ import de.javawi.jstun.test.DiscoveryInfo
 import de.javawi.jstun.test.DiscoveryTest
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.toList
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.time.withTimeout
 import org.slf4j.LoggerFactory
 import java.net.*
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.time.temporal.TemporalUnit
-import kotlin.math.log
-import kotlin.time.DurationUnit
 
 private val logger = LoggerFactory.getLogger("StunUtils")
 
@@ -23,14 +17,14 @@ data class StunTestResult(
     val localInetAddress: InetAddress,
     val natType: NATType,
     val publicInetAddress: InetAddress?,
-    val testedBy: TestedBy = StunTestResult.TestedBy.NAT
+    val testedBy: TestedBy = StunTestResult.TestedBy.STUN
 ) : Comparable<StunTestResult> {
     override fun compareTo(other: StunTestResult): Int {
         return this.natType.compareTo(other.natType)
     }
 
     enum class TestedBy {
-        NAT,
+        STUN,
         UPNP
     }
 }

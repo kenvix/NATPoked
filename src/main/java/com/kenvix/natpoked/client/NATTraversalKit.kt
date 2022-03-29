@@ -58,11 +58,11 @@ object NATTraversalKit {
                 val externalIp = UPnP.getExternalIP()
                 val result = StunTestResult(
                     InetAddress.getByName(localIp),
-                    NATType.RESTRICTED_CONE,
+                    NATType.FULL_CONE,
                     InetAddress.getByName(externalIp),
                     StunTestResult.TestedBy.UPNP
                 )
-                logger.info("$srcAddr: Public UPnP supported: $result")
+                logger.debug("$srcAddr: Public UPnP supported: $result")
                 result
             } else {
                 logger.info("$srcAddr: Public UPnP not supported")
@@ -71,14 +71,16 @@ object NATTraversalKit {
         }
 
         val natTypeTask = async {
-            testNatType(srcAddr).also { logger.info("$srcAddr: NAT Type: $it") }
+            testNatType(srcAddr).also { logger.debug("$srcAddr: STUN tested NAT Type: $it") }
         }
 
         val upnp: StunTestResult? = upnpTask.await()
         val natType: StunTestResult = natTypeTask.await()
 
         if (upnp != null) {
-            maxOf(natType, upnp)
+            val result = maxOf(natType, upnp)
+            logger.info("$srcAddr: NAT Type: ${result.natType}")
+            result
         } else {
             natType
         }
