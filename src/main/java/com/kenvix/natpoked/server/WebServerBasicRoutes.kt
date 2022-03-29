@@ -43,12 +43,19 @@ internal object WebServerBasicRoutes : KtorModule {
                 resources("public")
             }
 
+            get("/") {
+                throw BadRequestException("NATPoked server works well. But you should not access this page manually.")
+            }
+
             route("/api/v1") {
                 route("/tools") {
-                    get("/ip") { call.respondText(call.request.origin.remoteHost) }
+                    get("/ip") {
+                        call.respondInfo(call.request.origin.remoteHost)
+                    }
 
                     post("/test") {
                         val params = call.receiveParameters()
+                        call.response.headers.append("Content-Type", "text/plain")
                         call.respondText("Input: " + params["test_in"])
                     }
                 }

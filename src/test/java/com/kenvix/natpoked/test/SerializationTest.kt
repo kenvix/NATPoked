@@ -9,8 +9,11 @@ package com.kenvix.natpoked.test
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.contacts.PeersConfig
+import com.kenvix.natpoked.server.CommonJsonResult
+import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.toHexString
+import com.kenvix.web.utils.JSON
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -55,6 +58,13 @@ class SerializationTest {
         val configFile = Files.readString(Path.of(AppEnv.PeerTrustsFile))
         val peers = Yaml.decodeFromString<PeersConfig>(configFile)
         println(peers)
+    }
+
+    @Test
+    fun testJson() {
+        val json = "{\"status\":200,\"code\":404,\"data\":{\"a\": 1}}"
+        val info: CommonJsonResult<ErrorResult?> = JSON.decodeFromString(json)
+        println(info)
     }
 
     interface ITestDataPartial {

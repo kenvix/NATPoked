@@ -23,6 +23,8 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonConfiguration
+import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.protobuf.ProtoBuf
 import org.apache.commons.io.FileUtils
 import org.apache.commons.text.StringEscapeUtils
@@ -31,8 +33,18 @@ import java.io.File
 import java.net.URI
 import java.sql.Timestamp
 
+val JSON = Json {
+    isLenient = true
+    ignoreUnknownKeys = true
+    serializersModule = EmptySerializersModule
+}
+
+val PROTO = ProtoBuf {
+    serializersModule = EmptySerializersModule
+}
+
 private val utilsLogger = LoggerFactory.getLogger("HttpUtils")!!
-val defaultRpcProtocol = "proto"
+val defaultRpcProtocol = "json"
 
 fun Route.controller(path: String, controller: Controller) {
     this.route(path, controller::route)
@@ -44,18 +56,18 @@ data class Result3<T, U, V>(val component1: T, val component2: U, val component3
 data class Result4<T, U, V, W>(val component1: T, val component2: U, val component3: V, val component4: W)
 data class Result5<T, U, V, W, X>(val component1: T, val component2: U, val component3: V, val component4: W, val component5: X)
 
-suspend fun <T> ApplicationCall.respondJson(data: T? = null, info: String? = null,
-                                               code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend inline fun <reified T> ApplicationCall.respondJson(data: T? = null, info: String? = null,
+                                                           code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
     this.respond(Json.encodeToString(CommonJsonResult(status.value, info = info ?: status.description, code = code, data = data)))
 }
 
-suspend fun <T> ApplicationCall.respondProtobuf(data: T? = null, info: String? = null,
-                                                                code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend inline fun <reified T> ApplicationCall.respondProtobuf(data: T? = null, info: String? = null,
+                                                               code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
     this.respond(ProtoBuf.encodeToByteArray(CommonJsonResult(status.value, info = info ?: status.description, code = code, data = data)))
 }
 
-suspend fun <T> ApplicationCall.respondData(data: T? = null, info: String? = null,
-                                            code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend inline fun <reified T> ApplicationCall.respondData(data: T? = null, info: String? = null,
+                                                           code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
     val type = this.request.contentType().contentSubtype
     if (type.contains("json")) {
         respondJson(data, info, code, status)
@@ -85,34 +97,21 @@ suspend fun ApplicationCall.respondJsonText(jsonText: String,
  * @param data return data. If data is [URI] it will be equals to redirectUrl
  * @param redirectURI Redirect user to this url, will be attached to Header "X-Redirect-Location" Redirection is only available if useragent is a valid user browser.
  */
-suspend fun ApplicationCall.respondSuccess(
+suspend inline fun <reified T> ApplicationCall.respondSuccess(
     msg: String? = null,
-    data: Any? = null,
+    data: T? = null,
     redirectURI: URI? = null,
     statusCode: HttpStatusCode = HttpStatusCode.TemporaryRedirect
 ) {
-//    if (isUserBrowserRequest()) {
-//        val redirectTo: String? = (if (redirectURI == null && data != null && data is URI) data else redirectURI)?.run {
-//            appendQuery("msg=$msg").toString()
-//        }
-//        redirectTo.ifNotNull {  this.response.headers.append("X-Redirect-Location", it) }
-//        if (redirectTo != null) {
-//            this.respond(
-//                statusCode, FreeMarkerContent("redirect.ftl", mapOf(
-//                    "msg" to (msg ?: "请稍候"),
-//                    "redirectUrl" to redirectTo
-//                ))
-//            )
-//        } else {
-//            this.respond(
-//                HttpStatusCode.OK, FreeMarkerContent("success.ftl", mapOf(
-//                    "msg" to (msg ?: "操作成功"),
-//                ))
-//            )
-//        }
-//    } else {
-        respondData(data, msg)
-//    }
+    respondData(data, msg)
+}
+
+suspend inline fun ApplicationCall.respondSuccess(
+    msg: String? = null,
+    redirectURI: URI? = null,
+    statusCode: HttpStatusCode = HttpStatusCode.TemporaryRedirect
+) {
+    respondData<Unit>(null, msg)
 }
 
 fun businessException(description: String): Nothing {
@@ -177,7 +176,7 @@ suspend fun <R> File.useTempFile(then: (suspend (File) -> R))
     }
 }
 
-inline fun <T: Any> T?.validateValue(errorMessage: String, passCondition: (check: T) -> Boolean): T {
+inline fun <reified T: Any> T?.validateValue(errorMessage: String, passCondition: (check: T) -> Boolean): T {
     if (this == null)
         throw BadRequestException("Illegal input data: Required form param not found")
 
@@ -187,7 +186,7 @@ inline fun <T: Any> T?.validateValue(errorMessage: String, passCondition: (check
     return this
 }
 
-inline fun <T: Any> T?.validateValue(passCondition: (check: T) -> Boolean): T
+inline fun <reified T: Any> T?.validateValue(passCondition: (check: T) -> Boolean): T
         = validateValue("Illegal input data: $this", passCondition)
 
 

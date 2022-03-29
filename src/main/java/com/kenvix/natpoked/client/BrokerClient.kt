@@ -13,8 +13,10 @@ import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
+import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.utils.exception.*
+import com.kenvix.web.utils.JSON
 import com.kenvix.web.utils.ProcessUtils
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -74,44 +76,48 @@ class BrokerClient(
 //            .build()
 //        websocket = httpClient.newWebSocket(request, listener = brokerWebSocketListener)
 
-        registerPeer()
+        val registerTask = async { registerPeer() }
+        val mqttTask = async {
+            val serverURI = "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
+            mqttClient = MqttClient(serverURI, AppEnv.PeerId.toHexString())
+            mqttClient.setCallback(object : MqttCallback {
+                override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
+                    logger.info("MQTT Disconnected")
+                }
 
-        val serverURI = "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
-        mqttClient = MqttClient(serverURI, AppEnv.PeerId.toHexString())
-        mqttClient.setCallback(object : MqttCallback {
-            override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
-                logger.info("MQTT Disconnected")
-            }
+                override fun mqttErrorOccurred(exception: MqttException?) {
+                    logger.error("MQTT Error Occurred", exception)
+                }
 
-            override fun mqttErrorOccurred(exception: MqttException?) {
-                logger.error("MQTT Error Occurred", exception)
-            }
+                override fun messageArrived(topic: String?, message: MqttMessage?) {
+                    logger.info("Message arrived: $topic, ${message?.payload}")
+                }
 
-            override fun messageArrived(topic: String?, message: MqttMessage?) {
-                logger.info("Message arrived: $topic, ${message?.payload}")
-            }
+                override fun deliveryComplete(token: IMqttToken?) {
+                    logger.info("Delivery complete: $token")
+                }
 
-            override fun deliveryComplete(token: IMqttToken?) {
-                logger.info("Delivery complete: $token")
-            }
+                override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+                    logger.info("Connect complete: $reconnect, $serverURI")
+                }
 
-            override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-                logger.info("Connect complete: $reconnect, $serverURI")
-            }
+                override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
+                    logger.info("Auth packet arrived: $reasonCode, $properties")
+                }
+            })
 
-            override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
-                logger.info("Auth packet arrived: $reasonCode, $properties")
-            }
-        })
+            val options = MqttConnectionOptionsBuilder()
+                .automaticReconnectDelay(0, 1)
+                .username("broker")
+                .password(sha256Of(AppEnv.ServerPSK).toBase64String().toByteArray())
+                .automaticReconnect(true)
+                .build()
 
-        val options = MqttConnectionOptionsBuilder()
-            .automaticReconnectDelay(0, 1)
-            .username("broker")
-            .password(sha256Of(AppEnv.ServerPSK).toBase64String().toByteArray())
-            .automaticReconnect(true)
-            .build()
+            mqttClient.connect(options)
+        }
 
-        mqttClient.connect(options)
+        registerTask.await()
+        mqttTask.await()
     }
 
     private suspend inline fun <reified T: Any> requestAPI(url: String, method: String, data: T? = null): Response {
@@ -162,12 +168,12 @@ class BrokerClient(
         return getRequestResult<NATClientItem>(rsp).data!!
     }
 
-    private fun <T> getRequestResult(rsp: Response): CommonJsonResult<T> {
+    private inline fun <reified T> getRequestResult(rsp: Response): CommonJsonResult<T> {
         if (rsp.code in 400 until 600) {
-            val err: CommonJsonResult<*>? = try {
-                Json.decodeFromString(rsp.body!!.string())
+            val err: CommonJsonResult<Unit?>? = try {
+                JSON.decodeFromString(rsp.body!!.string())
             } catch (e: Exception) {
-                logger.warn("Unable to decode error info from response body", e)
+                logger.warn("Unable to decode error info from response body: " + rsp.body?.string(), e)
                 null
             }
 
@@ -183,9 +189,9 @@ class BrokerClient(
             }
         } else {
             try {
-                return Json.decodeFromString(rsp.body!!.string())
+                return JSON.decodeFromString<CommonJsonResult<T>>(rsp.body!!.string())
             } catch (e: Exception) {
-                throw InvalidResultException("Unable to decode result from response body", e)
+                throw InvalidResultException("Unable to decode result from response body: " + rsp.body?.string(), e)
             }
         }
     }
