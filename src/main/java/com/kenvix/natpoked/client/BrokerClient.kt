@@ -16,8 +16,7 @@ import com.kenvix.natpoked.server.CommonRequest
 import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.utils.exception.*
-import com.kenvix.web.utils.JSON
-import com.kenvix.web.utils.ProcessUtils
+import com.kenvix.web.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -29,14 +28,23 @@ import okhttp3.*
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.internal.toHexString
 import okio.ByteString
+import org.apache.commons.lang3.Conversion
 import org.eclipse.paho.mqttv5.client.*
 import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
+import org.eclipse.paho.mqttv5.common.packet.MqttAck
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
+import org.eclipse.paho.mqttv5.common.packet.UserProperty
 import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 import kotlin.math.log
+import kotlin.random.Random
 
 @Suppress("CAST_NEVER_SUCCEEDS")
 @OptIn(ExperimentalSerializationApi::class)
@@ -61,12 +69,26 @@ class BrokerClient(
     private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
     private lateinit var mqttClient: MqttAsyncClient
 
-    override fun toString(): String {
-        return "npbroker://$brokerHost:$brokerPort$brokerPath"
+    private val suspendResponses: MutableMap<Int, Deferred<*>> = ConcurrentHashMap()
+    private val nextSuspendResponseId: AtomicInteger = AtomicInteger(Random.nextInt(0, Int.MAX_VALUE))
+
+    suspend fun sendPeerMessage(topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
+                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix, key, payload, qos, props, retained)
     }
 
-    fun getMqttChannelBasePath(peerId: PeerId): String {
-        return "/peer/${peerId.toHexString()}/"
+    suspend fun <T> sendPeerMessageWithResponse(topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
+                                props: MqttProperties = MqttProperties(), retained: Boolean = false): T {
+        val responseId = nextSuspendResponseId.getAndIncrement()
+        val arr = ByteArray(4)
+        props.correlationData = Conversion.intToByteArray(responseId, 0, arr, 0, 4)
+
+        sendPeerMessage(topicSuffix, key, payload, qos, props, retained)
+        TODO()
+    }
+
+    override fun toString(): String {
+        return "npbroker://$brokerHost:$brokerPort$brokerPath"
     }
 
     suspend fun connect() = withContext(Dispatchers.IO) {
@@ -105,6 +127,8 @@ class BrokerClient(
                         logger.warn("Invalid message arrived: $topic, ${message?.payload}")
                         return
                     }
+
+                    println("Message auth: ${message.properties.authenticationMethod}: ${String(message.properties.authenticationData)}")
                 }
 
                 override fun deliveryComplete(token: IMqttToken?) {

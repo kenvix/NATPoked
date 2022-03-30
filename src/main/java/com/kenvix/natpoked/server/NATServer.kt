@@ -13,6 +13,7 @@ import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
 import kotlin.math.log
@@ -22,6 +23,8 @@ object NATServer : Closeable {
     private val peerConnectionsImpl: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
     val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
         get() = peerConnectionsImpl
+
+    private val brokerServer: BrokerServer by lazy { BrokerServer(UUID.randomUUID().toString(), AppEnv.ServerMqttPort) }
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -101,6 +104,10 @@ object NATServer : Closeable {
         if (!tempPath.exists()) {
             tempPath.toFile().mkdirs()
         }
+        
+        if (AppEnv.DebugMode) {
+            logger.info("<!> MQTT Server random key: ${brokerServer.token}")
+        }
 
         val web = async {
             logger.info("Starting web server")
@@ -111,7 +118,10 @@ object NATServer : Closeable {
         val mqttConfig = async(Dispatchers.IO) {
             logger.info("Pre-Configuring MQTT broker")
             val mqttPasswd =  tempPath.resolve("mqtt.passwd")
-            mqttPasswd.toFile().writeText("broker:" + sha256Of(AppEnv.ServerPSK).toBase58String())
+            mqttPasswd.toFile().writeText(
+                "server:${brokerServer.token}" + "\n" +
+                "broker:${sha256Of(AppEnv.ServerPSK).toBase58String()}"
+            )
 
             ProcessUtils.runProcess("mqtt_passwd", ProcessBuilder().command(
                 "mosquitto_passwd", "-U", "\"${mqttPasswd.toAbsolutePath()}\"",
@@ -152,9 +162,14 @@ password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
         }
 
         val mqtt = launchMqttBrokerAsync()
+        mqtt.await()
+
+        val brokerServerTask = async {
+            brokerServer.connect()
+        }
 
         web.await()
-        mqtt.await()
+        brokerServerTask.await()
     }
 
     internal suspend fun preload() {
