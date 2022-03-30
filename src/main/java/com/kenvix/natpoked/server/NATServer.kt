@@ -2,10 +2,7 @@ package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.contacts.*
-import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.PlatformDetection
-import com.kenvix.natpoked.utils.sha256Of
-import com.kenvix.natpoked.utils.toBase64String
+import com.kenvix.natpoked.utils.*
 import com.kenvix.web.server.CachedClasses
 import com.kenvix.web.utils.ProcessUtils
 import io.ktor.application.Application
@@ -114,7 +111,7 @@ object NATServer : Closeable {
         val mqttConfig = async(Dispatchers.IO) {
             logger.info("Pre-Configuring MQTT broker")
             val mqttPasswd =  tempPath.resolve("mqtt.passwd")
-            mqttPasswd.toFile().writeText("broker:" + sha256Of(AppEnv.ServerPSK).toBase64String())
+            mqttPasswd.toFile().writeText("broker:" + sha256Of(AppEnv.ServerPSK).toBase58String())
 
             ProcessUtils.runProcess("mqtt_passwd", ProcessBuilder().command(
                 "mosquitto_passwd", "-U", "\"${mqttPasswd.toAbsolutePath()}\"",
@@ -129,6 +126,10 @@ object NATServer : Closeable {
 
             var mqttBrokerConfig = """
 listener ${AppEnv.ServerMqttPort}
+socket_domain ipv4
+protocol websockets
+listener ${AppEnv.ServerMqttPort}
+socket_domain ipv6
 protocol websockets
 allow_anonymous false
 password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}

@@ -13,6 +13,8 @@ import kotlin.io.path.deleteIfExists
 
 
 fun main() {
+    println("MQTT PASS:" + sha256Of(AppEnv.ServerPSK).toBase58String())
+
     val defaultGateway4 = getDefaultGatewayInterface4()
     println("Default gateway ipv4: #${defaultGateway4?.index} $defaultGateway4 - ${defaultGateway4?.inetAddresses?.toList()}")
     val defaultGateway6 = getDefaultGatewayInterface6()

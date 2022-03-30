@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import net.mamoe.yamlkt.Yaml
+import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.slf4j.LoggerFactory
 import java.net.URL
 import java.nio.file.Files
@@ -118,6 +119,10 @@ object NATClient : CoroutineScope, AutoCloseable {
         } else {
             TODO("Not implemented")
         }
+    }
+
+    internal fun onBrokerMessage(topic: String, mqttMessage: MqttMessage) {
+
     }
 
     override fun close() {

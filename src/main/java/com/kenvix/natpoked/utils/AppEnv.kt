@@ -12,10 +12,10 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val DebugMode: Boolean by envOf(false)
 
     @Description("中介端地址 (HTTP)，例如 https://example.kenvix.com/path")
-    val BrokerUrl: String by envOf("http://127.0.0.1:6449/")
+    val BrokerUrl: String by envOf("http://127.0.0.1:8000/")
 
     @Description("中介端地址 (MQTT)，例如 https://example.kenvix.com/path。可以为空，若为空则使用 BrokerUrl")
-    val BrokerMqttUrl: String by envOf("http://127.0.0.1:1883/")
+    val BrokerMqttUrl: String by envOf("http://127.0.0.1:8001/")
 
     @Description("本地网络的 NAT 类型。强烈建议服务器等网络环境恒定不变时设置此项以避免浪费时间检测，相反，" +
             "网络环境会改变时则应保持 AUTO。可选值: AUTO, PUBLIC, FULL_CONE, RESTRICTED_CONE, PORT_RESTRICTED_CONE, SYMMETRIC")
@@ -45,13 +45,13 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val NetworkTestDomain: String by envOf("www.baidu.com")
 
     @Description("中介端（服务端）MQTT 端口。仅用作服务端时需要配置。另外，在 Linux/macOS 平台，也会监听 Unix socket: ./Temp/mqtt.sock")
-    val ServerMqttPort: Int by envOf(1883)
+    val ServerMqttPort: Int by envOf(8001)
 
     @Description("HTTP 地址")
     val ServerHttpHost: String by envOf( "127.0.0.1")
 
     @Description("中介端（服务端）HTTP 端口。仅用作服务端时需要配置。")
-    val ServerHttpPort: Int by envOf(6449)
+    val ServerHttpPort: Int by envOf(8000)
 
     @Description("对等端和服务端通信的密钥，两端密钥必须相同才能实现和服务器的沟通。请注意与对等端的通信不使用此密钥，而是使用 PeerKey")
     val ServerKey: String by envOf("1919810bbbbbb")

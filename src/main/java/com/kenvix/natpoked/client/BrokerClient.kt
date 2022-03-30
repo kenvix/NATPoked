@@ -59,10 +59,14 @@ class BrokerClient(
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
     private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
     private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
-    private lateinit var mqttClient: MqttClient
+    private lateinit var mqttClient: MqttAsyncClient
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
+    }
+
+    fun getMqttChannelBasePath(peerId: PeerId): String {
+        return "/peer/${peerId.toHexString()}/"
     }
 
     suspend fun connect() = withContext(Dispatchers.IO) {
@@ -76,10 +80,16 @@ class BrokerClient(
 //            .build()
 //        websocket = httpClient.newWebSocket(request, listener = brokerWebSocketListener)
 
-        val registerTask = async { registerPeer() }
+        val registerTask = async {
+            logger.info("Testing NAT type and Registering to broker ...")
+            registerPeer()
+        }
+
         val mqttTask = async {
             val serverURI = "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
-            mqttClient = MqttClient(serverURI, AppEnv.PeerId.toHexString())
+            logger.debug("Connecting to MQTT server: $serverURI")
+
+            mqttClient = MqttAsyncClient(serverURI, AppEnv.PeerId.toHexString())
             mqttClient.setCallback(object : MqttCallback {
                 override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
                     logger.info("MQTT Disconnected")
@@ -90,7 +100,11 @@ class BrokerClient(
                 }
 
                 override fun messageArrived(topic: String?, message: MqttMessage?) {
-                    logger.info("Message arrived: $topic, ${message?.payload}")
+                    logger.info("Message arrived: $topic, Len ${message?.payload?.size}")
+                    if (topic.isNullOrBlank() || message == null) {
+                        logger.warn("Invalid message arrived: $topic, ${message?.payload}")
+                        return
+                    }
                 }
 
                 override fun deliveryComplete(token: IMqttToken?) {
@@ -98,7 +112,15 @@ class BrokerClient(
                 }
 
                 override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-                    logger.info("Connect complete: $reconnect, $serverURI")
+                    logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
+
+                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/*", 2)
+                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2)
+                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0)
+                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0)
+                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2)
+
+                    logger.info("MQTT Connected and subscribed to topics")
                 }
 
                 override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
@@ -107,9 +129,11 @@ class BrokerClient(
             })
 
             val options = MqttConnectionOptionsBuilder()
-                .automaticReconnectDelay(0, 1)
+                .automaticReconnectDelay(1000, 2000)
+                .keepAliveInterval(AppEnv.PeerToBrokenPingInterval)
+                .cleanStart(false)
                 .username("broker")
-                .password(sha256Of(AppEnv.ServerPSK).toBase64String().toByteArray())
+                .password(sha256Of(AppEnv.ServerPSK).toBase58String().toByteArray())
                 .automaticReconnect(true)
                 .build()
 
@@ -118,6 +142,14 @@ class BrokerClient(
 
         registerTask.await()
         mqttTask.await()
+    }
+
+    companion object {
+        const val TOPIC_CONTROL_CONNECT = "control/connect"
+        const val TOPIC_RELAY = "relay"
+        const val TOPIC_PING = "ping"
+        const val TOPIC_TEST = "test"
+        const val TOPIC_RESPONSE = "response"
     }
 
     private suspend inline fun <reified T: Any> requestAPI(url: String, method: String, data: T? = null): Response {
@@ -132,6 +164,8 @@ class BrokerClient(
 
         return httpClient.newCall(request).await()
     }
+
+
 
     private suspend fun send(byteArray: ByteArray) = withContext(Dispatchers.IO) {
         websocket.send(ByteString.of(*byteArray))

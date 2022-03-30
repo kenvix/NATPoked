@@ -24,6 +24,11 @@ class LangTest {
     }
 
     @Test
+    fun resumeTest() {
+
+    }
+
+    @Test
     fun collectionsTest() {
         val map: MutableMap<Int, Int> = Collections.singletonMap(114, 514)
     }

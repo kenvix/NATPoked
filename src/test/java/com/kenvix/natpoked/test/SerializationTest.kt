@@ -11,8 +11,7 @@ import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.ErrorResult
-import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.toHexString
+import com.kenvix.natpoked.utils.*
 import com.kenvix.web.utils.JSON
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -22,6 +21,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import net.mamoe.yamlkt.Yaml
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.net.DatagramSocket
@@ -78,6 +78,16 @@ class SerializationTest {
         override val str: String,
         override val integer: Int
     ) : ITestDataPartial
+
+    @Test
+    fun base() {
+        val str = "0123456789?!拨号上网-Hello World 😅😅😅😅 WDNMD"
+        assertEquals(str.toByteArray().toBase64String(), "MDEyMzQ1Njc4OT8h5ouo5Y+35LiK572RLUhlbGxvIFdvcmxkIPCfmIXwn5iF8J+YhfCfmIUgV0ROTUQ=")
+        assertEquals(String(str.toByteArray().toBase64String().fromBase64String()), str)
+
+        assertEquals(str.toByteArray().toBase58String(), "2wDx9gUmm2VkDJjaKi3kov4cyZDQKfbabw4aqSHkA5Wj2Q2Fky8NCCUGPpAQJncmzsqGuLTMx8emRr98f")
+        assertEquals(String(str.toByteArray().toBase58String().fromBase58String()), str)
+    }
 
     @Test
     fun testInterfaceSerialization() {

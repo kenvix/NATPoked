@@ -125,6 +125,7 @@ dependencies {
 
     // https://mvnrepository.com/artifact/org.eclipse.paho/org.eclipse.paho.mqttv5.client
     implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
+
 }
 
 tasks.getByName<Test>("test") {
