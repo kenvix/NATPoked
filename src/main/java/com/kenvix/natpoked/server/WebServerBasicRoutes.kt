@@ -22,6 +22,7 @@ import io.ktor.routing.*
 import io.ktor.sessions.*
 import io.ktor.websocket.*
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
 import java.util.Collections
 import kotlin.time.toJavaDuration
@@ -137,7 +138,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {
-                                    requestPeerMakeConnection(clientRolePeer.session!!, myPeerId, serverRolePeer.client)
+                                    requestPeerMakeConnection(myPeerId, serverRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -146,11 +147,11 @@ internal object WebServerBasicRoutes : KtorModule {
                                 }
 
                                 NATType.RESTRICTED_CONE -> {
-                                    requestPeerMakeConnection(serverRolePeer.session!!, myPeerId, clientRolePeer.client)
+                                    requestPeerMakeConnection(myPeerId, clientRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
-                                    requestPeerMakeConnection(clientRolePeer.session!!, myPeerId, serverRolePeer.client)
+                                    requestPeerMakeConnection(myPeerId, serverRolePeer.client)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
                                             "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId}")
                                 }
@@ -192,9 +193,8 @@ internal object WebServerBasicRoutes : KtorModule {
                             NATServer.peerConnections.getOrFail(req.data.clientId) else NATPeerToBrokerConnection(
                             req.data
                         )
-                        client.session = this
-                        NATServer.peerWebsocketSessionMap[this] = client
 
+                        NATServer.peerWebsocketSessionMap[this] = client
 
                         call.respondSuccess()
                         client.stage = NATPeerToBrokerConnectionStage.READY
@@ -240,7 +240,7 @@ internal object WebServerBasicRoutes : KtorModule {
         }
     }
 
-    private suspend fun requestPeerMakeConnection(requestedPeer: DefaultWebSocketSession, myPeerId: PeerId, targetPeerClientInfo: NATClientItem) {
+    private suspend fun requestPeerMakeConnection(myPeerId: PeerId, targetPeerClientInfo: NATClientItem) {
         val infoCopy = targetPeerClientInfo.copy()
         infoCopy.peersConfig = targetPeerClientInfo.peersConfig!!.copy()
 
@@ -249,6 +249,7 @@ internal object WebServerBasicRoutes : KtorModule {
         peerConfigCopy.keySha = emptyByteArray()
         infoCopy.peersConfig!!.peers = Collections.singletonMap(myPeerId, peerConfigCopy)
 
-        requestedPeer.sendInternalJson(ACTION_CONNECT_PEER, targetPeerClientInfo.clientId, peerConfigCopy)
+        val json = JSON.encodeToString(BrokerMessage(ACTION_CONNECT_PEER.typeId, targetPeerClientInfo.clientId, peerConfigCopy))
+        NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", json.toByteArray(), 2)
     }
 }

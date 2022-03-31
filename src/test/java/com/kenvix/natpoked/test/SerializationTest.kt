@@ -21,10 +21,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import net.mamoe.yamlkt.Yaml
-import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -55,7 +53,7 @@ class SerializationTest {
     @Test
     fun testPeerConfig() {
         println("ConfigParserTest")
-        val configFile = Files.readString(Path.of(AppEnv.PeerTrustsFile))
+        val configFile = Files.readString(Path.of(AppEnv.PeerFile))
         val peers = Yaml.decodeFromString<PeersConfig>(configFile)
         println(peers)
     }

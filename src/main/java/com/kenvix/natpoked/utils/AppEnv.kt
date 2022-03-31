@@ -36,8 +36,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("与对等端的默认通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey。此外，可以为 Peer 单独设置不同的 Key")
     val PeerDefaultKey: String by envOf("114514aaaaaa")
 
-    @Description("信任的 Peer 列表文件")
-    val PeerTrustsFile: String by envOf("peers.yml")
+    @Description("Peer 列表文件")
+    val PeerFile: String by envOf("peers.yml")
 
     @Description("我的 PeerID，必须全局唯一。建议随机生成一个64位正整数。不能为空")
     val PeerId: Long by envOf(100000L)
@@ -117,6 +117,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     @Description("是否启用 XForwardedHeaders 支持，若没有反向代理务必为 false")
     val XForwardedHeadersSupport by envOf(false)
+
+    val Mode by envOf("")
 
     @Description("是否启用压缩")
     val EnableCompression by envOf(false)

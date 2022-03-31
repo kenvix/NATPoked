@@ -19,13 +19,15 @@ enum class NATPeerToPeerConnectionStage {
 
 data class NATPeerToBrokerConnection(
     val client: NATClientItem,
-    var session: DefaultWebSocketSession? = null,
     var stage: NATPeerToBrokerConnectionStage = NATPeerToBrokerConnectionStage.HANDSHAKE,
     /**
      * State machine for peer to peer connection
      */
     private val connectionsImpl: MutableMap<PeerId, Connection> = ConcurrentHashMap()
 ) {
+    val peerTopic: String
+        get() = "/peer/${client.clientId}/"
+
     val connections: Map<PeerId, Connection>
         get() = connectionsImpl
 

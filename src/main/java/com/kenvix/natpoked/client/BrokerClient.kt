@@ -154,7 +154,7 @@ class BrokerClient(
 
             val options = MqttConnectionOptionsBuilder()
                 .automaticReconnectDelay(1000, 2000)
-                .keepAliveInterval(AppEnv.PeerToBrokenPingInterval)
+                .keepAliveInterval(AppEnv.PeerToBrokenPingInterval / 1000)
                 .cleanStart(false)
                 .username("broker")
                 .password(sha256Of(AppEnv.ServerPSK).toBase58String().toByteArray())

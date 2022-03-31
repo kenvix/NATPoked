@@ -1,6 +1,7 @@
 package com.kenvix.natpoked
 
 import ch.qos.logback.classic.Level
+import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.server.NATServer
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.ConsoleCommands
@@ -35,10 +36,23 @@ object Main : CoroutineScope {
         registerShutdownHandler()
 
         launch(Dispatchers.IO) {
-            runCatching {
-                logger.info("Starting server ...")
-                NATServer.start()
-            }.onFailure { showErrorAndExit(it, 2, "Server initialization failed") }
+            val mode = AppEnv.Mode.lowercase()
+            if (mode == "server" || cmd.hasOption('s')) {
+                runCatching {
+                    logger.info("Starting server ...")
+                    NATServer.start()
+                }.onFailure { showErrorAndExit(it, 2, "Server initialization failed") }
+            } else {
+                runCatching {
+                    logger.info("Starting NATPoked client(peer) ...")
+                    NATClient.start()
+
+                    if (!cmd.hasOption('x')) {
+                        logger.info("Trying to connect all configured peers ...")
+                        NATClient.pokeAll()
+                    }
+                }.onFailure { showErrorAndExit(it, 2, "Client initialization failed") }
+            }
         }
 
         beginReadSystemConsole()
@@ -78,12 +92,9 @@ object Main : CoroutineScope {
     private fun loadCommandLine(args: Array<String>): CommandLine {
         val ops = Options()
 
-        ops.addOption("i", "target-id", true, "要打洞的对端的客户端ID，例如 12345678ABCDEF")
-        ops.addOption("p", "forward-port", true, "要代理的本机端口，本参数可以多次出现。格式为 " +
-                "协议:本机端口:远端端口，例如 -p tcp:80:8080 使得对方能够通过 127.0.0.2:8080 访问本机的 80 端口。地址 127.0.0.2 可以通过 .env 文件或环境变量修改。")
+        ops.addOption("x", "no-connect", false, "不要在启动时开始打洞")
 
         ops.addOption("s", "server", false, "以中介服务器模式运行")
-        ops.addOption("c", "client", false, "以P2P通信端运行")
 
         ops.addOption("d", "dump-settings", false, "导出设置参数到文件 ${AppConstants.workingFolder}.env")
 

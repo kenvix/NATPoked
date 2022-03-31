@@ -3,16 +3,12 @@ package com.kenvix.natpoked.client
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.contacts.PeersConfig
-import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.BrokerMessage
-import com.kenvix.natpoked.server.CommonJsonResult
-import com.kenvix.natpoked.server.NATServer
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
 import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
 import net.mamoe.yamlkt.Yaml
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.slf4j.LoggerFactory
@@ -59,6 +55,10 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     private lateinit var reportLoopJob: Job
 
+    suspend fun pokeAll() {
+
+    }
+
     suspend fun start() = withContext(Dispatchers.IO) {
         logger.info("NATPoked Client Starting")
         logger.info("NATPoked Client Broker Client Connecting")
@@ -73,7 +73,7 @@ object NATClient : CoroutineScope, AutoCloseable {
             }
         }
 
-        val peersConfig = Files.readString(Path.of(AppEnv.PeerTrustsFile)).let {
+        val peersConfig = Files.readString(Path.of(AppEnv.PeerFile)).let {
             if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
         }
 

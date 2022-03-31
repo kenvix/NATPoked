@@ -24,7 +24,7 @@ object NATServer : Closeable {
     val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
         get() = peerConnectionsImpl
 
-    private val brokerServer: BrokerServer by lazy { BrokerServer(UUID.randomUUID().toString(), AppEnv.ServerMqttPort) }
+    val brokerServer: BrokerServer by lazy { BrokerServer(UUID.randomUUID().toString(), AppEnv.ServerMqttPort) }
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread {

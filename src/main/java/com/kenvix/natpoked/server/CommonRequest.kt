@@ -7,7 +7,9 @@
 package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.contacts.PeerId
+import com.kenvix.web.utils.JSON
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 
 interface CommonRequest<T> {
     val type: Int
@@ -28,4 +30,5 @@ data class BrokerMessage<T> (
     override val type: Int,
     val peerId: PeerId = -1,
     override val data: T,
-) : CommonRequest<T>
+) : CommonRequest<T> {
+}

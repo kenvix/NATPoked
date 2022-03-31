@@ -12,10 +12,7 @@ import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase58String
 import com.kenvix.web.utils.aSendPeerMessage
 import com.kenvix.web.utils.getMqttChannelBasePath
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import okhttp3.internal.toHexString
 import org.eclipse.paho.mqttv5.client.*
 import org.eclipse.paho.mqttv5.common.MqttException
@@ -46,7 +43,7 @@ class BrokerServer(
         }
         val options = MqttConnectionOptionsBuilder()
             .automaticReconnectDelay(1000, 2000)
-            .keepAliveInterval(AppEnv.PeerToBrokenPingInterval)
+            .keepAliveInterval(10)
             .cleanStart(false)
             .username("broker")
             .password(sha256Of(AppEnv.ServerPSK).toBase58String().toByteArray())
@@ -57,46 +54,50 @@ class BrokerServer(
         val handler = MqttHandler()
         mqttClient.setCallback(handler)
 
+        logger.info("Connecting to mosquitto broker...")
         while (isActive) {
             try {
                 mqttClient.connect(options).waitForCompletion()
                 break
-            } catch (e: Exception) {
-                logger.warn("Server mqtt connect failed", e)
+            } catch (_: Exception) {
+                delay(200)
             }
         }
     }
 
     private inner class MqttHandler() : MqttCallback {
         override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
-            logger.info("MQTT Disconnected")
+            logger.info("Server MQTT Disconnected")
         }
 
         override fun mqttErrorOccurred(exception: MqttException?) {
-            logger.error("MQTT Error Occurred", exception)
+            logger.error("Server MQTT Error Occurred", exception)
         }
 
         override fun messageArrived(topic: String?, message: MqttMessage?) {
-            logger.info("Message arrived: $topic, Len ${message?.payload?.size}")
+            logger.info("Server Message arrived: $topic, Len ${message?.payload?.size}")
             if (topic.isNullOrBlank() || message == null) {
                 logger.warn("Invalid message arrived: $topic, ${message?.payload}")
                 return
             }
 
-            println("Message auth: ${message.properties.authenticationMethod}: ${String(message.properties.authenticationData)}")
+            println("Server Message auth: ${message.properties.authenticationMethod}: ${String(message.properties.authenticationData)}")
         }
 
         override fun deliveryComplete(token: IMqttToken?) {
-            logger.info("Delivery complete: $token")
+            logger.info("Server Delivery complete: $token")
         }
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-            logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
-            logger.info("MQTT Connected and subscribed to topics")
+            logger.info("Server Connect completed: [is_reconnect? $reconnect]: $serverURI")
+
+            mqttClient.subscribe("/server", 2)
+
+            logger.info("Server MQTT Connected and subscribed to topics")
         }
 
         override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
-            logger.info("Auth packet arrived: $reasonCode, $properties")
+            logger.info("Server Auth packet arrived: $reasonCode, $properties")
         }
     }
 }
