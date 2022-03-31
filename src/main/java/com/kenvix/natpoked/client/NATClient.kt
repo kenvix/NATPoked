@@ -56,7 +56,10 @@ object NATClient : CoroutineScope, AutoCloseable {
     private lateinit var reportLoopJob: Job
 
     suspend fun pokeAll() {
+        logger.info("Poking all peers")
+        for (peer in peersImpl.values) {
 
+        }
     }
 
     suspend fun start() = withContext(Dispatchers.IO) {
@@ -79,7 +82,7 @@ object NATClient : CoroutineScope, AutoCloseable {
 
         peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
 
-        logger.info("NATPoked Client Broker Client Connected")
+        logger.info("NATPoked Client Started")
     }
 
     // todo: iface id
@@ -112,6 +115,10 @@ object NATClient : CoroutineScope, AutoCloseable {
         return lastSelfClientInfo
     }
 
+    fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATClientItem): NATPeerToPeer {
+        TODO()
+    }
+
     internal fun onBrokerMessage(data: BrokerMessage<*>) {
         if (data.peerId >= 0) {
             peersImpl[data.peerId]?.onBrokerMessage(data)
@@ -121,7 +128,7 @@ object NATClient : CoroutineScope, AutoCloseable {
         }
     }
 
-    internal fun onBrokerMessage(topic: String, mqttMessage: MqttMessage) {
+    internal fun onBrokerMessage(topicPath: List<String>, typeId: Int, messagePayload: ByteArray) {
 
     }
 

@@ -27,8 +27,8 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     TYPE_DATA_STREAM          (0b000_0000_0010_0000), // 0x2_
     TYPE_DATA_STREAM_KCP      (0b000_0000_0000_0000),
 
-    TYPE_DATA_CONTROL         (0b000_0000_0011_0000),
-    TYPE_DATA_CONTROL_HELLO   (0b000_0000_0011_0001);
+    TYPE_DATA_CONTROL          (0b000_0000_0011_0000),
+    TYPE_DATA_CONTROL_HELLO    (0b000_0000_0011_0001);
 
     val isEncrypted: Boolean
         get() = isEncrypted(typeId)

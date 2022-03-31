@@ -27,6 +27,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("每隔多长时间强制刷新并上报当前网络情况，单位为秒。默认为 5 分钟。-1 表示停用")
     val PeerReportToBrokerDelay: Int by envOf(5 * 60)
 
+    val PeerFloodingDelay: Long by envOf(50)
+
     @Description("是否启用 UPnP 功能")
     val UPnPEnabled: Boolean by envOf(true)
 
@@ -35,6 +37,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     @Description("与对等端的默认通信密钥，两端密钥必须相同才能通信。请注意与服务器的通信不使用此密钥，而是使用 ServerKey。此外，可以为 Peer 单独设置不同的 Key")
     val PeerDefaultKey: String by envOf("114514aaaaaa")
+
+    val PeerMyKey: String by envOf("11154a5as1sd5sdf4514aaaaaa")
 
     @Description("Peer 列表文件")
     val PeerFile: String by envOf("peers.yml")
@@ -144,6 +148,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     // Pre shared key (256bits)
     val PeerDefaultPSK: ByteArray = sha256Of(PeerDefaultKey)
+    val PeerMyPSK: ByteArray = sha256Of(PeerMyKey)
     val ServerPSK: ByteArray = sha256Of(ServerKey)
 //    val PeerTrustList: Map<PeerId, ByteArray> = PeerTrusts.split(' ').associate {
 //        it.split(':').run {

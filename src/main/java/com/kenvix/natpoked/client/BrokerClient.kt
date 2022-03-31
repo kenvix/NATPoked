@@ -128,7 +128,43 @@ class BrokerClient(
                         return
                     }
 
-                    println("Message auth: ${message.properties.authenticationMethod}: ${String(message.properties.authenticationData)}")
+                    val topicPath = topic.split("/")
+                    try {
+                        when (topicPath[0]) {
+                            "peer" -> {
+                                if (topicPath.size < 3 || topicPath[1] != AppEnv.PeerId.toHexString()) {
+                                    logger.warn("Invalid peer message arrived - not for me!: $topic, ${message.payload}")
+                                    return
+                                }
+
+                                message.checkPeerAuth(AppEnv.PeerMyPSK)
+                                val typeId: Int = message.properties.userProperties?.find { it.key == "type" }?.value?.toInt() ?: -1
+                                 //NATClient.onBrokerMessage(topicPath.drop(2), typeId, message.payload)
+                                when (topicPath[2]) {
+                                    TOPIC_CONTROL -> {
+                                        topicPath.assertLengthBiggerOrEqual(4)
+                                        when (topicPath[3]) {
+                                            "connect" -> {
+                                                val jsonStr = String(message.payload)
+                                                val clientInfo: BrokerMessage<NATClientItem> = JSON.decodeFromString(jsonStr)
+                                                NATClient.requestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
+                                            }
+                                        }
+                                    }
+
+                                    TOPIC_PING -> {
+
+                                    }
+
+                                    TOPIC_RELAY -> {
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e: CommonBusinessException) {
+                        logger.warn("Peer wrong data:", e)
+                        return
+                    }
                 }
 
                 override fun deliveryComplete(token: IMqttToken?) {
@@ -169,6 +205,7 @@ class BrokerClient(
     }
 
     companion object {
+        const val TOPIC_CONTROL = "control"
         const val TOPIC_CONTROL_CONNECT = "control/connect"
         const val TOPIC_RELAY = "relay"
         const val TOPIC_PING = "ping"

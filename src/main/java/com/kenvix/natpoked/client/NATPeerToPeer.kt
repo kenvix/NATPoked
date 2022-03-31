@@ -34,7 +34,8 @@ class NATPeerToPeer(
 
     private val job = Job() + CoroutineName(this.toString())
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
-    private val currentIV: ByteArray = ByteArray(ivSize)
+    private val currentMyIV: ByteArray = ByteArray(ivSize)
+    private val currentTargetIV: ByteArray = ByteArray(ivSize)
     private val aes = AES256GCM(if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
 
@@ -106,12 +107,19 @@ class NATPeerToPeer(
         udpChannel.receive(buffer)
     }
 
-    suspend fun sendHelloPacket(target: InetSocketAddress, num: Int = 3) {
+    /**
+     * 发送握手消息。
+     * PeerA发起连接，然后PeerB应答。
+     * 阶段 0：Peer-A 洪泛发送握手消息。
+     * 阶段 1：Peer-B 接收握手消息，并应答。
+     */
+    suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 3) {
         val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() and STATUS_HAS_IV.typeId.toInt()
         val buffer = ByteBuffer.allocate(3 + ivSize)
         buffer.order(ByteOrder.BIG_ENDIAN)
         buffer.putUnsignedShort(typeIdInt)
-        buffer.put(currentIV)
+        buffer.put(stage)
+        buffer.put(currentMyIV)
         buffer.flip()
         for (i in 0 until num) {
             writeRawDatagram(buffer, target)
@@ -216,7 +224,7 @@ class NATPeerToPeer(
     }
 
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
-        val addr: SocketAddress = packet.socketAddress
+        val addr: InetSocketAddress = packet.socketAddress as InetSocketAddress
         val inArrayBuf: ByteArray = packet.data
         val inArrayBufLen: Int = packet.length
 
@@ -228,14 +236,14 @@ class NATPeerToPeer(
         val mainTypeClass: Short = PeerCommunicationType.getTypeMainClass(typeIdInt)
 
         if (PeerCommunicationType.hasIV(typeIdInt)) {
-            inBuf.readBytes(currentIV, 0, ivSize)
+            inBuf.readBytes(currentMyIV, 0, ivSize)
         }
 
         val decryptedBuf = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
             Unpooled.wrappedBuffer(
                 aes.decrypt(
                     inArrayBuf,
-                    currentIV,
+                    currentMyIV,
                     inBuf.readerIndexInArrayOffset(),
                     inArrayBufLen - inBuf.readerIndexInArrayOffset()
                 )
@@ -284,7 +292,31 @@ class NATPeerToPeer(
                     }
 
                     TYPE_DATA_CONTROL.typeId -> {
-                        controlMessageARQ.onRawPacketIncoming(decryptedBuf)
+                        when ((typeIdInt and 0x3F).toShort()) {
+                            TYPE_DATA_CONTROL_HELLO.typeId -> {
+                                logger.info("Received peer helloACK packet from $addr, size $size")
+                                if (connectJob?.isActive == true)
+                                    connectJob?.cancel("Connection to peer is established")
+
+                                val stage = decryptedBuf.readByte()
+                                decryptedBuf.readBytes(currentTargetIV, 0, ivSize)
+
+                                if (!udpChannel.isConnected) {
+                                    if (stage == 0.toByte()) {
+                                        sendHelloPacket(addr, stage = 1, num = 20)
+                                    }
+
+                                    connectTo(addr)
+                                    logger.info("Connection to peer is established")
+                                } else {
+                                    logger.debug("Connection to peer is already established, no need to connect again")
+                                }
+                            }
+
+                            else -> {
+                                TODO()
+                            }
+                        }
                     }
                 }
             } catch (e: Throwable) {
@@ -295,6 +327,26 @@ class NATPeerToPeer(
 
     fun registerPeer() {
 
+    }
+
+    @Volatile private var connectJob: Job? = null
+    /**
+     * Connect to peer with flooding specificated ports
+     */
+    fun connectPeerAsync(ports: List<Int>) {
+        if (connectJob?.isActive == true) {
+            connectJob?.cancel()
+        }
+
+        connectJob = launch(Dispatchers.IO) {
+            for (port in ports) {
+                val sockAddr = InetSocketAddress(port)
+                sendHelloPacket(sockAddr)
+
+                if (ports.size >= 2)
+                    delay(AppEnv.PeerFloodingDelay)
+            }
+        }
     }
 
     internal fun onBrokerMessage(data: BrokerMessage<*>) {
