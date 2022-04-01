@@ -1,8 +1,6 @@
 package com.kenvix.natpoked.client
 
-import com.kenvix.natpoked.contacts.NATClientItem
-import com.kenvix.natpoked.contacts.PeerId
-import com.kenvix.natpoked.contacts.PeersConfig
+import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.default
@@ -31,6 +29,8 @@ object NATClient : CoroutineScope, AutoCloseable {
     var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
     val isIp6Supported
         get() = lastSelfClientInfo.clientPublicIp6Address != null
+    val isUpnpOrFullCone
+        get() = lastSelfClientInfo.isUpnpSupported || lastSelfClientInfo.clientNatType == NATType.FULL_CONE
 
     val brokerClient: BrokerClient = kotlin.run {
         val http = parseUrl(AppEnv.BrokerUrl)
@@ -115,7 +115,7 @@ object NATClient : CoroutineScope, AutoCloseable {
         return lastSelfClientInfo
     }
 
-    fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATClientItem): NATPeerToPeer {
+    fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATConnectReq): NATPeerToPeer {
         TODO()
     }
 

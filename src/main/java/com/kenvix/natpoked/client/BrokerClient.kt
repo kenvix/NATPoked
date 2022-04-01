@@ -6,10 +6,7 @@
 
 package com.kenvix.natpoked.client
 
-import com.kenvix.natpoked.contacts.NATClientItem
-import com.kenvix.natpoked.contacts.PeerAddPortMapRequest
-import com.kenvix.natpoked.contacts.PeerId
-import com.kenvix.natpoked.contacts.RequestTypes
+import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
@@ -146,7 +143,7 @@ class BrokerClient(
                                         when (topicPath[3]) {
                                             "connect" -> {
                                                 val jsonStr = String(message.payload)
-                                                val clientInfo: BrokerMessage<NATClientItem> = JSON.decodeFromString(jsonStr)
+                                                val clientInfo: BrokerMessage<NATConnectReq> = JSON.decodeFromString(jsonStr)
                                                 NATClient.requestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
                                             }
                                         }

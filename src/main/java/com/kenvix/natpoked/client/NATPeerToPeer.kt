@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.client.NATClient.isUpnpOrFullCone
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
@@ -90,6 +91,21 @@ class NATPeerToPeer(
         }
     }
 
+    /**
+     * 尝试监听一个端口，并返回外网端口。
+     *
+     * 此操作仅对 FULLCONE NAT / UPNP 有意义。
+     */
+    suspend fun openPort(): Int = withContext(Dispatchers.IO) {
+        if (NATClient.lastSelfClientInfo.isUpnpSupported) {
+
+        } else if (NATClient.lastSelfClientInfo.clientNatType == NATType.FULL_CONE) {
+
+        } else {
+            throw UnsupportedOperationException("Unsupported NAT Type ${NATClient.lastSelfClientInfo.clientNatType} and upnp is not supported")
+        }
+    }
+
     fun listenUdpSourcePort(sourcePort: Int = config.pokedPort) {
         val socketAddress = InetSocketAddress(sourcePort)
         udpChannel.bind(socketAddress)
@@ -113,14 +129,15 @@ class NATPeerToPeer(
      * 阶段 0：Peer-A 洪泛发送握手消息。
      * 阶段 1：Peer-B 接收握手消息，并应答。
      */
-    suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 3) {
+    suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 12) {
         val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() and STATUS_HAS_IV.typeId.toInt()
-        val buffer = ByteBuffer.allocate(3 + ivSize)
+        val buffer = ByteBuffer.allocate(512)
         buffer.order(ByteOrder.BIG_ENDIAN)
         buffer.putUnsignedShort(typeIdInt)
         buffer.put(stage)
         buffer.put(currentMyIV)
         buffer.flip()
+
         for (i in 0 until num) {
             writeRawDatagram(buffer, target)
         }
@@ -333,18 +350,20 @@ class NATPeerToPeer(
     /**
      * Connect to peer with flooding specificated ports
      */
-    fun connectPeerAsync(ports: List<Int>) {
+    fun connectPeerAsync(addr: InetAddress, ports: List<Int>, floodNum: Int = 12) {
         if (connectJob?.isActive == true) {
             connectJob?.cancel()
         }
 
         connectJob = launch(Dispatchers.IO) {
-            for (port in ports) {
-                val sockAddr = InetSocketAddress(port)
-                sendHelloPacket(sockAddr)
+            for (i in 0 until floodNum) {
+                for (port in ports) {
+                    val sockAddr = InetSocketAddress(addr, port)
+                    sendHelloPacket(sockAddr, num = 1)
 
-                if (ports.size >= 2)
-                    delay(AppEnv.PeerFloodingDelay)
+                    if (ports.size >= 2)
+                        delay(AppEnv.PeerFloodingDelay)
+                }
             }
         }
     }

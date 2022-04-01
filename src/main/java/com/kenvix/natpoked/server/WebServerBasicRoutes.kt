@@ -138,7 +138,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {
-                                    requestPeerMakeConnection(myPeerId, serverRolePeer.client)
+                                    requestPeerMakeConnection(myPeerId, serverRolePeer.client, )
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -240,16 +240,20 @@ internal object WebServerBasicRoutes : KtorModule {
         }
     }
 
-    private suspend fun requestPeerMakeConnection(myPeerId: PeerId, targetPeerClientInfo: NATClientItem) {
+    private suspend fun requestPeerMakeConnection(myPeerId: PeerId, targetPeerClientInfo: NATClientItem, targetPorts: List<Int>? = null) {
         val infoCopy = targetPeerClientInfo.copy()
         infoCopy.peersConfig = targetPeerClientInfo.peersConfig!!.copy()
 
-        val peerConfigCopy = infoCopy.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
+        val peerConfigCopy: PeersConfig.Peer = infoCopy.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
         peerConfigCopy.key = ""
         peerConfigCopy.keySha = emptyByteArray()
         infoCopy.peersConfig!!.peers = Collections.singletonMap(myPeerId, peerConfigCopy)
 
-        val json = JSON.encodeToString(BrokerMessage(ACTION_CONNECT_PEER.typeId, targetPeerClientInfo.clientId, peerConfigCopy))
+        val json = JSON.encodeToString(BrokerMessage(
+            ACTION_CONNECT_PEER.typeId,
+            targetPeerClientInfo.clientId,
+            NATConnectReq(infoCopy, )
+        ))
         NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", json.toByteArray(), 2)
     }
 }

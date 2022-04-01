@@ -27,7 +27,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("每隔多长时间强制刷新并上报当前网络情况，单位为秒。默认为 5 分钟。-1 表示停用")
     val PeerReportToBrokerDelay: Int by envOf(5 * 60)
 
-    val PeerFloodingDelay: Long by envOf(50)
+    val PeerFloodingDelay: Long by envOf(32)
 
     @Description("是否启用 UPnP 功能")
     val UPnPEnabled: Boolean by envOf(true)
