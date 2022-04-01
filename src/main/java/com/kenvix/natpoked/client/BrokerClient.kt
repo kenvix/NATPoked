@@ -36,10 +36,7 @@ import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.*
 import kotlin.math.log
 import kotlin.random.Random
 
@@ -66,22 +63,45 @@ class BrokerClient(
     private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
     private lateinit var mqttClient: MqttAsyncClient
 
-    private val suspendResponses: MutableMap<Int, Deferred<*>> = ConcurrentHashMap()
-    private val nextSuspendResponseId: AtomicInteger = AtomicInteger(Random.nextInt(0, Int.MAX_VALUE))
+    private val suspendResponses: MutableMap<Int, Continuation<ByteArray>> = ConcurrentHashMap()
+    private val nextSuspendResponseId: AtomicInteger = AtomicInteger(Random.nextInt(Int.MIN_VALUE, Int.MAX_VALUE))
 
     suspend fun sendPeerMessage(topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
                                 props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
         return mqttClient.aSendPeerMessage(getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix, key, payload, qos, props, retained)
     }
 
-    suspend fun <T> sendPeerMessageWithResponse(topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
-                                props: MqttProperties = MqttProperties(), retained: Boolean = false): T {
+    suspend fun sendPeerMessage(topicSuffix: String, key: ByteArray, payload: String, qos: Int = 0,
+                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix, key, payload.toByteArray(), qos, props, retained)
+    }
+
+    /**
+     * sendPeerMessageWithResponse
+     * @param topicSuffix topic suffix
+     * @param key key
+     * @param payload payload
+     *
+     * QOS must be 2
+     */
+    @Suppress("UNCHECKED_CAST")
+    suspend fun sendPeerMessageWithResponse(topicSuffix: String, key: ByteArray, payload: ByteArray,
+                                                props: MqttProperties = MqttProperties(), retained: Boolean = false): ByteArray {
         val responseId = nextSuspendResponseId.getAndIncrement()
         val arr = ByteArray(4)
-        props.correlationData = Conversion.intToByteArray(responseId, 0, arr, 0, 4)
+        props.responseTopic = getMqttChannelBasePath(AppEnv.PeerId) + "response"
+        props.correlationData = Conversion.intToByteArray(responseId, 0, arr, 0, 4) // little endian
 
-        sendPeerMessage(topicSuffix, key, payload, qos, props, retained)
-        TODO()
+        sendPeerMessage(topicSuffix, key, payload, 2, props, retained)
+
+        return suspendCoroutine<ByteArray> {  continuation ->
+            suspendResponses[responseId] = continuation
+        }
+    }
+
+    suspend fun sendPeerMessageWithResponse(topicSuffix: String, key: ByteArray, payload: String,
+                                            props: MqttProperties = MqttProperties(), retained: Boolean = false): String {
+        return String(sendPeerMessageWithResponse(topicSuffix, key, payload.toByteArray(), props, retained))
     }
 
     override fun toString(): String {
@@ -154,6 +174,21 @@ class BrokerClient(
                                     }
 
                                     TOPIC_RELAY -> {
+                                    }
+
+                                    TOPIC_RESPONSE -> {
+                                        try {
+                                            val responseId = Conversion.byteArrayToInt(message.properties.correlationData, 0, 0, 0, 4)
+                                            val continuation = suspendResponses[responseId]
+                                            if (continuation != null) {
+                                                continuation.resume(message.payload)
+                                                suspendResponses.remove(responseId)
+                                            }
+
+                                            return
+                                        } catch (e: Exception) {
+                                            logger.error("Failed to handle response with correlationData: ${message.properties.correlationData.contentToString()}", e)
+                                        }
                                     }
                                 }
                             }
