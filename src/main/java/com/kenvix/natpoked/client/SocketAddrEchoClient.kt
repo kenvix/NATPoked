@@ -6,31 +6,24 @@
 
 package com.kenvix.natpoked.client
 
+import com.google.common.primitives.Ints
 import com.kenvix.natpoked.contacts.SocketAddrEchoResult
 import com.kenvix.natpoked.server.SocketAddrEchoServer
-import com.kenvix.web.utils.getUnsignedInt
 import com.kenvix.web.utils.getUnsignedShort
 import io.ktor.features.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import org.apache.commons.lang3.Conversion
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.channels.DatagramChannel
-import kotlin.math.log
 
 class SocketAddrEchoClient(
     var timeout: Int = 700,
 ) {
-    private val outgoingData = ByteArray(4).apply {
-        Conversion.intToByteArray(SocketAddrEchoServer.PacketPrefixRequest, 0, this, 0, 4)
-    }
+    private val outgoingData = Ints.toByteArray(SocketAddrEchoServer.PacketPrefixRequest)
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
@@ -82,7 +75,7 @@ class SocketAddrEchoClient(
     @Suppress("UsePropertyAccessSyntax")
     private fun parseEchoResult(packet: DatagramPacket): SocketAddrEchoResult {
         val buffer = ByteBuffer.wrap(packet.data, 0, packet.length)
-        buffer.order(ByteOrder.LITTLE_ENDIAN)
+        buffer.order(ByteOrder.BIG_ENDIAN)
 
         if (buffer.getInt() != SocketAddrEchoServer.PacketPrefixResponse)
             throw BadRequestException("Bad response")

@@ -6,6 +6,7 @@
 
 package com.kenvix.natpoked.client
 
+import com.google.common.primitives.Ints
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
@@ -90,7 +91,7 @@ class BrokerClient(
         val responseId = nextSuspendResponseId.getAndIncrement()
         val arr = ByteArray(4)
         props.responseTopic = getMqttChannelBasePath(AppEnv.PeerId) + "response"
-        props.correlationData = Conversion.intToByteArray(responseId, 0, arr, 0, 4) // little endian
+        props.correlationData = Ints.toByteArray(responseId) // big endian
 
         sendPeerMessage(topicSuffix, key, payload, 2, props, retained)
 
@@ -178,7 +179,7 @@ class BrokerClient(
 
                                     TOPIC_RESPONSE -> {
                                         try {
-                                            val responseId = Conversion.byteArrayToInt(message.properties.correlationData, 0, 0, 0, 4)
+                                            val responseId = Ints.fromByteArray(message.properties.correlationData) // big endian
                                             val continuation = suspendResponses[responseId]
                                             if (continuation != null) {
                                                 continuation.resume(message.payload)

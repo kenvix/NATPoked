@@ -22,7 +22,7 @@ class EchoServerTest {
             server.startAsync()
             delay(100)
             val client = SocketAddrEchoClient()
-            client.requestEcho(ports, InetAddress.getByName("127.0.0.1"))
+            println(client.requestEcho(ports, InetAddress.getByName("127.0.0.1")))
         }
     }
 }
