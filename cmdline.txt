@@ -1,1 +1,1 @@
--Djava.net.useSystemProxies=true -Djava.net.preferIPv4Stack=true -Dkenvix.natpoked.fastboot=true
+-Djava.lang.Integer.IntegerCache.high=65535 -Djava.net.useSystemProxies=true -Djava.net.preferIPv4Stack=true -Dkenvix.natpoked.fastboot=true
