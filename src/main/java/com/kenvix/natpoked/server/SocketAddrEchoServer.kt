@@ -1,5 +1,5 @@
 //--------------------------------------------------
-// Class EchoServer
+// Class SocketAddrEchoServer
 //--------------------------------------------------
 // Written by Kenvix <i@kenvix.com>
 //--------------------------------------------------
@@ -56,7 +56,9 @@ class SocketAddrEchoServer(
     }
 
     private lateinit var serverJob: Job
-    private val buffer = ByteBuffer.allocateDirect(32)
+    private val buffer = ByteBuffer.allocateDirect(32).apply {
+        order(ByteOrder.LITTLE_ENDIAN)
+    }
 
     fun startAsync() {
         if (!isActive || this::serverJob.isInitialized)
@@ -89,9 +91,9 @@ class SocketAddrEchoServer(
     private fun echo(addr: InetSocketAddress, channel: DatagramChannel) {
         if (buffer.position() >= 4) {
             buffer.flip()
-            if (buffer.getInt(0) == PacketPrefixRequest) {
+
+            if (buffer.getInt() == PacketPrefixRequest) {
                 buffer.clear()
-                buffer.order(ByteOrder.LITTLE_ENDIAN)
                 buffer.putInt(PacketPrefixResponse)
                 buffer.putUnsignedShort(addr.port)
 
@@ -105,6 +107,8 @@ class SocketAddrEchoServer(
 
                 buffer.put(addr.address.address)
                 buffer.putLong(System.currentTimeMillis())
+
+                buffer.flip()
                 channel.send(buffer, addr)
             }
         }
