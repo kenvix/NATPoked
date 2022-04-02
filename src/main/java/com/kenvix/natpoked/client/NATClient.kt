@@ -10,6 +10,9 @@ import kotlinx.serialization.decodeFromString
 import net.mamoe.yamlkt.Yaml
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.slf4j.LoggerFactory
+import java.net.DatagramSocket
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,6 +44,10 @@ object NATClient : CoroutineScope, AutoCloseable {
     val echoClient = SocketAddrEchoClient(AppEnv.EchoTimeout)
 
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
+
+    fun getOutboundInetSocketAddress(socket: DatagramSocket, maxTries: Int = 20): SocketAddrEchoResult {
+        return echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), socket, maxTries)
+    }
 
     private fun parseUrl(it: String): UrlParseResult {
         val url = URL(it)

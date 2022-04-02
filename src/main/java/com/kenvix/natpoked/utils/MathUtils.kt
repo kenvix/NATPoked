@@ -1,7 +1,7 @@
 package com.kenvix.natpoked.utils
 
 fun parseIntRangeToArray(str: String, spliter: Char = ' '): IntArray {
-    val s1 = str.split(spliter)
+    val s1 = str.split(spliter).filter { it.isNotEmpty() }
     val v = ArrayList<Any>(s1.size)
     var size = 0
 

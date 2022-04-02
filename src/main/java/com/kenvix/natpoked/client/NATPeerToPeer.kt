@@ -96,7 +96,7 @@ class NATPeerToPeer(
     /**
      * 尝试监听一个端口，并返回外网端口。
      *
-     * 此操作仅对 FULLCONE NAT / UPNP 有意义。
+     * 此操作仅对 Public / Full Cone NAT / uPnP / Restricted Cone NAT 有意义。
      */
     @Throws(IOException::class)
     suspend fun openPort(sourcePort: Int = config.pokedPort): Int = withContext(Dispatchers.IO) {
@@ -104,14 +104,15 @@ class NATPeerToPeer(
             listenUdpSourcePort(sourcePort)
         }
 
-        if (NATClient.lastSelfClientInfo.isUpnpSupported) {
+        if (NATClient.lastSelfClientInfo.clientNatType == NATType.PUBLIC) {
+            sourcePort
+        } else if (NATClient.lastSelfClientInfo.isUpnpSupported) {
             if (!NATTraversalKit.tryUPnPOpenPort(sourcePort))
                 throw IOException("UPnP Open Port $sourcePort Failed")
             else
                 sourcePort
-        } else if (NATClient.lastSelfClientInfo.clientNatType == NATType.FULL_CONE) {
-
-            1
+        } else if (NATClient.lastSelfClientInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
+            NATClient.getOutboundInetSocketAddress(udpSocket).port
         } else {
             throw UnsupportedOperationException("Unsupported NAT Type ${NATClient.lastSelfClientInfo.clientNatType} and upnp is not supported")
         }

@@ -3,9 +3,8 @@ package com.kenvix.natpoked.client
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
+import java.io.IOException
+import java.net.*
 import kotlin.random.Random
 
 suspend fun sendUdpPacket(addr: InetAddress, dstPort: Int = 53, srcPort: Int = 0, packetNum: Int = 1, data: ByteArray? = null)

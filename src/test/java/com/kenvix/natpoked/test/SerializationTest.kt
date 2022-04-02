@@ -99,4 +99,11 @@ class SerializationTest {
         val part: TestData = Json.decodeFromString(json)
         println(part)
     }
+
+    @Test
+    fun testIntRangeParse() {
+        val str = " 1 3 5 7 99-200   30000-40000  0"
+        val arr = parseIntRangeToArray(str)
+        assertEquals(arr.size, 4 + 102 + 10001 + 1)
+    }
 }
