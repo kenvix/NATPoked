@@ -17,6 +17,7 @@ import java.util.*
 object STUNTest {
     @JvmStatic
     fun main(args: Array<String>) {
+        testNatType(InetAddress.getByName("10.0.0.6"))
         val ifaces: Enumeration<NetworkInterface> = NetworkInterface.getNetworkInterfaces()
         while (ifaces.hasMoreElements()) {
             val iface = ifaces.nextElement()

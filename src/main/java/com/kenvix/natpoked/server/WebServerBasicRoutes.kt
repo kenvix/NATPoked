@@ -248,11 +248,11 @@ internal object WebServerBasicRoutes : KtorModule {
         peerConfigCopy.key = ""
         peerConfigCopy.keySha = emptyByteArray()
         infoCopy.peersConfig!!.peers = Collections.singletonMap(myPeerId, peerConfigCopy)
-
+        TODO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         val json = JSON.encodeToString(BrokerMessage(
             ACTION_CONNECT_PEER.typeId,
             targetPeerClientInfo.clientId,
-            NATConnectReq(infoCopy, )
+            NATConnectReq(infoCopy, listOf(1))
         ))
         NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", json.toByteArray(), 2)
     }

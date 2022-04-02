@@ -11,12 +11,14 @@ import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.web.utils.getOrFail
 import com.kenvix.web.utils.putUnsignedShort
 import com.kenvix.web.utils.readerIndexInArrayOffset
+import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -96,11 +98,20 @@ class NATPeerToPeer(
      *
      * 此操作仅对 FULLCONE NAT / UPNP 有意义。
      */
-    suspend fun openPort(): Int = withContext(Dispatchers.IO) {
-        if (NATClient.lastSelfClientInfo.isUpnpSupported) {
+    @Throws(IOException::class)
+    suspend fun openPort(sourcePort: Int = config.pokedPort): Int = withContext(Dispatchers.IO) {
+        if (udpChannel.localAddress == null || udpChannel.localAddress.port == 0) {
+            listenUdpSourcePort(sourcePort)
+        }
 
+        if (NATClient.lastSelfClientInfo.isUpnpSupported) {
+            if (!NATTraversalKit.tryUPnPOpenPort(sourcePort))
+                throw IOException("UPnP Open Port $sourcePort Failed")
+            else
+                sourcePort
         } else if (NATClient.lastSelfClientInfo.clientNatType == NATType.FULL_CONE) {
 
+            1
         } else {
             throw UnsupportedOperationException("Unsupported NAT Type ${NATClient.lastSelfClientInfo.clientNatType} and upnp is not supported")
         }

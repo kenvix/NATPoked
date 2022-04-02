@@ -1,12 +1,18 @@
 package com.kenvix.natpoked.utils
 
 import com.kenvix.natpoked.contacts.NATType
+import de.javawi.jstun.attribute.*
+import de.javawi.jstun.header.MessageHeader
+import de.javawi.jstun.header.MessageHeaderInterface
+import de.javawi.jstun.header.MessageHeaderParsingException
 import de.javawi.jstun.test.DiscoveryInfo
 import de.javawi.jstun.test.DiscoveryTest
+import de.javawi.jstun.util.UtilityException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.time.withTimeout
 import org.slf4j.LoggerFactory
+import java.io.IOException
 import java.net.*
 import java.time.Duration
 import java.time.temporal.ChronoUnit
@@ -143,5 +149,52 @@ fun getDefaultGatewayInterface6(): NetworkInterface? {
     return DatagramSocket().use { s ->
         s.connect(Inet4Address.getByName("2402:4e00::"), 53)
         NetworkInterface.getByInetAddress(s.localAddress)
+    }
+}
+
+/**
+ * Get outbound socket address
+ *
+ * @param socket A bound but not connected socket
+ * @return
+ * @throws UtilityException
+ * @throws SocketException
+ * @throws UnknownHostException
+ * @throws IOException
+ * @throws MessageAttributeParsingException
+ * @throws MessageHeaderParsingException
+ * @author Kenvix
+ */
+@Throws(
+    UtilityException::class,
+    SocketException::class,
+    UnknownHostException::class,
+    IOException::class,
+    MessageAttributeParsingException::class,
+    MessageHeaderParsingException::class
+)
+
+fun getOutboundInetSocketAddress(socket: DatagramSocket, stunServer: String, stunPort: Int): InetSocketAddress? {
+    socket.connect(InetAddress.getByName(stunServer), stunPort)
+    return try {
+        val sendMH = MessageHeader(MessageHeaderInterface.MessageHeaderType.BindingRequest)
+        sendMH.generateTransactionID()
+        val changeRequest = ChangeRequest()
+        sendMH.addMessageAttribute(changeRequest)
+        val data = sendMH.bytes
+        val send = DatagramPacket(data, data.size)
+        socket.send(send)
+        var receiveMH = MessageHeader()
+        while (!receiveMH.equalTransactionID(sendMH)) {
+            val receive = DatagramPacket(ByteArray(200), 200)
+            socket.receive(receive)
+            receiveMH = MessageHeader.parseHeader(receive.data)
+            receiveMH.parseAttributes(receive.data)
+        }
+        val ma = receiveMH.getMessageAttribute(MessageAttributeInterface.MessageAttributeType.MappedAddress) as MappedAddress
+
+        InetSocketAddress(ma.address.inetAddress, ma.port)
+    } finally {
+        socket.disconnect()
     }
 }

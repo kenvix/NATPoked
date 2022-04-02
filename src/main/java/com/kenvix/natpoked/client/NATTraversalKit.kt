@@ -130,7 +130,7 @@ object NATTraversalKit {
         }
     }
 
-    private suspend fun tryUPnPPort(port: Int): Boolean = withContext(Dispatchers.IO) {
+    suspend fun tryUPnPOpenPort(port: Int): Boolean = withContext(Dispatchers.IO) {
         if (isPublicUPnPSupported()) {
             UPnP.openPortUDP(port)
         } else {
@@ -138,7 +138,7 @@ object NATTraversalKit {
         }
     }
 
-    private suspend fun tryUPnPAnyPort(maxTries: Int = 20): Int = withContext(Dispatchers.IO) {
+    suspend fun tryUPnPOpenAnyPort(maxTries: Int = 20): Int = withContext(Dispatchers.IO) {
         if (isPublicUPnPSupported()) {
             DatagramSocket(0).use { socket ->
                 val port = socket.localPort
