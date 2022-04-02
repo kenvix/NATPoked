@@ -63,7 +63,7 @@ class SocketAddrEchoClient(
     }
 
     @Throws(IOException::class, SocketTimeoutException::class)
-    suspend fun requestEcho(ports: List<Int>, address: InetAddress, srcSocket: DatagramSocket? = null,
+    suspend fun requestEcho(ports: Iterable<Int>, address: InetAddress, srcSocket: DatagramSocket? = null,
                     maxTires: Int = 100, delay: Long = 20): List<SocketAddrEchoResult> = withContext(Dispatchers.IO) {
         ports.map { port ->
             val result = requestEcho(port, address, srcSocket, maxTires)

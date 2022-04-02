@@ -38,6 +38,8 @@ object NATClient : CoroutineScope, AutoCloseable {
         BrokerClient(http.host, http.port, http.path, http.ssl, mqtt.host, mqtt.port, mqtt.path, mqtt.ssl)
     }
 
+    val echoClient = SocketAddrEchoClient(AppEnv.EchoTimeout)
+
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
 
     private fun parseUrl(it: String): UrlParseResult {

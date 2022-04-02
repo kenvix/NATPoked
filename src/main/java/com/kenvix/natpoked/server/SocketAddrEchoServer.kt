@@ -41,7 +41,7 @@ import java.nio.channels.Selector
  * ```
  */
 class SocketAddrEchoServer(
-    val ports: List<Int>
+    val ports: Iterable<Int>
 ): Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val channels: List<DatagramChannel> = ports.map { port ->
         DatagramChannel.open().apply {

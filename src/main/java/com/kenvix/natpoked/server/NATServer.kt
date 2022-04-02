@@ -2,6 +2,8 @@ package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.contacts.*
+import com.kenvix.natpoked.server.NATServer.brokerServer
+import com.kenvix.natpoked.server.NATServer.peerConnectionsImpl
 import com.kenvix.natpoked.utils.*
 import com.kenvix.web.server.CachedClasses
 import com.kenvix.web.utils.ProcessUtils
@@ -24,7 +26,11 @@ object NATServer : Closeable {
     val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
         get() = peerConnectionsImpl
 
-    val brokerServer: BrokerServer by lazy { BrokerServer(UUID.randomUUID().toString(), AppEnv.ServerMqttPort) }
+    lateinit var brokerServer: BrokerServer
+        private set
+
+    lateinit var echoServer: SocketAddrEchoServer
+        private set
 
     init {
         Runtime.getRuntime().addShutdownHook(Thread {
@@ -100,11 +106,15 @@ object NATServer : Closeable {
     suspend fun start() = withContext(Dispatchers.IO) {
         logger.info("Starting NATServer...")
 
+        brokerServer = BrokerServer(UUID.randomUUID().toString(), AppEnv.ServerMqttPort)
+        echoServer = SocketAddrEchoServer(AppEnv.EchoPortList.asIterable())
+        echoServer.startAsync()
+
         val tempPath = AppConstants.workingPath.resolve("Temp")
         if (!tempPath.exists()) {
             tempPath.toFile().mkdirs()
         }
-        
+
         if (AppEnv.DebugMode) {
             logger.info("<!> MQTT Server random key: ${brokerServer.token}")
         }

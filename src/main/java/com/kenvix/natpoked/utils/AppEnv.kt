@@ -24,6 +24,10 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("端口预测模型。可选值：PSM, EVM, LSM")
     val PokedModel: String by envOf("EVM")
 
+    @Description("进行端口预测时的发包间隔时间，单位为毫秒")
+    val EchoDelay: Long by envOf(15)
+    val EchoTimeout: Int by envOf(700)
+
     @Description("每隔多长时间强制刷新并上报当前网络情况，单位为秒。默认为 5 分钟。-1 表示停用")
     val PeerReportToBrokerDelay: Int by envOf(5 * 60)
 
@@ -31,6 +35,9 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     @Description("是否启用 UPnP 功能")
     val UPnPEnabled: Boolean by envOf(true)
+
+    @Description("回声端口范围。用于预测 NAT 端口分配情况，用空格分隔每个端口，可以用横线-表示闭区间范围")
+    val EchoPortRange: String by envOf("5000-5100 5101")
 
     @Description("通信使用的网卡编号，auto 表示使用默认网关")
     val NetworkInterface: String by envOf("auto")
@@ -158,4 +165,5 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     val PeerToBrokenPingIntervalDuration = PeerToBrokenPingInterval.toDuration(DurationUnit.MILLISECONDS)
     val PeerToBrokenTimeoutDuration = PeerToBrokenTimeout.toDuration(DurationUnit.MILLISECONDS)
+    val EchoPortList: IntArray = parseIntRangeToArray(EchoPortRange)
 }
