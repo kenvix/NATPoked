@@ -13,6 +13,7 @@ import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
@@ -55,7 +56,7 @@ class SocketAddrEchoServer(
     }
 
     private lateinit var serverJob: Job
-    private val buffer = ByteBuffer.allocateDirect(128)
+    private val buffer = ByteBuffer.allocateDirect(32)
 
     fun startAsync() {
         if (!isActive || this::serverJob.isInitialized)
@@ -90,6 +91,7 @@ class SocketAddrEchoServer(
             buffer.flip()
             if (buffer.getInt(0) == PacketPrefixRequest) {
                 buffer.clear()
+                buffer.order(ByteOrder.LITTLE_ENDIAN)
                 buffer.putInt(PacketPrefixResponse)
                 buffer.putUnsignedShort(addr.port)
 
