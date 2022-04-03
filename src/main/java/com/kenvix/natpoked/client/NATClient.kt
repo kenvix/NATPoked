@@ -3,6 +3,7 @@ package com.kenvix.natpoked.client
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.utils.exception.NotFoundException
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
 import kotlinx.coroutines.*
@@ -17,6 +18,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
+import kotlin.jvm.Throws
 
 object NATClient : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName(this.toString())
@@ -97,12 +99,13 @@ object NATClient : CoroutineScope, AutoCloseable {
     // todo: iface id
     suspend fun registerPeerToBroker() = brokerClient.registerPeer()
 
-    fun addPeerIfNotExist(peerId: PeerId, targetPeerConfig: PeersConfig.Peer) {
+    fun addPeerIfNotExist(peerId: PeerId, targetPeerConfig: PeersConfig.Peer): NATPeerToPeer {
         if (peersImpl.containsKey(peerId))
-            return
+            return peersImpl[peerId]!!
 
         val peer = NATPeerToPeer(peerId, targetPeerConfig)
         addPeer(peer)
+        return peer
     }
 
     fun addPeer(peer: NATPeerToPeer) {
@@ -124,8 +127,16 @@ object NATClient : CoroutineScope, AutoCloseable {
         return lastSelfClientInfo
     }
 
+    @Throws(NotFoundException::class)
     fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATConnectReq): NATPeerToPeer {
-        TODO()
+        if (!peersImpl.containsKey(targetPeerId)) {
+            throw NotFoundException("Peer not found locally: $targetPeerId")
+        }
+
+        val peer = peers[targetPeerId]!!
+        launch { peer.connectPeer(info) }
+
+        return peer
     }
 
     internal fun onBrokerMessage(data: BrokerMessage<*>) {

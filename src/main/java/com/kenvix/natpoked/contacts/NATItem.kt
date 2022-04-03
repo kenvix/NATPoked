@@ -121,7 +121,8 @@ typealias PeerId = Long
 @Serializable
 data class NATConnectReq(
     val targetClientItem: NATClientItem,
-    val ports: List<Int>,
+    val ports: List<Int>?,
+    val configForMe: PeersConfig.Peer,
 )
 
 @Serializable

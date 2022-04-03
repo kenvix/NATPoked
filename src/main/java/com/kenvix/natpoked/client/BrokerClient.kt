@@ -305,16 +305,8 @@ class BrokerClient(
                 null
             }
 
-            when (rsp.code) {
-                400 -> throw BadRequestException(err?.info ?: "Unknown error")
-                401 -> throw InvalidAuthorizationException(err?.info ?: "Unauthorized")
-                403 -> throw ForbiddenOperationException(err?.info ?: "Forbidden")
-                404 -> throw NotFoundException(err?.info ?: "Not found")
-                429 -> throw TooManyRequestException(err?.info ?: "Too many request")
-                500 -> throw ServerFaultException(err?.info ?: "Server fault")
-                501 -> throw NotSupportedException(err?.info ?: "Not supported")
-                else -> throw CommonBusinessException(err?.info ?: "Unknown error", err?.code ?: 1)
-            }
+            err?.checkException()
+            throw CommonBusinessException("Unknown error", rsp.code)
         } else {
             try {
                 return JSON.decodeFromString<CommonJsonResult<T>>(rsp.body!!.string())

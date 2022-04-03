@@ -16,3 +16,5 @@ fun List<*>.assertLengthBiggerOrEqual(length: Int) {
     if (size < length)
         throw BadRequestException("Expected length bigger or equal than $length, but got ${size}")
 }
+
+infix fun <K, V> K.maps(another: V): Map<K, V> = Collections.singletonMap(this, another)

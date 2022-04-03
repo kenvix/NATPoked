@@ -242,18 +242,22 @@ internal object WebServerBasicRoutes : KtorModule {
 
     private suspend fun requestPeerMakeConnection(myPeerId: PeerId, targetPeerClientInfo: NATClientItem, targetPorts: List<Int>? = null) {
         val infoCopy = targetPeerClientInfo.copy()
-        infoCopy.peersConfig = targetPeerClientInfo.peersConfig!!.copy()
+        infoCopy.peersConfig = null
 
-        val peerConfigCopy: PeersConfig.Peer = infoCopy.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
+        val peerConfigCopy: PeersConfig.Peer = targetPeerClientInfo.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
         peerConfigCopy.key = ""
         peerConfigCopy.keySha = emptyByteArray()
-        infoCopy.peersConfig!!.peers = Collections.singletonMap(myPeerId, peerConfigCopy)
-        TODO("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
         val json = JSON.encodeToString(BrokerMessage(
             ACTION_CONNECT_PEER.typeId,
             targetPeerClientInfo.clientId,
-            NATConnectReq(infoCopy, listOf(1))
+            NATConnectReq(
+                targetClientItem = infoCopy,
+                ports = targetPorts,
+                configForMe = peerConfigCopy,
+            )
         ))
+
         NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", json.toByteArray(), 2)
     }
 }

@@ -28,6 +28,7 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.*
 
 class SerializationTest {
     @OptIn(ExperimentalSerializationApi::class)
@@ -56,6 +57,13 @@ class SerializationTest {
         val configFile = Files.readString(Path.of(AppEnv.PeerFile))
         val peers = Yaml.decodeFromString<PeersConfig>(configFile)
         println(peers)
+    }
+
+    @Test
+    fun testPair() {
+        val p = "a" maps 114514
+        val j = JSON.encodeToString(p)
+        assertEquals(114514, JSON.decodeFromString<Map<String, Int>>(j)["a"])
     }
 
     @Test

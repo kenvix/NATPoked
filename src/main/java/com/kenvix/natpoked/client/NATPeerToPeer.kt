@@ -1,6 +1,5 @@
 package com.kenvix.natpoked.client
 
-import com.kenvix.natpoked.client.NATClient.isUpnpOrFullCone
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
@@ -8,15 +7,14 @@ import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
-import com.kenvix.web.utils.getOrFail
-import com.kenvix.web.utils.putUnsignedShort
-import com.kenvix.web.utils.readerIndexInArrayOffset
+import com.kenvix.web.utils.*
 import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
@@ -39,7 +37,9 @@ class NATPeerToPeer(
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentMyIV: ByteArray = ByteArray(ivSize)
     private val currentTargetIV: ByteArray = ByteArray(ivSize)
-    private val aes = AES256GCM(if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha)
+    private val targetKey = if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha
+    private val targetMqttKey = sha256Of(targetKey).toBase58String()
+    private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
 
 //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
@@ -376,6 +376,34 @@ class NATPeerToPeer(
                     if (ports.size >= 2)
                         delay(AppEnv.PeerFloodingDelay)
                 }
+            }
+        }
+    }
+
+    suspend fun connectPeer(connectReq: NATConnectReq) {
+        logger.info("connectPeerAsync: Connecting to peer ${connectReq.targetClientItem.clientId}")
+        val peerInfo = connectReq.targetClientItem
+
+        // request to open port
+        val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
+            getMqttChannelBasePath(peerInfo.clientId) + "control/openPort",
+            targetKey,
+            JSON.encodeToString("peerId" maps AppEnv.PeerId),
+        )
+
+        if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
+            launch {
+                logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
+//                val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPeerConfig.pokedPort)
+//                sendHelloPacket(addr, num = 10)
+            }
+        }
+
+        if (peerInfo.clientInetAddress != null) {
+            launch {
+                logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
+//                val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPeerConfig.pokedPort)
+//                sendHelloPacket(addr, num = 10)
             }
         }
     }
