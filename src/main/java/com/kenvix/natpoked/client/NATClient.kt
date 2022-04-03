@@ -4,16 +4,16 @@ import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.exception.NotFoundException
+import com.kenvix.web.utils.Getable
+import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
 import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
 import net.mamoe.yamlkt.Yaml
-import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.slf4j.LoggerFactory
 import java.net.DatagramSocket
 import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
@@ -30,6 +30,9 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     val portRedirector: PortRedirector = PortRedirector()
     private val logger = LoggerFactory.getLogger(NATClient::class.java)
+    val peersKey: Getable<PeerId, ByteArray> = object : Getable<PeerId, ByteArray> {
+        override operator fun get(peerId: PeerId): ByteArray = peersImpl[peerId]?.targetKey ?: throw NotFoundException("Peer $peerId not found")
+    }
 
     var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
     val isIp6Supported
@@ -137,6 +140,11 @@ object NATClient : CoroutineScope, AutoCloseable {
         launch { peer.connectPeer(info) }
 
         return peer
+    }
+
+    suspend fun requestPeerOpenPort(peerId: PeerId /* = kotlin.Long */): Int {
+        val peer = peers[peerId].assertExist()
+        return peer.openPort()
     }
 
     internal fun onBrokerMessage(data: BrokerMessage<*>) {

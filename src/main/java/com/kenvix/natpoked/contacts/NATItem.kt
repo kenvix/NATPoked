@@ -119,6 +119,12 @@ enum class NATTraversalSolution(val levelId: Int) : Comparable<NATTraversalSolut
 typealias PeerId = Long
 
 @Serializable
+data class PeerIdReq(val peerId: PeerId)
+
+@Serializable
+data class PortReq(val port: Int)
+
+@Serializable
 data class NATConnectReq(
     val targetClientItem: NATClientItem,
     val ports: List<Int>?,

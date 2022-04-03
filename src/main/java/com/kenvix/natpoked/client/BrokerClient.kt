@@ -77,6 +77,12 @@ class BrokerClient(
         return mqttClient.aSendPeerMessage(getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix, key, payload.toByteArray(), qos, props, retained)
     }
 
+    suspend fun respondPeer(originalMessage: MqttMessage, key: ByteArray, payload: ByteArray, props: MqttProperties = MqttProperties()): IMqttToken {
+         props.correlationData = originalMessage.properties.correlationData ?: throw BadRequestException("No Correlation Data")
+         val respTopic = originalMessage.properties.responseTopic ?: throw BadRequestException("No Response Topic")
+         return mqttClient.aSendPeerMessage(respTopic, key, payload, 2, props, false)
+    }
+
     /**
      * sendPeerMessageWithResponse
      * @param topicSuffix topic suffix
@@ -107,6 +113,72 @@ class BrokerClient(
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
+    }
+
+    private suspend fun onMqttMessageArrived(topic: String, message: MqttMessage) {
+        val topicPath = topic.split("/")
+        try {
+            when (topicPath[0]) {
+                "peer" -> {
+                    if (topicPath.size < 3 || topicPath[1] != AppEnv.PeerId.toHexString()) {
+                        logger.warn("Invalid peer message arrived - not for me!: $topic, ${message.payload}")
+                        return
+                    }
+
+                    message.checkPeerAuth(AppEnv.PeerMyPSK)
+                    val typeId: Int = message.properties.userProperties?.find { it.key == "type" }?.value?.toInt() ?: -1
+                    //NATClient.onBrokerMessage(topicPath.drop(2), typeId, message.payload)
+                    when (topicPath[2]) {
+                        TOPIC_CONTROL -> {
+                            topicPath.assertLengthBiggerOrEqual(4)
+                            when (topicPath[3]) {
+                                "connect" -> {
+                                    val jsonStr = String(message.payload)
+                                    val clientInfo: BrokerMessage<NATConnectReq> = JSON.decodeFromString(jsonStr)
+                                    NATClient.requestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
+                                }
+
+                                "openPort" -> {
+                                    val req: PeerIdReq = JSON.decodeFromString(String(message.payload))
+                                    val port = NATClient.requestPeerOpenPort(req.peerId)
+                                    respondPeer(message, NATClient.peersKey[req.peerId],
+                                        JSON.encodeToString(PortReq(port)).toByteArray())
+                                }
+
+                                "guessPort" -> {
+
+                                }
+                            }
+                        }
+
+                        TOPIC_PING -> {
+
+                        }
+
+                        TOPIC_RELAY -> {
+                        }
+
+                        TOPIC_RESPONSE -> {
+                            try {
+                                val responseId = Ints.fromByteArray(message.properties.correlationData) // big endian
+                                val continuation = suspendResponses[responseId]
+                                if (continuation != null) {
+                                    continuation.resume(message.payload)
+                                    suspendResponses.remove(responseId)
+                                }
+
+                                return
+                            } catch (e: Exception) {
+                                logger.error("Failed to handle response with correlationData: ${message.properties.correlationData.contentToString()}", e)
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: CommonBusinessException) {
+            logger.warn("Peer wrong data:", e)
+            return
+        }
     }
 
     suspend fun connect() = withContext(Dispatchers.IO) {
@@ -146,58 +218,7 @@ class BrokerClient(
                         return
                     }
 
-                    val topicPath = topic.split("/")
-                    try {
-                        when (topicPath[0]) {
-                            "peer" -> {
-                                if (topicPath.size < 3 || topicPath[1] != AppEnv.PeerId.toHexString()) {
-                                    logger.warn("Invalid peer message arrived - not for me!: $topic, ${message.payload}")
-                                    return
-                                }
-
-                                message.checkPeerAuth(AppEnv.PeerMyPSK)
-                                val typeId: Int = message.properties.userProperties?.find { it.key == "type" }?.value?.toInt() ?: -1
-                                 //NATClient.onBrokerMessage(topicPath.drop(2), typeId, message.payload)
-                                when (topicPath[2]) {
-                                    TOPIC_CONTROL -> {
-                                        topicPath.assertLengthBiggerOrEqual(4)
-                                        when (topicPath[3]) {
-                                            "connect" -> {
-                                                val jsonStr = String(message.payload)
-                                                val clientInfo: BrokerMessage<NATConnectReq> = JSON.decodeFromString(jsonStr)
-                                                NATClient.requestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
-                                            }
-                                        }
-                                    }
-
-                                    TOPIC_PING -> {
-
-                                    }
-
-                                    TOPIC_RELAY -> {
-                                    }
-
-                                    TOPIC_RESPONSE -> {
-                                        try {
-                                            val responseId = Ints.fromByteArray(message.properties.correlationData) // big endian
-                                            val continuation = suspendResponses[responseId]
-                                            if (continuation != null) {
-                                                continuation.resume(message.payload)
-                                                suspendResponses.remove(responseId)
-                                            }
-
-                                            return
-                                        } catch (e: Exception) {
-                                            logger.error("Failed to handle response with correlationData: ${message.properties.correlationData.contentToString()}", e)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e: CommonBusinessException) {
-                        logger.warn("Peer wrong data:", e)
-                        return
-                    }
+                    launch { onMqttMessageArrived(topic, message) }
                 }
 
                 override fun deliveryComplete(token: IMqttToken?) {

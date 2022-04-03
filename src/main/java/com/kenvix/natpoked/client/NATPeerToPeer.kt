@@ -14,6 +14,7 @@ import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -37,7 +38,7 @@ class NATPeerToPeer(
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
     private val currentMyIV: ByteArray = ByteArray(ivSize)
     private val currentTargetIV: ByteArray = ByteArray(ivSize)
-    private val targetKey = if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha
+    val targetKey = if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha
     private val targetMqttKey = sha256Of(targetKey).toBase58String()
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
@@ -384,27 +385,39 @@ class NATPeerToPeer(
         logger.info("connectPeerAsync: Connecting to peer ${connectReq.targetClientItem.clientId}")
         val peerInfo = connectReq.targetClientItem
 
-        // request to open port
-        val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
-            getMqttChannelBasePath(peerInfo.clientId) + "control/openPort",
-            targetKey,
-            JSON.encodeToString("peerId" maps AppEnv.PeerId),
-        )
+        if (peerInfo.isUpnpSupported || peerInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
+            // 如果对方支持 UPnP 或者对方是 >= RESTRICTED_CONE 类型的 NAT，则直接连接
+            // request to open port
+            val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
+                getMqttChannelBasePath(peerInfo.clientId) + "control/openPort",
+                targetKey,
+                JSON.encodeToString(PeerIdReq(AppEnv.PeerId)),
+            )
 
-        if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
-            launch {
-                logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
+            val result: CommonJsonResult<Unit> = JSON.decodeFromString(resultJson)
+            result.checkException()
+
+            val helloIp6Task = if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
+                withContext(Dispatchers.IO) {
+                    async {
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
 //                val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPeerConfig.pokedPort)
 //                sendHelloPacket(addr, num = 10)
-            }
-        }
+                    }
+                }
+            } else null
 
-        if (peerInfo.clientInetAddress != null) {
-            launch {
-                logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
+            val helloIp4Task = if (peerInfo.clientInetAddress != null) {
+                withContext(Dispatchers.IO) {
+                    async {
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
 //                val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPeerConfig.pokedPort)
 //                sendHelloPacket(addr, num = 10)
-            }
+                    }
+                }
+            } else null
+        } else {
+
         }
     }
 

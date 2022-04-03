@@ -3,31 +3,22 @@
 
 package com.kenvix.web.utils
 
-import com.kenvix.natpoked.contacts.RequestTypes
 import com.kenvix.natpoked.server.CommonJsonResult
-import com.kenvix.natpoked.server.CommonRequest
 import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.utils.exception.CommonBusinessException
 import io.ktor.application.*
-import io.ktor.client.utils.EmptyContent.status
 import io.ktor.features.*
 import io.ktor.http.*
-import io.ktor.http.cio.websocket.*
 import io.ktor.request.*
 import io.ktor.response.*
 import io.ktor.routing.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonConfiguration
 import kotlinx.serialization.modules.EmptySerializersModule
 import kotlinx.serialization.protobuf.ProtoBuf
-import org.apache.commons.io.FileUtils
-import org.apache.commons.text.StringEscapeUtils
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URI
@@ -54,20 +45,50 @@ fun Route.controller(path: String, controller: Controller) {
 data class Result2<T, U>(val component1: T, val component2: U)
 data class Result3<T, U, V>(val component1: T, val component2: U, val component3: V)
 data class Result4<T, U, V, W>(val component1: T, val component2: U, val component3: V, val component4: W)
-data class Result5<T, U, V, W, X>(val component1: T, val component2: U, val component3: V, val component4: W, val component5: X)
+data class Result5<T, U, V, W, X>(
+    val component1: T,
+    val component2: U,
+    val component3: V,
+    val component4: W,
+    val component5: X
+)
 
-suspend inline fun <reified T> ApplicationCall.respondJson(data: T? = null, info: String? = null,
-                                                           code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
-    this.respond(Json.encodeToString(CommonJsonResult(status.value, info = info ?: status.description, code = code, data = data)))
+suspend inline fun <reified T> ApplicationCall.respondJson(
+    data: T? = null, info: String? = null,
+    code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK
+) {
+    this.respond(
+        Json.encodeToString(
+            CommonJsonResult(
+                status.value,
+                info = info ?: status.description,
+                code = code,
+                data = data
+            )
+        )
+    )
 }
 
-suspend inline fun <reified T> ApplicationCall.respondProtobuf(data: T? = null, info: String? = null,
-                                                               code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
-    this.respond(ProtoBuf.encodeToByteArray(CommonJsonResult(status.value, info = info ?: status.description, code = code, data = data)))
+suspend inline fun <reified T> ApplicationCall.respondProtobuf(
+    data: T? = null, info: String? = null,
+    code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK
+) {
+    this.respond(
+        ProtoBuf.encodeToByteArray(
+            CommonJsonResult(
+                status.value,
+                info = info ?: status.description,
+                code = code,
+                data = data
+            )
+        )
+    )
 }
 
-suspend inline fun <reified T> ApplicationCall.respondData(data: T? = null, info: String? = null,
-                                                           code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend inline fun <reified T> ApplicationCall.respondData(
+    data: T? = null, info: String? = null,
+    code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK
+) {
     val type = this.request.contentType().contentSubtype
     if (type.contains("json")) {
         respondJson(data, info, code, status)
@@ -81,13 +102,17 @@ suspend inline fun <reified T> ApplicationCall.respondData(data: T? = null, info
     }
 }
 
-suspend fun ApplicationCall.respondInfo(info: String? = null,
-                                            code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK) {
+suspend fun ApplicationCall.respondInfo(
+    info: String? = null,
+    code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK
+) {
     respondData<Unit>(null, info, code, status)
 }
 
-suspend fun ApplicationCall.respondJsonText(jsonText: String,
-                                                            status: HttpStatusCode = HttpStatusCode.OK) {
+suspend fun ApplicationCall.respondJsonText(
+    jsonText: String,
+    status: HttpStatusCode = HttpStatusCode.OK
+) {
     this.respondText(jsonText, ContentType.Application.Json, status)
 }
 
@@ -124,7 +149,10 @@ fun ApplicationCall.isUserBrowserRequest(): Boolean {
             this.request.header("X-Requested-With") == null
 }
 
-suspend fun ApplicationCall.respondError(code: HttpStatusCode, exception: Throwable? = null, redirectURI: URI? = null) {
+suspend fun ApplicationCall.respondError(
+    status: HttpStatusCode,
+    exception: Throwable? = null,
+) {
     var info = ""
     var trace = ""
 
@@ -133,7 +161,7 @@ suspend fun ApplicationCall.respondError(code: HttpStatusCode, exception: Throwa
             info = "${exception.message}"
             trace = exception.getStringStackTrace()
         } else {
-            if (code.value in 400..499 || code.value != 501)
+            if (status.value in 400..499 || status.value != 501)
                 info = exception.message ?: exception.hashCode().toString()
             else
                 info = exception.hashCode().toString()
@@ -150,33 +178,34 @@ suspend fun ApplicationCall.respondError(code: HttpStatusCode, exception: Throwa
 //                "redirectUrl" to redirectURI?.appendQuery("msg=$info&code=${code.value}&description=${code.description}")?.toString()
 //        )))
 //    } else {
-        respondData(info = info,
-                code = if (exception is CommonBusinessException) exception.code else code.value,
-                data = ErrorResult(
-                        exception = exception?.javaClass?.simpleName ?: "",
-                        exceptionFullName = exception?.javaClass?.name ?: "",
-                        trace = trace
-                )
+    respondData(
+        info = info,
+        status = status,
+        code = if (exception is CommonBusinessException) exception.code else if (status.value in 200..299) 0 else status.value,
+        data = ErrorResult(
+            exception = exception?.javaClass?.simpleName ?: "",
+            exceptionFullName = exception?.javaClass?.name ?: "",
+            trace = trace
         )
+    )
 //    }
 }
 
 fun currentTimeStamp() = Timestamp(System.currentTimeMillis())
 
-suspend fun <R> File.useTempFile(then: (suspend (File) -> R))
-        = withContext(Dispatchers.IO) {
+suspend fun <R> File.useTempFile(then: (suspend (File) -> R)) = withContext(Dispatchers.IO) {
 
     try {
         then(this@useTempFile)
     } catch (exception: Throwable) {
         kotlin.runCatching { this@useTempFile.delete() }
-                .onFailure { warn("Delete temp file failed", it, utilsLogger) }
+            .onFailure { warn("Delete temp file failed", it, utilsLogger) }
 
         throw exception
     }
 }
 
-inline fun <reified T: Any> T?.validateValue(errorMessage: String, passCondition: (check: T) -> Boolean): T {
+inline fun <reified T : Any> T?.validateValue(errorMessage: String, passCondition: (check: T) -> Boolean): T {
     if (this == null)
         throw BadRequestException("Illegal input data: Required form param not found")
 
@@ -186,25 +215,25 @@ inline fun <reified T: Any> T?.validateValue(errorMessage: String, passCondition
     return this
 }
 
-inline fun <reified T: Any> T?.validateValue(passCondition: (check: T) -> Boolean): T
-        = validateValue("Illegal input data: $this", passCondition)
+inline fun <reified T : Any> T?.validateValue(passCondition: (check: T) -> Boolean): T =
+    validateValue("Illegal input data: $this", passCondition)
 
 
-fun <T: Any> T?.assertNotNull(msg: String = "Illegal input data: Required data is null"): T {
+fun <T : Any> T?.assertNotNull(msg: String = "Illegal input data: Required data is null"): T {
     if (this == null)
         throw BadRequestException(msg)
 
     return this
 }
 
-fun <T: Any> T?.assertExist(msg: String = "Specified data not exist"): T {
+fun <T : Any> T?.assertExist(msg: String = "Specified data not exist"): T {
     if (this == null)
         throw NotFoundException(msg)
 
     return this
 }
 
-fun <T: Collection<*>> T?.assertNotEmpty(): T {
+fun <T : Collection<*>> T?.assertNotEmpty(): T {
     if (this == null || this.isEmpty())
         throw NotFoundException("Specified data not exist")
 
@@ -219,8 +248,8 @@ inline fun <reified E : Enum<E>> validatedEnumValueOf(value: String?, default: E
             return default
     }
 
-    return enumValues<E>().find { it.name == value } ?:
-    throw BadRequestException("Illegal value $value for ${E::class.java.simpleName}")
+    return enumValues<E>().find { it.name == value }
+        ?: throw BadRequestException("Illegal value $value for ${E::class.java.simpleName}")
 }
 
 suspend fun ApplicationCall.receiveBytes(): ByteArray {
