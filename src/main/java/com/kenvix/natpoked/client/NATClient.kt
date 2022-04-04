@@ -31,10 +31,20 @@ object NATClient : CoroutineScope, AutoCloseable {
     val portRedirector: PortRedirector = PortRedirector()
     private val logger = LoggerFactory.getLogger(NATClient::class.java)
     val peersKey: Getable<PeerId, ByteArray> = object : Getable<PeerId, ByteArray> {
+        @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
         override operator fun get(peerId: PeerId): ByteArray = peersImpl[peerId]?.targetKey ?: throw NotFoundException("Peer $peerId not found")
     }
 
+    lateinit var peersConfig: PeersConfig
+        private set
+
     var lastSelfClientInfo: NATClientItem = NATClientItem.UNKNOWN
+        get() {
+            if (field.peersConfig == null)
+                field.peersConfig = this@NATClient.peersConfig
+            return field
+        }
+
     val isIp6Supported
         get() = lastSelfClientInfo.clientPublicIp6Address != null
     val isUpnpOrFullCone
@@ -79,7 +89,7 @@ object NATClient : CoroutineScope, AutoCloseable {
     suspend fun start() = withContext(Dispatchers.IO) {
         logger.info("NATPoked Client Starting")
 
-        val peersConfig = Files.readString(Path.of(AppEnv.PeerFile)).let {
+        peersConfig = Files.readString(Path.of(AppEnv.PeerFile)).let {
             if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
         }
 
