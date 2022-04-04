@@ -177,7 +177,8 @@ class BrokerClient(
             }
         } catch (e: CommonBusinessException) {
             logger.warn("Peer wrong data:", e)
-            return
+        } catch (e: Throwable) {
+            logger.error("Unexpected error:", e)
         }
     }
 

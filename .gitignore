@@ -327,3 +327,5 @@ lint/tmp/
 # Android Profiling
 *.hprof
 
+/peer-test-a.yml
+/peer-test-b.yml

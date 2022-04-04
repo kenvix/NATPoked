@@ -78,6 +78,11 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     suspend fun start() = withContext(Dispatchers.IO) {
         logger.info("NATPoked Client Starting")
+
+        val peersConfig = Files.readString(Path.of(AppEnv.PeerFile)).let {
+            if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
+        }
+
         logger.info("NATPoked Client Broker Client Connecting")
         brokerClient.connect()
 
@@ -90,12 +95,7 @@ object NATClient : CoroutineScope, AutoCloseable {
             }
         }
 
-        val peersConfig = Files.readString(Path.of(AppEnv.PeerFile)).let {
-            if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
-        }
-
         peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
-
         logger.info("NATPoked Client Started")
     }
 
@@ -131,13 +131,13 @@ object NATClient : CoroutineScope, AutoCloseable {
     }
 
     @Throws(NotFoundException::class)
-    fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATConnectReq): NATPeerToPeer {
+    suspend fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATConnectReq): NATPeerToPeer {
         if (!peersImpl.containsKey(targetPeerId)) {
             throw NotFoundException("Peer not found locally: $targetPeerId")
         }
 
         val peer = peers[targetPeerId]!!
-        launch { peer.connectPeer(info) }
+        peer.connectPeer(info)
 
         return peer
     }

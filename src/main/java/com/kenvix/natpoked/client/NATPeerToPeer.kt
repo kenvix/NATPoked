@@ -43,7 +43,7 @@ class NATPeerToPeer(
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
 
-//    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
+    //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
     val sendLock: Mutex = Mutex()
 //    val receiveLock: Mutex = Mutex()
@@ -89,7 +89,7 @@ class NATPeerToPeer(
             } else {
                 val buffer = message.data
                 val version = buffer.readUnsignedShort()
-                
+
             }
         }
     }
@@ -253,6 +253,7 @@ class NATPeerToPeer(
         return InetSocketAddress(targetAddr, port)
     }
 
+
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
         val addr: InetSocketAddress = packet.socketAddress as InetSocketAddress
         val inArrayBuf: ByteArray = packet.data
@@ -332,12 +333,12 @@ class NATPeerToPeer(
                                 decryptedBuf.readBytes(currentTargetIV, 0, ivSize)
 
                                 if (!udpChannel.isConnected) {
+                                    connectTo(addr)
                                     if (stage == 0.toByte()) {
                                         sendHelloPacket(addr, stage = 1, num = 20)
                                     }
 
-                                    connectTo(addr)
-                                    logger.info("Connection to peer is established")
+                                    logger.info("Connection to peer is established | stage $stage")
                                 } else {
                                     logger.debug("Connection to peer is already established, no need to connect again")
                                 }
@@ -359,7 +360,9 @@ class NATPeerToPeer(
 
     }
 
-    @Volatile private var connectJob: Job? = null
+    @Volatile
+    private var connectJob: Job? = null
+
     /**
      * Connect to peer with flooding specificated ports
      */
@@ -394,15 +397,17 @@ class NATPeerToPeer(
                 JSON.encodeToString(PeerIdReq(AppEnv.PeerId)),
             )
 
-            val result: CommonJsonResult<Unit> = JSON.decodeFromString(resultJson)
+            val result: CommonJsonResult<PortReq> = JSON.decodeFromString(resultJson)
             result.checkException()
+
+            val targetPort = result.data!!.port
 
             val helloIp6Task = if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
                 withContext(Dispatchers.IO) {
                     async {
                         logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
-//                val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPeerConfig.pokedPort)
-//                sendHelloPacket(addr, num = 10)
+                        val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
+                        sendHelloPacket(addr, num = 10)
                     }
                 }
             } else null
@@ -411,11 +416,13 @@ class NATPeerToPeer(
                 withContext(Dispatchers.IO) {
                     async {
                         logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
-//                val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPeerConfig.pokedPort)
-//                sendHelloPacket(addr, num = 10)
+                        val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
+                        sendHelloPacket(addr, num = 10)
                     }
                 }
             } else null
+
+
         } else {
 
         }

@@ -44,7 +44,7 @@ object Main : CoroutineScope {
                 }.onFailure { showErrorAndExit(it, 2, "Server initialization failed") }
             } else {
                 runCatching {
-                    logger.info("Starting NATPoked client(peer) ...")
+                    logger.info("Starting NATPoked client(peer) (PeerId=${AppEnv.PeerId}) ...")
                     NATClient.start()
 
                     if (!cmd.hasOption('x')) {

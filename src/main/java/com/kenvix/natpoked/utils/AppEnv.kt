@@ -37,7 +37,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val UPnPEnabled: Boolean by envOf(true)
 
     @Description("回声端口范围。用于预测 NAT 端口分配情况，用空格分隔每个端口，可以用横线-表示闭区间范围")
-    val EchoPortRange: String by envOf("5000-5100 5101")
+    val EchoPortRange: String by envOf("5700-5798 5799")
 
     @Description("通信使用的网卡编号，auto 表示使用默认网关")
     val NetworkInterface: String by envOf("auto")
