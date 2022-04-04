@@ -151,7 +151,7 @@ internal object WebServerBasicRoutes : KtorModule {
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
                                     call.respondSuccess("Requested to connect. One of Network type is " +
-                                            "FullCone/Public. Server is ${serverRolePeer.client.clientId}")
+                                            "FullCone/Public. Server is ${serverRolePeer.client.clientId} , client is ${clientRolePeer.client.clientId}")
                                 }
 
                                 NATType.RESTRICTED_CONE -> {
@@ -161,7 +161,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                                     requestPeerMakeConnection(my, serverRolePeer.client)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
-                                            "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId}")
+                                            "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId} , client is ${clientRolePeer.client.clientId}")
                                 }
 
                                 else -> TODO("其他类型的 NAT")

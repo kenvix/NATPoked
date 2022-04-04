@@ -107,23 +107,24 @@ object NATClient : CoroutineScope, AutoCloseable {
         peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
 
         if (AppEnv.DebugMode)
-            logger.debug("Peer key: $peerToBrokerKeyBase64Encoded")
+            logger.trace("Peer key: $peerToBrokerKeyBase64Encoded")
         logger.info("NATPoked Client Broker Client Connecting")
 
+        logger.trace(registerPeerToBroker().toString())
         brokerClient.connect()
 
         if (AppEnv.PeerReportToBrokerDelay >= 0) {
             reportLoopJob = launch {
                 while (isActive) {
-                    registerPeerToBroker()
                     delay(AppEnv.PeerReportToBrokerDelay * 1000L)
+                    registerPeerToBroker()
                 }
             }
         }
 
         if (AppEnv.AutoConnectToPeerId >= 0) {
             logger.info("Connection request from environment file: CONN --> ${AppEnv.AutoConnectToPeerId}")
-            requestConnectPeer(AppEnv.AutoConnectToPeerId)
+            requestConnectPeer(AppEnv.AutoConnectToPeerId).toString()
         }
 
         logger.info("NATPoked Client Started")

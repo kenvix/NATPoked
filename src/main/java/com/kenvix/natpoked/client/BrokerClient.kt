@@ -33,6 +33,7 @@ import ru.gildor.coroutines.okhttp.await
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.*
+import kotlin.math.log
 import kotlin.random.Random
 
 @Suppress("CAST_NEVER_SUCCEEDS")
@@ -113,12 +114,12 @@ class BrokerClient(
     }
 
     private suspend fun onMqttMessageArrived(topic: String, message: MqttMessage) {
-        val topicPath = topic.split("/")
+        val topicPath = topic.split('/').filter { it.isNotEmpty() }
         try {
             when (topicPath[0]) {
                 "peer" -> {
                     if (topicPath.size < 3 || topicPath[1] != AppEnv.PeerId.toHexString()) {
-                        logger.warn("Invalid peer message arrived - not for me!: $topic, ${message.payload}")
+                        logger.warn("Invalid peer message arrived - not for me!: $topic, ${message.payload.contentToString()}")
                         return
                     }
 
@@ -131,12 +132,15 @@ class BrokerClient(
                             when (topicPath[3]) {
                                 "connect" -> {
                                     val jsonStr = String(message.payload)
+                                    logger.trace("MQTT /peer/~/connect: $jsonStr")
                                     val clientInfo: BrokerMessage<NATConnectReq> = JSON.decodeFromString(jsonStr)
                                     NATClient.onRequestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
                                 }
 
                                 "openPort" -> {
-                                    val req: PeerIdReq = JSON.decodeFromString(String(message.payload))
+                                    val jsonStr = String(message.payload)
+                                    val req: PeerIdReq = JSON.decodeFromString(jsonStr)
+                                    logger.trace("MQTT /peer/~/openPort: $jsonStr")
                                     val port = NATClient.requestPeerOpenPort(req.peerId)
                                     respondPeer(message, NATClient.peersKey[req.peerId],
                                         JSON.encodeToString(PortReq(port)).toByteArray())
@@ -192,7 +196,7 @@ class BrokerClient(
 
         val registerTask = async {
             logger.info("Testing NAT type and Registering to broker ...")
-            registerPeer()
+            logger.debug(registerPeer().toString())
         }
 
         val mqttTask = async {
@@ -200,45 +204,7 @@ class BrokerClient(
             logger.debug("Connecting to MQTT server: $serverURI")
 
             mqttClient = MqttAsyncClient(serverURI, AppEnv.PeerId.toHexString())
-            mqttClient.setCallback(object : MqttCallback {
-                override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
-                    logger.info("MQTT Disconnected")
-                }
-
-                override fun mqttErrorOccurred(exception: MqttException?) {
-                    logger.error("MQTT Error Occurred", exception)
-                }
-
-                override fun messageArrived(topic: String?, message: MqttMessage?) {
-                    logger.info("Message arrived: $topic, Len ${message?.payload?.size}")
-                    if (topic.isNullOrBlank() || message == null) {
-                        logger.warn("Invalid message arrived: $topic, ${message?.payload}")
-                        return
-                    }
-
-                    launch { onMqttMessageArrived(topic, message) }
-                }
-
-                override fun deliveryComplete(token: IMqttToken?) {
-                    logger.info("Delivery complete: $token")
-                }
-
-                override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-                    logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
-
-                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/*", 2)
-                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2)
-                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0)
-                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0)
-                    mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2)
-
-                    logger.info("MQTT Connected and subscribed to topics")
-                }
-
-                override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
-                    logger.info("Auth packet arrived: $reasonCode, $properties")
-                }
-            })
+            mqttClient.setCallback(MqttEventHandler())
 
             val options = MqttConnectionOptionsBuilder()
                 .automaticReconnectDelay(1000, 2000)
@@ -254,6 +220,50 @@ class BrokerClient(
 
         registerTask.await()
         mqttTask.await()
+    }
+
+    private inner class MqttEventHandler() : MqttCallback {
+        override fun disconnected(disconnectResponse: MqttDisconnectResponse?) {
+            logger.info("MQTT Disconnected")
+        }
+
+        override fun mqttErrorOccurred(exception: MqttException?) {
+            logger.error("MQTT Error Occurred", exception)
+        }
+
+        override fun messageArrived(topic: String?, message: MqttMessage?) {
+            logger.trace("Message arrived: $topic, Len ${message?.payload?.size}")
+            if (topic.isNullOrBlank() || message == null) {
+                logger.warn("Invalid message arrived: $topic, ${message?.payload}")
+                return
+            }
+
+            launch {
+                onMqttMessageArrived(topic, message)
+            }
+        }
+
+        override fun deliveryComplete(token: IMqttToken?) {
+            logger.trace("Delivery complete: $token")
+        }
+
+        override fun connectComplete(reconnect: Boolean, serverURI: String?) {
+            logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
+
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/openPort", 2)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/connect", 2)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/guessPort", 2)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2)
+
+            logger.info("MQTT Connected and subscribed to topics. Root topic: ${getMqttChannelBasePath(AppEnv.PeerId)}")
+        }
+
+        override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {
+            logger.debug("Auth packet arrived: $reasonCode, $properties")
+        }
     }
 
     companion object {
@@ -370,7 +380,9 @@ class BrokerClient(
         override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
             super.onMessage(webSocket, bytes)
             try {
-                val data: BrokerMessage<*> = Json.decodeFromString(bytes.string(Charsets.UTF_8))
+                val json = bytes.string(Charsets.UTF_8)
+                val data: BrokerMessage<*> = Json.decodeFromString(json)
+                logger.trace(json)
                 NATClient.onBrokerMessage(data)
             } catch (e: Throwable) {
                 logger.error("Unable to parse or handle message from broker", e)

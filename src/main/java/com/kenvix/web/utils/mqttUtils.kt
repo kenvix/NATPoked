@@ -13,13 +13,17 @@ import org.eclipse.paho.mqttv5.client.MqttAsyncClient
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
 import org.eclipse.paho.mqttv5.common.packet.UserProperty
+import org.slf4j.LoggerFactory
+import java.lang.invoke.MethodHandles
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
+private val logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
 
 suspend fun MqttAsyncClient.aSendMessage(topic: String, msg: MqttMessage): IMqttToken {
     return suspendCoroutine<IMqttToken> { continuation ->
+        logger.trace("MQTT: Sending message to topic: $topic with msg $msg")
         publish(topic, msg, null, object : MqttActionListener {
             override fun onSuccess(asyncAction: IMqttToken) {
                 continuation.resume(asyncAction)
