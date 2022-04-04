@@ -100,7 +100,7 @@ fun Application.module() {
     if (AppEnv.DebugMode) {
         install(CallLogging) {
             level = Level.DEBUG
-            logger = LoggerFactory.getLogger("CallLogging")
+            logger = LoggerFactory.getLogger(this::class.java)
         }
     }
 

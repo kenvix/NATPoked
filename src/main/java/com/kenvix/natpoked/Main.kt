@@ -6,6 +6,7 @@ import com.kenvix.natpoked.server.NATServer
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.ConsoleCommands
 import com.kenvix.web.utils.ExceptionHandler
+import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.error
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
@@ -19,7 +20,7 @@ object Main : CoroutineScope {
     private const val CLI_HEADER = "NATPoked By Kenvix"
 
     @JvmStatic
-    fun main(args: Array<String>) = runBlocking {
+    fun main(args: Array<String>): Unit = runBlocking {
         logger.trace("Application start")
         logger.trace("Working directory: " + AppConstants.workingFolder)
         ExceptionHandler.registerGlobalExceptionHandler()
@@ -34,6 +35,7 @@ object Main : CoroutineScope {
 
         registerCommands()
         registerShutdownHandler()
+        launch(Dispatchers.IO) { beginReadSystemConsole() }
 
         launch(Dispatchers.IO) {
             val mode = AppEnv.Mode.lowercase()
@@ -45,7 +47,13 @@ object Main : CoroutineScope {
             } else {
                 runCatching {
                     logger.info("Starting NATPoked client(peer) (PeerId=${AppEnv.PeerId}) ...")
+
                     NATClient.start()
+
+                    if (cmd.hasOption("connect")) {
+                        logger.info("Connection request from cmdline: CONN --> ${cmd.getOptionValue("connect")}")
+                        NATClient.requestConnectPeer(cmd.getOptionValue("connect").toLong())
+                    }
 
                     if (!cmd.hasOption('x')) {
                         logger.info("Trying to connect all configured peers ...")
@@ -54,8 +62,6 @@ object Main : CoroutineScope {
                 }.onFailure { showErrorAndExit(it, 2, "Client initialization failed") }
             }
         }
-
-        beginReadSystemConsole()
     }
 
     @JvmOverloads
@@ -92,7 +98,7 @@ object Main : CoroutineScope {
     private fun loadCommandLine(args: Array<String>): CommandLine {
         val ops = Options()
 
-        ops.addOption("x", "no-connect", false, "不要在启动时开始打洞")
+        ops.addOption("x", "no-poke", false, "不要在启动时开始打洞")
 
         ops.addOption("s", "server", false, "以中介服务器模式运行")
 
@@ -104,6 +110,7 @@ object Main : CoroutineScope {
         ops.addOption("vv", "very-verbose", false, "Very Verbose logging mode.")
         ops.addOption("h", "help", false, "Print help messages and exit")
         ops.addOption(null, "nogui", false, "No GUI")
+        ops.addOption(null, "connect", true, "立即连接到 <PeerId>")
 
         val parser = DefaultParser()
         val cmd = parser.parse(ops, args)

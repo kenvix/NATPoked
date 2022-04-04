@@ -70,6 +70,9 @@ internal object WebServerBasicRoutes : KtorModule {
                      */
                     post("/") {
                         val data: NATClientItem = call.receiveInternalData()
+                        if (data.peersConfig == null || data.peersConfig?.peers == null || data.peersConfig?.peers?.size == 0)
+                            logger.info("Excuse me? PeersConfig is empty.")
+
                         NATServer.addPeerConnection(data)
                         call.respondSuccess()
                     }

@@ -83,6 +83,8 @@ object NATClient : CoroutineScope, AutoCloseable {
             if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
         }
 
+        peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
+
         logger.info("NATPoked Client Broker Client Connecting")
         brokerClient.connect()
 
@@ -95,7 +97,11 @@ object NATClient : CoroutineScope, AutoCloseable {
             }
         }
 
-        peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
+        if (AppEnv.AutoConnectToPeerId >= 0) {
+            logger.info("Connection request from environment file: CONN --> ${AppEnv.AutoConnectToPeerId}")
+            requestConnectPeer(AppEnv.AutoConnectToPeerId)
+        }
+
         logger.info("NATPoked Client Started")
     }
 
@@ -130,8 +136,15 @@ object NATClient : CoroutineScope, AutoCloseable {
         return lastSelfClientInfo
     }
 
+    suspend fun requestConnectPeer(targetPeerId: PeerId) {
+        logger.debug("requestConnectPeer: CONN --> $targetPeerId")
+        val result = brokerClient.requestConnectPeer(AppEnv.PeerId, targetPeerId)
+        result.checkException()
+        logger.info("requestConnectPeer: CONN --> $targetPeerId: $result")
+    }
+
     @Throws(NotFoundException::class)
-    suspend fun requestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATConnectReq): NATPeerToPeer {
+    suspend fun onRequestPeerConnect(targetPeerId: PeerId, subTypeId: Int, info: NATConnectReq): NATPeerToPeer {
         if (!peersImpl.containsKey(targetPeerId)) {
             throw NotFoundException("Peer not found locally: $targetPeerId")
         }

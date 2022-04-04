@@ -48,11 +48,13 @@ class NATPeerToPeer(
     val sendLock: Mutex = Mutex()
 //    val receiveLock: Mutex = Mutex()
 
-    private val controlMessageARQ = KCPARQProvider(
-        onRawPacketToSendHandler = { buffer: ByteBuf, user: Any? -> handleControlMessageOutgoingPacket(buffer) },
-        user = null,
-        useStreamMode = false,
-    )
+    private val controlMessageARQ: KCPARQProvider by lazy {
+        KCPARQProvider(
+            onRawPacketToSendHandler = { buffer: ByteBuf, user: Any? -> handleControlMessageOutgoingPacket(buffer) },
+            user = null,
+            useStreamMode = false,
+        )
+    }
 
     companion object {
         private const val ivSize = 16
@@ -80,19 +82,19 @@ class NATPeerToPeer(
         }
     }
 
-    val controlMessageJob: Job = launch(Dispatchers.IO) {
-        while (isActive) {
-            val message = controlMessageARQ.receive()
-            if (message.size < 3) {
-                logger.warn("Received control message with invalid size ${message.size}")
-                continue
-            } else {
-                val buffer = message.data
-                val version = buffer.readUnsignedShort()
-
-            }
-        }
-    }
+//    val controlMessageJob: Job = launch(Dispatchers.IO) {
+//        while (isActive) {
+//            val message = controlMessageARQ.receive()
+//            if (message.size < 3) {
+//                logger.warn("Received control message with invalid size ${message.size}")
+//                continue
+//            } else {
+//                val buffer = message.data
+//                val version = buffer.readUnsignedShort()
+//
+//            }
+//        }
+//    }
 
     /**
      * 尝试监听一个端口，并返回外网端口。

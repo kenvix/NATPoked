@@ -11,34 +11,27 @@ import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
-import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.utils.exception.*
 import com.kenvix.web.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.protobuf.ProtoBuf
 import okhttp3.*
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.internal.toHexString
 import okio.ByteString
-import org.apache.commons.lang3.Conversion
 import org.eclipse.paho.mqttv5.client.*
 import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
-import org.eclipse.paho.mqttv5.common.packet.MqttAck
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
-import org.eclipse.paho.mqttv5.common.packet.UserProperty
 import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.*
-import kotlin.math.log
 import kotlin.random.Random
 
 @Suppress("CAST_NEVER_SUCCEEDS")
@@ -135,7 +128,7 @@ class BrokerClient(
                                 "connect" -> {
                                     val jsonStr = String(message.payload)
                                     val clientInfo: BrokerMessage<NATConnectReq> = JSON.decodeFromString(jsonStr)
-                                    NATClient.requestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
+                                    NATClient.onRequestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
                                 }
 
                                 "openPort" -> {
@@ -293,6 +286,11 @@ class BrokerClient(
 
     suspend fun registerPeer(clientItem: NATClientItem): CommonJsonResult<*> {
         val rsp = requestAPI("/peers/", "POST", clientItem)
+        return getRequestResult<Unit?>(rsp)
+    }
+
+    suspend fun requestConnectPeer(myPeerId: PeerId, targetPeerId: PeerId): CommonJsonResult<*> {
+        val rsp = requestAPI("/peers/connect", "POST", PeerConnectRequest(myPeerId, targetPeerId))
         return getRequestResult<Unit?>(rsp)
     }
 

@@ -54,7 +54,7 @@ class PokerTest {
 
         val req1to2 = NATConnectReq(item2, listOf(peerConfig2.pokedPort), peerConfig2)
         runBlocking {
-            NATClient.requestPeerConnect(2, 0, req1to2)
+            NATClient.onRequestPeerConnect(2, 0, req1to2)
         }
     }
 }
