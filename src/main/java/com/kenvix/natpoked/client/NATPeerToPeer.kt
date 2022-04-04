@@ -39,7 +39,7 @@ class NATPeerToPeer(
     private val currentMyIV: ByteArray = ByteArray(ivSize)
     private val currentTargetIV: ByteArray = ByteArray(ivSize)
     val targetKey = if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha
-    private val targetMqttKey = sha256Of(targetKey).toBase58String()
+    private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
 

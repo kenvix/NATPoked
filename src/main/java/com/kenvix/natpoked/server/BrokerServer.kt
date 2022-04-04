@@ -6,10 +6,12 @@
 
 package com.kenvix.natpoked.server
 
+import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase58String
+import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.web.utils.aSendPeerMessage
 import com.kenvix.web.utils.getMqttChannelBasePath
 import kotlinx.coroutines.*
@@ -18,10 +20,12 @@ import org.eclipse.paho.mqttv5.client.*
 import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
+import org.eclipse.paho.mqttv5.common.packet.UserProperty
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.random.Random
 
 class BrokerServer(
     val token: String,
@@ -30,10 +34,16 @@ class BrokerServer(
     private val logger = LoggerFactory.getLogger(this::class.java)
     private val mqttClient: MqttAsyncClient = MqttAsyncClient("ws://127.0.0.1:$port/mqtt", "server")
 
-    suspend fun sendPeerMessage(peerId: PeerId, topicSuffix: String, payload: ByteArray, qos: Int = 0,
+    suspend fun sendPeerMessage(peerId: PeerId, topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
                                 props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
         return mqttClient.aSendPeerMessage(getMqttChannelBasePath(peerId) + topicSuffix,
-            sha256Of(AppEnv.ServerPSK).toBase58String().toByteArray(), payload, qos, props, retained)
+            key, payload, qos, props, retained)
+    }
+
+    suspend fun sendPeerMessage(peerId: PeerId, topicSuffix: String, encodedKey: String, payload: ByteArray, qos: Int = 0,
+                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(peerId) + topicSuffix,
+            encodedKey, payload, qos, props, retained)
     }
 
     suspend fun connect() = withContext(Dispatchers.IO) {
@@ -41,6 +51,7 @@ class BrokerServer(
             logger.warn("Already connected.")
             return@withContext
         }
+
         val options = MqttConnectionOptionsBuilder()
             .automaticReconnectDelay(1000, 2000)
             .keepAliveInterval(10)
@@ -55,6 +66,7 @@ class BrokerServer(
         mqttClient.setCallback(handler)
 
         logger.info("Connecting to mosquitto broker...")
+
         while (isActive) {
             try {
                 mqttClient.connect(options).waitForCompletion()

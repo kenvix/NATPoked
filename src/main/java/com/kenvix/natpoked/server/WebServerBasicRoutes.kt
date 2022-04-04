@@ -73,7 +73,12 @@ internal object WebServerBasicRoutes : KtorModule {
                         if (data.peersConfig == null || data.peersConfig?.peers == null || data.peersConfig?.peers?.size == 0)
                             logger.info("Excuse me? PeersConfig is empty.")
 
-                        NATServer.addPeerConnection(data)
+                        val peerKey = call.request.headers["Peer-Key"]
+                        NATServer.addPeerConnection(data, peerKey ?: "")
+                        logger.debug("Peer $data added.")
+                        if (AppEnv.DebugMode)
+                            logger.debug("Peer ${data.clientId} key: $peerKey")
+
                         call.respondSuccess()
                     }
 
@@ -141,7 +146,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {
-                                    requestPeerMakeConnection(myPeerId, serverRolePeer.client, )
+                                    requestPeerMakeConnection(my, serverRolePeer.client, )
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -150,11 +155,11 @@ internal object WebServerBasicRoutes : KtorModule {
                                 }
 
                                 NATType.RESTRICTED_CONE -> {
-                                    requestPeerMakeConnection(myPeerId, clientRolePeer.client)
+                                    requestPeerMakeConnection(my, clientRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
-                                    requestPeerMakeConnection(myPeerId, serverRolePeer.client)
+                                    requestPeerMakeConnection(my, serverRolePeer.client)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
                                             "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId}")
                                 }
@@ -191,16 +196,16 @@ internal object WebServerBasicRoutes : KtorModule {
                      * @throws NotFoundException (HTTP 404) if client not exist
                      */
                     MESSAGE_HANDSHAKE.typeId -> {
-                        val req = incomingReq as CommonRequest<NATClientItem>
-                        val client = if (req.data.clientId in NATServer.peerConnections)
-                            NATServer.peerConnections.getOrFail(req.data.clientId) else NATPeerToBrokerConnection(
-                            req.data
-                        )
-
-                        NATServer.peerWebsocketSessionMap[this] = client
-
-                        call.respondSuccess()
-                        client.stage = NATPeerToBrokerConnectionStage.READY
+//                        val req = incomingReq as CommonRequest<NATClientItem>
+//                        val client = if (req.data.clientId in NATServer.peerConnections)
+//                            NATServer.peerConnections.getOrFail(req.data.clientId) else NATPeerToBrokerConnection(
+//                            req.data
+//                        )
+//
+//                        NATServer.peerWebsocketSessionMap[this] = client
+//
+//                        call.respondSuccess()
+//                        client.stage = NATPeerToBrokerConnectionStage.READY
                     }
 
                     MESSAGE_KEEP_ALIVE.typeId -> {
@@ -243,9 +248,10 @@ internal object WebServerBasicRoutes : KtorModule {
         }
     }
 
-    private suspend fun requestPeerMakeConnection(myPeerId: PeerId, targetPeerClientInfo: NATClientItem, targetPorts: List<Int>? = null) {
+    private suspend fun requestPeerMakeConnection(myPeer: NATPeerToBrokerConnection, targetPeerClientInfo: NATClientItem, targetPorts: List<Int>? = null) {
         val infoCopy = targetPeerClientInfo.copy()
         infoCopy.peersConfig = null
+        val myPeerId = myPeer.client.clientId
 
         val peerConfigCopy: PeersConfig.Peer = targetPeerClientInfo.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
         peerConfigCopy.key = ""
@@ -261,6 +267,6 @@ internal object WebServerBasicRoutes : KtorModule {
             )
         ))
 
-        NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", json.toByteArray(), 2)
+        NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", myPeer.encodedKey, json.toByteArray(), 2)
     }
 }

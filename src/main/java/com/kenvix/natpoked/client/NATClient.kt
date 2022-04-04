@@ -2,12 +2,15 @@ package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
+import com.kenvix.natpoked.server.WebServerBasicRoutes
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.NotFoundException
 import com.kenvix.web.utils.Getable
 import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
+import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
 import net.mamoe.yamlkt.Yaml
@@ -19,6 +22,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 import kotlin.jvm.Throws
+import kotlin.random.Random
 
 object NATClient : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName(this.toString())
@@ -27,12 +31,14 @@ object NATClient : CoroutineScope, AutoCloseable {
     private val peersImpl: MutableMap<PeerId, NATPeerToPeer> = mutableMapOf()
     val peers: Map<PeerId, NATPeerToPeer>
         get() = peersImpl
+    val peerToBrokerKeyBase64Encoded = Random.Default.nextBytes(16).toBase64String()
 
     val portRedirector: PortRedirector = PortRedirector()
     private val logger = LoggerFactory.getLogger(NATClient::class.java)
     val peersKey: Getable<PeerId, ByteArray> = object : Getable<PeerId, ByteArray> {
         @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
-        override operator fun get(peerId: PeerId): ByteArray = peersImpl[peerId]?.targetKey ?: throw NotFoundException("Peer $peerId not found")
+        override operator fun get(peerId: PeerId): ByteArray =
+            peersImpl[peerId]?.targetKey ?: throw NotFoundException("Peer $peerId not found")
     }
 
     lateinit var peersConfig: PeersConfig
@@ -61,7 +67,12 @@ object NATClient : CoroutineScope, AutoCloseable {
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
 
     fun getOutboundInetSocketAddress(socket: DatagramSocket, maxTries: Int = 20): SocketAddrEchoResult {
-        return echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), socket, maxTries)
+        return echoClient.requestEcho(
+            AppEnv.EchoPortList[0],
+            InetAddress.getByName(brokerClient.brokerHost),
+            socket,
+            maxTries
+        )
     }
 
     private fun parseUrl(it: String): UrlParseResult {
@@ -95,7 +106,10 @@ object NATClient : CoroutineScope, AutoCloseable {
 
         peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
 
+        if (AppEnv.DebugMode)
+            logger.debug("Peer key: $peerToBrokerKeyBase64Encoded")
         logger.info("NATPoked Client Broker Client Connecting")
+
         brokerClient.connect()
 
         if (AppEnv.PeerReportToBrokerDelay >= 0) {

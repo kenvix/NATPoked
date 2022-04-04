@@ -19,6 +19,7 @@ enum class NATPeerToPeerConnectionStage {
 
 data class NATPeerToBrokerConnection(
     val client: NATClientItem,
+    val encodedKey: String,
     var stage: NATPeerToBrokerConnectionStage = NATPeerToBrokerConnectionStage.HANDSHAKE,
     /**
      * State machine for peer to peer connection

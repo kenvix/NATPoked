@@ -7,6 +7,7 @@
 package com.kenvix.natpoked.client
 
 import com.google.common.primitives.Ints
+import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
@@ -54,7 +55,10 @@ class BrokerClient(
     private val networkOperationLock: Mutex = Mutex()
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
     private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
-    private val encodedServerKey = AppEnv.ServerPSK.toBase64String()
+    private val encodedServerKey = sha256Of(AppEnv.ServerPSK).toBase64String()
+    private val peerToBrokerKeyBase64Encoded: String
+        get() = NATClient.peerToBrokerKeyBase64Encoded
+
     private lateinit var mqttClient: MqttAsyncClient
 
     private val suspendResponses: MutableMap<Int, Continuation<ByteArray>> = ConcurrentHashMap()
@@ -261,13 +265,14 @@ class BrokerClient(
         const val TOPIC_RESPONSE = "response"
     }
 
-    private suspend inline fun <reified T: Any> requestAPI(url: String, method: String, data: T? = null): Response {
+    private suspend inline fun <reified T: Any> requestAPI(url: String, method: String, data: T? = null, headers: Headers? = null): Response {
         val request = Request.Builder()
             .url("$baseHttpUrl$url")
+            .run { if (headers != null) headers(headers) else this }
             .header("Accept", "application/json")
             .header("Content-Type", "application/json; charset=utf-8")
             .header("User-Agent", "NATPoked/1.0 (HTTP). ${PlatformDetection.getInstance()}")
-            .header("X-Key", encodedServerKey)
+            .header("Peer-Key", peerToBrokerKeyBase64Encoded)
             .method(method, data?.let { Json.encodeToString(it).toRequestBody() })
             .build()
 
@@ -285,7 +290,7 @@ class BrokerClient(
     }
 
     suspend fun registerPeer(clientItem: NATClientItem): CommonJsonResult<*> {
-        val rsp = requestAPI("/peers/", "POST", clientItem)
+        val rsp = requestAPI("/peers/", "POST", clientItem, headers = Headers.Builder().add("X-Key", encodedServerKey).build())
         return getRequestResult<Unit?>(rsp)
     }
 

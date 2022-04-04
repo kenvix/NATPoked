@@ -4,6 +4,7 @@ import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase58String
+import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.InvalidAuthorizationException
 import okhttp3.internal.toHexString
 import org.eclipse.paho.mqttv5.client.IMqttToken
@@ -31,12 +32,22 @@ suspend fun MqttAsyncClient.aSendMessage(topic: String, msg: MqttMessage): IMqtt
     }
 }
 
-suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
-                            props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, rawKey: ByteArray, payload: ByteArray, qos: Int = 0,
+                                             props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
     if (props.userProperties == null)
         props.userProperties = arrayListOf()
 
-    props.userProperties!!.add(UserProperty("key", sha256Of(key).toBase58String()))
+    props.userProperties!!.add(UserProperty("key", sha256Of(rawKey).toBase64String()))
+    val msg = MqttMessage(payload, qos, retained, props)
+    return aSendMessage(topic, msg)
+}
+
+suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, base58EncodedKey: String, payload: ByteArray, qos: Int = 0,
+                                             props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+    if (props.userProperties == null)
+        props.userProperties = arrayListOf()
+
+    props.userProperties!!.add(UserProperty("key", base58EncodedKey))
     val msg = MqttMessage(payload, qos, retained, props)
     return aSendMessage(topic, msg)
 }
@@ -50,7 +61,7 @@ suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, key: ByteArray, payl
 
 fun MqttMessage.checkPeerAuth(key: ByteArray) {
     val keyHash = sha256Of(key)
-    val keyHashStr = keyHash.toBase58String()
+    val keyHashStr = keyHash.toBase64String()
     val userKey = properties.userProperties?.find { it.key == "key" }?.value
     if (userKey == null || userKey != keyHashStr) {
         throw InvalidAuthorizationException("Invalid peer Auth, wrong key: $userKey")

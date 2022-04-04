@@ -44,8 +44,8 @@ object NATServer : Closeable {
         peerConnectionsImpl[peerId] = connection
     }
 
-    fun addPeerConnection(clientItem: NATClientItem) {
-        addPeerConnection(clientItem.clientId, NATPeerToBrokerConnection(clientItem))
+    fun addPeerConnection(clientItem: NATClientItem, encodedKey: String) {
+        addPeerConnection(clientItem.clientId, NATPeerToBrokerConnection(clientItem, encodedKey))
     }
 
     fun addPeerWebsocketSession(session: DefaultWebSocketSession, connection: NATPeerToBrokerConnection) {
