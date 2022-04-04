@@ -12,7 +12,9 @@ import com.kenvix.utils.lang.toUnit
 import com.kenvix.web.server.KtorModule
 import com.kenvix.web.utils.*
 import io.ktor.application.*
+import io.ktor.client.utils.EmptyContent.status
 import io.ktor.features.*
+import io.ktor.http.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.http.content.*
 import io.ktor.locations.*
@@ -136,13 +138,25 @@ internal object WebServerBasicRoutes : KtorModule {
 
                     post("/connect") {
                         val (myPeerId, targetPeerId) = call.receiveInternalData<PeerConnectRequest>()
+                        if (myPeerId == targetPeerId) {
+                            return@post call.respondInfo("Cannot connect to self: got myPeerId == targetPeerId", 400, status = HttpStatusCode.BadRequest)
+                        }
+
                         val my: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
                         my.addConnection(targetPeerId)
 
                         val targetPeer = NATServer.peerConnections[targetPeerId]
                         if (targetPeer != null) {
-                            val serverRolePeer: NATPeerToBrokerConnection = maxOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
-                            val clientRolePeer: NATPeerToBrokerConnection = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                            val serverRolePeer: NATPeerToBrokerConnection
+                            val clientRolePeer: NATPeerToBrokerConnection
+
+                            if (targetPeer.client.clientNatType == my.client.clientNatType) {
+                                serverRolePeer = targetPeer
+                                clientRolePeer = my
+                            } else {
+                                serverRolePeer = maxOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                                clientRolePeer = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                            }
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE -> {

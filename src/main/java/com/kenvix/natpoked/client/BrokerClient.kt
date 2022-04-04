@@ -28,6 +28,7 @@ import org.eclipse.paho.mqttv5.client.*
 import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
+import org.eclipse.paho.mqttv5.common.packet.UserProperty
 import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
 import java.util.concurrent.ConcurrentHashMap
@@ -55,7 +56,8 @@ class BrokerClient(
     private lateinit var websocket: WebSocket
     private val networkOperationLock: Mutex = Mutex()
     private val receiveQueue: Channel<CommonRequest<*>> = Channel(Channel.UNLIMITED)
-    private val baseHttpUrl = "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
+    private val baseHttpUrl =
+        "${brokerUseSsl.run { if (brokerUseSsl) "https" else "http" }}://$brokerHost:$brokerPort${brokerPath}api/v1/"
     private val encodedServerKey = sha256Of(AppEnv.ServerPSK).toBase64String()
     private val peerToBrokerKeyBase64Encoded: String
         get() = NATClient.peerToBrokerKeyBase64Encoded
@@ -65,20 +67,45 @@ class BrokerClient(
     private val suspendResponses: MutableMap<Int, Continuation<ByteArray>> = ConcurrentHashMap()
     private val nextSuspendResponseId: AtomicInteger = AtomicInteger(Random.nextInt(Int.MIN_VALUE, Int.MAX_VALUE))
 
-    suspend fun sendPeerMessage(topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
-                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
-        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix, key, payload, qos, props, retained)
+    suspend fun sendPeerMessage(
+        topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
+        props: MqttProperties = MqttProperties(), retained: Boolean = false
+    ): IMqttToken {
+        props.userProperties.add(UserProperty("fromPeerId", AppEnv.PeerId.toString()))
+        return mqttClient.aSendPeerMessage(
+            getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix,
+            key,
+            payload,
+            qos,
+            props,
+            retained
+        )
     }
 
-    suspend fun sendPeerMessage(topicSuffix: String, key: ByteArray, payload: String, qos: Int = 0,
-                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
-        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix, key, payload.toByteArray(), qos, props, retained)
+    suspend fun sendPeerMessage(
+        topicSuffix: String, key: ByteArray, payload: String, qos: Int = 0,
+        props: MqttProperties = MqttProperties(), retained: Boolean = false
+    ): IMqttToken {
+        return sendPeerMessage(
+            getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix,
+            key,
+            payload.toByteArray(),
+            qos,
+            props,
+            retained
+        )
     }
 
-    suspend fun respondPeer(originalMessage: MqttMessage, key: ByteArray, payload: ByteArray, props: MqttProperties = MqttProperties()): IMqttToken {
-         props.correlationData = originalMessage.properties.correlationData ?: throw BadRequestException("No Correlation Data")
-         val respTopic = originalMessage.properties.responseTopic ?: throw BadRequestException("No Response Topic")
-         return mqttClient.aSendPeerMessage(respTopic, key, payload, 2, props, false)
+    suspend fun respondPeer(
+        originalMessage: MqttMessage,
+        key: ByteArray,
+        payload: ByteArray,
+        props: MqttProperties = MqttProperties()
+    ): IMqttToken {
+        props.correlationData =
+            originalMessage.properties.correlationData ?: throw BadRequestException("No Correlation Data")
+        val respTopic = originalMessage.properties.responseTopic ?: throw BadRequestException("No Response Topic")
+        return sendPeerMessage(respTopic, key, payload, 2, props, false)
     }
 
     /**
@@ -90,27 +117,41 @@ class BrokerClient(
      * QOS must be 2
      */
     @Suppress("UNCHECKED_CAST")
-    suspend fun sendPeerMessageWithResponse(topicSuffix: String, key: ByteArray, payload: ByteArray,
-                                                props: MqttProperties = MqttProperties(), retained: Boolean = false): ByteArray {
+    suspend fun sendPeerMessageWithResponse(
+        topicSuffix: String, key: ByteArray, payload: ByteArray,
+        peerId: PeerId = AppEnv.PeerId, props: MqttProperties = MqttProperties(), retained: Boolean = false
+    ): ByteArray {
         val responseId = nextSuspendResponseId.getAndIncrement()
-        val arr = ByteArray(4)
         props.responseTopic = getMqttChannelBasePath(AppEnv.PeerId) + "response"
         props.correlationData = Ints.toByteArray(responseId) // big endian
+        logger.trace("sendPeerMessageWithResponse $peerId/$topicSuffix: correlationData:$responseId, responseTopic:${props.responseTopic}")
 
         sendPeerMessage(topicSuffix, key, payload, 2, props, retained)
 
-        return suspendCoroutine<ByteArray> {  continuation ->
+        return suspendCoroutine<ByteArray> { continuation ->
             suspendResponses[responseId] = continuation
         }
     }
 
-    suspend fun sendPeerMessageWithResponse(topicSuffix: String, key: ByteArray, payload: String,
-                                            props: MqttProperties = MqttProperties(), retained: Boolean = false): String {
-        return String(sendPeerMessageWithResponse(topicSuffix, key, payload.toByteArray(), props, retained))
+    suspend fun sendPeerMessageWithResponse(
+        topicSuffix: String, key: ByteArray, payload: String,
+        peerId: PeerId = AppEnv.PeerId, props: MqttProperties = MqttProperties(), retained: Boolean = false
+    ): String {
+        return String(sendPeerMessageWithResponse(topicSuffix, key, payload.toByteArray(), peerId, props, retained))
     }
 
     override fun toString(): String {
         return "npbroker://$brokerHost:$brokerPort$brokerPath"
+    }
+
+    private suspend fun respondErrorToPeerIfNeed(message: MqttMessage, e: Exception) {
+        if (message.properties.correlationData != null && !message.properties.responseTopic.isNullOrBlank()) {
+            val fromPeerId: Long = message.properties.userProperties.find { it.key == "fromPeerId" }?.value?.toLong() ?: return
+            respondPeer(
+                message, NATClient.peersKey[fromPeerId],
+                JSON.encodeToString(CommonJsonResult<Unit>(status = 1, code = 1, info = e.message ?: "")).toByteArray()
+            )
+        }
     }
 
     private suspend fun onMqttMessageArrived(topic: String, message: MqttMessage) {
@@ -123,7 +164,9 @@ class BrokerClient(
                         return
                     }
 
-                    message.checkPeerAuth(AppEnv.PeerMyPSK)
+                    if (message.properties.userProperties?.find { it.key == "key" }?.value != peerToBrokerKeyBase64Encoded)
+                        message.checkPeerAuth(AppEnv.PeerMyPSK)
+
                     val typeId: Int = message.properties.userProperties?.find { it.key == "type" }?.value?.toInt() ?: -1
                     //NATClient.onBrokerMessage(topicPath.drop(2), typeId, message.payload)
                     when (topicPath[2]) {
@@ -142,8 +185,10 @@ class BrokerClient(
                                     val req: PeerIdReq = JSON.decodeFromString(jsonStr)
                                     logger.trace("MQTT /peer/~/openPort: $jsonStr")
                                     val port = NATClient.requestPeerOpenPort(req.peerId)
-                                    respondPeer(message, NATClient.peersKey[req.peerId],
-                                        JSON.encodeToString(PortReq(port)).toByteArray())
+                                    respondPeer(
+                                        message, NATClient.peersKey[req.peerId],
+                                        JSON.encodeToString(PortReq(port)).toByteArray()
+                                    )
                                 }
 
                                 "guessPort" -> {
@@ -170,14 +215,21 @@ class BrokerClient(
 
                                 return
                             } catch (e: Exception) {
-                                logger.error("Failed to handle response with correlationData: ${message.properties.correlationData.contentToString()}", e)
+                                logger.error(
+                                    "Failed to handle response with correlationData: ${message.properties.correlationData.contentToString()}",
+                                    e
+                                )
                             }
                         }
                     }
                 }
             }
+        } catch (e: InvalidAuthorizationException) {
+            logger.info("Got a message with invalid authorization: $topic", e)
+            respondErrorToPeerIfNeed(message, e)
         } catch (e: CommonBusinessException) {
             logger.warn("Peer wrong data:", e)
+            respondErrorToPeerIfNeed(message, e)
         } catch (e: Throwable) {
             logger.error("Unexpected error:", e)
         }
@@ -200,7 +252,8 @@ class BrokerClient(
         }
 
         val mqttTask = async {
-            val serverURI = "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
+            val serverURI =
+                "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
             logger.debug("Connecting to MQTT server: $serverURI")
 
             mqttClient = MqttAsyncClient(serverURI, AppEnv.PeerId.toHexString())
@@ -244,7 +297,7 @@ class BrokerClient(
         }
 
         override fun deliveryComplete(token: IMqttToken?) {
-            logger.trace("Delivery complete: $token")
+            logger.trace("Delivery complete: ${token?.topics?.contentToString()} - #${token?.messageId}: ${token?.message}")
         }
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
@@ -275,7 +328,12 @@ class BrokerClient(
         const val TOPIC_RESPONSE = "response"
     }
 
-    private suspend inline fun <reified T: Any> requestAPI(url: String, method: String, data: T? = null, headers: Headers? = null): Response {
+    private suspend inline fun <reified T : Any> requestAPI(
+        url: String,
+        method: String,
+        data: T? = null,
+        headers: Headers? = null
+    ): Response {
         val request = Request.Builder()
             .url("$baseHttpUrl$url")
             .run { if (headers != null) headers(headers) else this }
@@ -290,7 +348,6 @@ class BrokerClient(
     }
 
 
-
     private suspend fun send(byteArray: ByteArray) = withContext(Dispatchers.IO) {
         websocket.send(ByteString.of(*byteArray))
     }
@@ -300,7 +357,12 @@ class BrokerClient(
     }
 
     suspend fun registerPeer(clientItem: NATClientItem): CommonJsonResult<*> {
-        val rsp = requestAPI("/peers/", "POST", clientItem, headers = Headers.Builder().add("X-Key", encodedServerKey).build())
+        val rsp = requestAPI(
+            "/peers/",
+            "POST",
+            clientItem,
+            headers = Headers.Builder().add("X-Key", encodedServerKey).build()
+        )
         return getRequestResult<Unit?>(rsp)
     }
 

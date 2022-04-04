@@ -157,6 +157,12 @@ object Main : CoroutineScope {
             Runtime.getRuntime().halt(255)
         }
 
+        ConsoleCommands["connect"] = {
+            val peerId = it.arguments[0].toLong()
+            logger.info("Connection request from console: CONN --> $peerId")
+            launch { NATClient.requestConnectPeer(peerId) }
+        }
+
         ConsoleCommands["saveprop"] = {
             logger.info("Saving properties...")
             AppEnv.save()

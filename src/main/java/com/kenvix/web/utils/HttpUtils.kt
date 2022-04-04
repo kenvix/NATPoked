@@ -149,6 +149,8 @@ fun ApplicationCall.isUserBrowserRequest(): Boolean {
             this.request.header("X-Requested-With") == null
 }
 
+
+
 suspend fun ApplicationCall.respondError(
     status: HttpStatusCode,
     exception: Throwable? = null,

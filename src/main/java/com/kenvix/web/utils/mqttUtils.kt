@@ -42,6 +42,7 @@ suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, rawKey: ByteArray, p
         props.userProperties = arrayListOf()
 
     props.userProperties!!.add(UserProperty("key", sha256Of(rawKey).toBase64String()))
+    logger.trace("aSendPeerMessage: $topic  with bytes ${payload.size}")
     val msg = MqttMessage(payload, qos, retained, props)
     return aSendMessage(topic, msg)
 }
@@ -52,6 +53,7 @@ suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, base58EncodedKey: St
         props.userProperties = arrayListOf()
 
     props.userProperties!!.add(UserProperty("key", base58EncodedKey))
+    logger.trace("aSendPeerMessage: $topic  with bytes ${payload.size}")
     val msg = MqttMessage(payload, qos, retained, props)
     return aSendMessage(topic, msg)
 }

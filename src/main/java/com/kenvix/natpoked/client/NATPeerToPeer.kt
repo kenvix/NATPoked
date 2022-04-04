@@ -394,9 +394,10 @@ class NATPeerToPeer(
             // 如果对方支持 UPnP 或者对方是 >= RESTRICTED_CONE 类型的 NAT，则直接连接
             // request to open port
             val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
-                getMqttChannelBasePath(peerInfo.clientId) + "control/openPort",
+                "control/openPort",
                 targetKey,
                 JSON.encodeToString(PeerIdReq(AppEnv.PeerId)),
+                peerId = peerInfo.clientId,
             )
 
             val result: CommonJsonResult<PortReq> = JSON.decodeFromString(resultJson)

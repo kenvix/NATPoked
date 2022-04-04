@@ -97,7 +97,7 @@ class BrokerServer(
         }
 
         override fun deliveryComplete(token: IMqttToken?) {
-            logger.info("Server Delivery complete: $token")
+            logger.trace("Server Delivery complete: ${token?.topics?.contentToString()} - #${token?.messageId}: ${token?.message}")
         }
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
