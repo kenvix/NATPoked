@@ -23,6 +23,7 @@ fun main() {
     println("Default gateway ipv4 address: ${getDefaultGatewayAddress4()}")
     println("Default gateway ipv6 address: ${getDefaultGatewayAddress6()}")
 
+
     runBlocking {
 //        println("Default gateway ipv6 NAT Type: ${testNatTypeParallel(getDefaultGatewayAddress6())}")
         println("Default gateway ipv4 NAT Type: ${testNatType(getDefaultGatewayAddress4())}")

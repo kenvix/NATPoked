@@ -69,11 +69,11 @@ class BrokerClient(
 
     suspend fun sendPeerMessage(
         topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
-        props: MqttProperties = MqttProperties(), retained: Boolean = false
+        props: MqttProperties = MqttProperties(), peerId: PeerId = AppEnv.PeerId, retained: Boolean = false
     ): IMqttToken {
-        props.userProperties.add(UserProperty("fromPeerId", AppEnv.PeerId.toString()))
+        props.userProperties.add(UserProperty("fromPeerId", peerId.toString()))
         return mqttClient.aSendPeerMessage(
-            getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix,
+            getMqttChannelBasePath(peerId) + topicSuffix,
             key,
             payload,
             qos,
@@ -84,14 +84,15 @@ class BrokerClient(
 
     suspend fun sendPeerMessage(
         topicSuffix: String, key: ByteArray, payload: String, qos: Int = 0,
-        props: MqttProperties = MqttProperties(), retained: Boolean = false
+        props: MqttProperties = MqttProperties(), peerId: PeerId = AppEnv.PeerId, retained: Boolean = false
     ): IMqttToken {
         return sendPeerMessage(
-            getMqttChannelBasePath(AppEnv.PeerId) + topicSuffix,
+            topicSuffix,
             key,
             payload.toByteArray(),
             qos,
             props,
+            peerId,
             retained
         )
     }
@@ -105,7 +106,7 @@ class BrokerClient(
         props.correlationData =
             originalMessage.properties.correlationData ?: throw BadRequestException("No Correlation Data")
         val respTopic = originalMessage.properties.responseTopic ?: throw BadRequestException("No Response Topic")
-        return sendPeerMessage(respTopic, key, payload, 2, props, false)
+        return mqttClient.aSendPeerMessage(respTopic, key, payload, 2, props)
     }
 
     /**
@@ -126,7 +127,7 @@ class BrokerClient(
         props.correlationData = Ints.toByteArray(responseId) // big endian
         logger.trace("sendPeerMessageWithResponse $peerId/$topicSuffix: correlationData:$responseId, responseTopic:${props.responseTopic}")
 
-        sendPeerMessage(topicSuffix, key, payload, 2, props, retained)
+        sendPeerMessage(topicSuffix, key, payload, 2, props, peerId, retained)
 
         return suspendCoroutine<ByteArray> { continuation ->
             suspendResponses[responseId] = continuation
@@ -228,6 +229,9 @@ class BrokerClient(
             logger.info("Got a message with invalid authorization: $topic", e)
             respondErrorToPeerIfNeed(message, e)
         } catch (e: CommonBusinessException) {
+            logger.warn("Peer wrong data:", e)
+            respondErrorToPeerIfNeed(message, e)
+        } catch (e: RequestException) {
             logger.warn("Peer wrong data:", e)
             respondErrorToPeerIfNeed(message, e)
         } catch (e: Throwable) {

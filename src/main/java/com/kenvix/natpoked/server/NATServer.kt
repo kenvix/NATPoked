@@ -166,7 +166,7 @@ password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
                 "mqtt", ProcessBuilder().command(
                     "mosquitto",
                     "-c", "\"${mqttConf.toAbsolutePath()}\"",
-                    "-v"
+//                    "-v"
                 ), keepAlive = true
             )
         }
