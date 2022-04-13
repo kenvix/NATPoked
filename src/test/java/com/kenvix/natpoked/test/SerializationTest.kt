@@ -71,6 +71,7 @@ class SerializationTest {
         val json = "{\"status\":200,\"code\":404,\"data\":{\"a\": 1}}"
         val info: CommonJsonResult<ErrorResult?> = JSON.decodeFromString(json)
         println(info)
+        println(CommonJsonResult(0, 0, "OK", "data").toJsonString<String>())
     }
 
     interface ITestDataPartial {

@@ -4,6 +4,7 @@ import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.WebServerBasicRoutes
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.NotFoundException
 import com.kenvix.web.utils.Getable
@@ -106,8 +107,10 @@ object NATClient : CoroutineScope, AutoCloseable {
 
         peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
 
-        if (AppEnv.DebugMode)
-            logger.trace("Peer key: $peerToBrokerKeyBase64Encoded")
+        if (AppEnv.DebugMode) {
+            logger.trace("Peer to broker key: $peerToBrokerKeyBase64Encoded")
+            logger.trace("Peer self key: ${sha256Of(AppEnv.PeerMyPSK).toBase64String()}")
+        }
         logger.info("NATPoked Client Broker Client Connecting")
 
         logger.trace(registerPeerToBroker().toString())

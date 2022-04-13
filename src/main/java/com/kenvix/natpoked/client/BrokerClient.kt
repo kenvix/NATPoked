@@ -109,6 +109,16 @@ class BrokerClient(
         return mqttClient.aSendPeerMessage(respTopic, key, payload, 2, props)
     }
 
+    suspend fun respondPeer(
+        originalMessage: MqttMessage,
+        key: ByteArray,
+        payload: String,
+        props: MqttProperties = MqttProperties()
+    ): IMqttToken {
+        logger.trace("Responding to peer with message: $payload")
+        return respondPeer(originalMessage, key, payload.toByteArray(), props)
+    }
+
     /**
      * sendPeerMessageWithResponse
      * @param topicSuffix topic suffix
@@ -138,7 +148,9 @@ class BrokerClient(
         topicSuffix: String, key: ByteArray, payload: String,
         peerId: PeerId = AppEnv.PeerId, props: MqttProperties = MqttProperties(), retained: Boolean = false
     ): String {
-        return String(sendPeerMessageWithResponse(topicSuffix, key, payload.toByteArray(), peerId, props, retained))
+        val rsp = String(sendPeerMessageWithResponse(topicSuffix, key, payload.toByteArray(), peerId, props, retained))
+        logger.trace("sendPeerMessageWithResponse $peerId/$topicSuffix RESPONSE: $rsp")
+        return rsp
     }
 
     override fun toString(): String {
@@ -186,9 +198,10 @@ class BrokerClient(
                                     val req: PeerIdReq = JSON.decodeFromString(jsonStr)
                                     logger.trace("MQTT /peer/~/openPort: $jsonStr")
                                     val port = NATClient.requestPeerOpenPort(req.peerId)
+                                    logger.info("Opened port $port for peer ${req.peerId}")
                                     respondPeer(
                                         message, NATClient.peersKey[req.peerId],
-                                        JSON.encodeToString(PortReq(port)).toByteArray()
+                                        CommonJsonResult(200, 0, data = PortReq(port)).toJsonString<PortReq>()
                                     )
                                 }
 

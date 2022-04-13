@@ -70,7 +70,12 @@ fun MqttMessage.checkPeerAuth(key: ByteArray) {
     val keyHashStr = keyHash.toBase64String()
     val userKey = properties.userProperties?.find { it.key == "key" }?.value
     if (userKey == null || userKey != keyHashStr) {
-        throw InvalidAuthorizationException("Invalid peer Auth, wrong key: $userKey")
+        throw InvalidAuthorizationException("Invalid peer Auth, wrong key: $userKey ".run {
+            if (AppEnv.DebugMode)
+                "$this | Expected: $keyHashStr"
+            else
+                this
+        })
     }
 }
 

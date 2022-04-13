@@ -34,5 +34,6 @@ data class CommonJsonResult<T>(
         }
     }
 
-    fun jsonOf() = JSON.encodeToString(this)
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified R: T> toJsonString() = JSON.encodeToString<CommonJsonResult<R>>(this as CommonJsonResult<R>)
 }
