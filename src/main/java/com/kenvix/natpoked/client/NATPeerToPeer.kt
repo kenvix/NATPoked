@@ -124,14 +124,19 @@ class NATPeerToPeer(
     fun listenUdpSourcePort(sourcePort: Int = config.pokedPort) {
         val socketAddress = InetSocketAddress(sourcePort)
         udpChannel.bind(socketAddress)
+        logger.debug("UDP Channel bind to $socketAddress")
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, target)
+        if (AppEnv.DebugMode && !buffer.isDirect)
+            logger.debugArray("$targetPeerId: writeRawDatagram to ${target.address}", buffer.array())
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
         udpChannel.write(buffer)
+        if (AppEnv.DebugMode && !buffer.isDirect)
+            logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
     }
 
     suspend fun readRawDatagram(buffer: ByteBuffer): SocketAddress = withContext(Dispatchers.IO) {
@@ -145,15 +150,15 @@ class NATPeerToPeer(
      * 阶段 1：Peer-B 接收握手消息，并应答。
      */
     suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 12) {
-        val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() and STATUS_HAS_IV.typeId.toInt()
-        val buffer = ByteBuffer.allocate(512)
+        val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
+        val buffer = ByteBuffer.allocate(2 + 1 + currentMyIV.size)
         buffer.order(ByteOrder.BIG_ENDIAN)
-        buffer.putUnsignedShort(typeIdInt)
-        buffer.put(stage)
-        buffer.put(currentMyIV)
-        buffer.flip()
+        buffer.putUnsignedShort(typeIdInt) // 2
+        buffer.put(stage) // 1
+        buffer.put(currentMyIV) // 16
 
         for (i in 0 until num) {
+            buffer.flip()
             writeRawDatagram(buffer, target)
         }
     }
@@ -408,8 +413,8 @@ class NATPeerToPeer(
             val helloIp6Task = if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
                 withContext(Dispatchers.IO) {
                     async {
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet")
                         val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
                         sendHelloPacket(addr, num = 10)
                     }
                 }
@@ -418,8 +423,8 @@ class NATPeerToPeer(
             val helloIp4Task = if (peerInfo.clientInetAddress != null) {
                 withContext(Dispatchers.IO) {
                     async {
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet")
                         val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
                         sendHelloPacket(addr, num = 10)
                     }
                 }
@@ -479,6 +484,7 @@ class NATPeerToPeer(
             udpChannel.disconnect()
 
         udpChannel.connect(target)
+        logger.debug("connectTo: connected to $target")
     }
 
     override fun toString(): String {

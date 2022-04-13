@@ -3,6 +3,7 @@
 package com.kenvix.natpoked.utils
 
 import com.kenvix.utils.exception.BadRequestException
+import org.slf4j.Logger
 import java.util.*
 
 private val emptyByteArray = ByteArray(0)
@@ -18,3 +19,5 @@ fun List<*>.assertLengthBiggerOrEqual(length: Int) {
 }
 
 infix fun <K, V> K.maps(another: V): Map<K, V> = Collections.singletonMap(this, another)
+
+fun Logger.debugArray(message: String, bytes: ByteArray) = debug(message + " | " + bytes.toHexString())
