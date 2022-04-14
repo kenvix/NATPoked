@@ -13,8 +13,26 @@ import kotlinx.serialization.Transient
 @Suppress("unused", "ArrayInDataClass")
 @Serializable
 data class PeersConfig(
-    var peers: MutableMap<Long, Peer> = hashMapOf()
+    var peers: MutableMap<Long, Peer> = hashMapOf(),
+    var my: My = My()
 ) {
+    @Serializable
+    data class My(
+        val id: String = "",
+        val key: String = "",
+        val nat: Nat = Nat(),
+    ) {
+        @Serializable
+        data class Nat(
+            val auto: Boolean = true,
+            val clientPublicIpAddress: String = "",
+            val clientPublicIp6Address: String = "",
+            val clientNatType: NATType = NATType.UNKNOWN,
+            val isUpnpSupported: Boolean = false,
+            val isValueChecked: Boolean = false,
+        )
+    }
+
     @Serializable
     data class Peer(
         var key: String,

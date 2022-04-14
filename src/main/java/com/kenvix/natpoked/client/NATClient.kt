@@ -113,6 +113,10 @@ object NATClient : CoroutineScope, AutoCloseable {
         }
         logger.info("NATPoked Client Broker Client Connecting")
 
+        if (!peersConfig.my.nat.auto) {
+            logger.info("Using manual local peer NAT type config: ${peersConfig.my.nat}")
+        }
+
         logger.trace(registerPeerToBroker().toString())
         brokerClient.connect()
 
@@ -159,8 +163,19 @@ object NATClient : CoroutineScope, AutoCloseable {
         }
     }
 
+    @Suppress("BlockingMethodInNonBlockingContext")
     suspend fun getLocalNatClientItem(ifaceId: Int = -1): NATClientItem {
-        lastSelfClientInfo = NATTraversalKit.getLocalNatClientItem(ifaceId)
+        lastSelfClientInfo = if (peersConfig.my.nat.auto) {
+            NATTraversalKit.getLocalNatClientItem(ifaceId)
+        } else {
+            NATClientItem(
+                AppEnv.PeerId,
+                InetAddress.getByName(peersConfig.my.nat.clientPublicIpAddress).address,
+                InetAddress.getByName(peersConfig.my.nat.clientPublicIp6Address).address,
+                clientNatType = peersConfig.my.nat.clientNatType,
+                isValueChecked = peersConfig.my.nat.isValueChecked
+            )
+        }
         return lastSelfClientInfo
     }
 
