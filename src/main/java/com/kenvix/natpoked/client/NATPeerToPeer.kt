@@ -69,7 +69,9 @@ class NATPeerToPeer(
             configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
         }
 
-    val udpSocket: DatagramSocket = udpChannel.socket()!!
+    val udpSocket: DatagramSocket = udpChannel.socket()!!.apply {
+        listenUdpSourcePort(config.pokedPort)
+    }
 
     val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
@@ -130,13 +132,17 @@ class NATPeerToPeer(
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, target)
         if (AppEnv.DebugMode && !buffer.isDirect)
-            logger.debugArray("$targetPeerId: writeRawDatagram to ${target.address}", buffer.array())
+            logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
+        else
+            logger.debug("$targetPeerId: writeRawDatagram to ${target}")
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
         udpChannel.write(buffer)
         if (AppEnv.DebugMode && !buffer.isDirect)
             logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
+        else
+            logger.debug("$targetPeerId: writeRawDatagram to default",)
     }
 
     suspend fun readRawDatagram(buffer: ByteBuffer): SocketAddress = withContext(Dispatchers.IO) {

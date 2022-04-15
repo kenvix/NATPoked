@@ -252,6 +252,7 @@ class BrokerClient(
         }
     }
 
+    private var connectCoroutineContinuation: Continuation<Unit>? = null
     suspend fun connect() = withContext(Dispatchers.IO) {
 //        if (::websocket.isInitialized) {
 //            websocket.close(1000, "Reconnecting")
@@ -285,7 +286,10 @@ class BrokerClient(
                 .automaticReconnect(true)
                 .build()
 
-            mqttClient.connect(options)
+            suspendCoroutine<Unit> {
+                connectCoroutineContinuation = it
+                mqttClient.connect(options)
+            }
         }
 
         registerTask.await()
@@ -319,6 +323,7 @@ class BrokerClient(
 
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
             logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
+            connectCoroutineContinuation?.resume(Unit)
 
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/openPort", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/connect", 2)

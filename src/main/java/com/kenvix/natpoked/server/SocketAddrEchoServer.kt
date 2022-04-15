@@ -8,6 +8,7 @@ package com.kenvix.natpoked.server
 
 import com.kenvix.web.utils.putUnsignedShort
 import kotlinx.coroutines.*
+import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.net.Inet4Address
 import java.net.Inet6Address
@@ -50,6 +51,9 @@ class SocketAddrEchoServer(
         }
     }
 
+    private val logger = LoggerFactory.getLogger(SocketAddrEchoServer::class.java)
+
+
     companion object {
         const val PacketPrefixResponse: Int = 0x7A1B4CCD
         const val PacketPrefixRequest: Int  = 0x7A1B4CCE
@@ -86,6 +90,8 @@ class SocketAddrEchoServer(
                 keys.clear()
             }
         }
+
+        logger.info("SocketAddrEchoServer started on ports: ${ports.joinToString()}")
     }
 
     private fun echo(addr: InetSocketAddress, channel: DatagramChannel) {

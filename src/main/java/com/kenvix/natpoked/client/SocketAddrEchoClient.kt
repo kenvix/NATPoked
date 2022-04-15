@@ -32,15 +32,18 @@ class SocketAddrEchoClient(
                             maxTires: Int = 100): SocketAddrEchoResult {
         val socket = srcSocket ?: DatagramSocket()
         val oldTimeout = socket.soTimeout
-        socket.connect(address, port)
+        val addr = InetSocketAddress(address, port)
+        socket.soTimeout = timeout
+
+        //todo: it stuck here, but I don't know why
+        //socket.connect(address, port)
         val incomingData = ByteArray(32)
 
         try {
-            socket.soTimeout = timeout
 
             for (i in 0 until maxTires) {
                 try {
-                    val outgoingPacket = DatagramPacket(outgoingData, 0, 4)
+                    val outgoingPacket = DatagramPacket(outgoingData, 0, 4, addr)
                     socket.send(outgoingPacket)
                     val packet = DatagramPacket(incomingData, 32)
                     socket.receive(packet)
