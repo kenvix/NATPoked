@@ -1,26 +1,22 @@
 package com.kenvix.natpoked.utils.network
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
-import java.util.LinkedList
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
-    data class SuspendedEvent(
-        var readable: LinkedList<Continuation<DatagramChannel>> = LinkedList(),
-        var written: LinkedList<Continuation<DatagramChannel>> = LinkedList(),
+    private data class SuspendedEvent(
+        var readable: ArrayDeque<Continuation<DatagramChannel>> = ArrayDeque(),
+        var writable: ArrayDeque<Continuation<DatagramChannel>> = ArrayDeque(),
     )
 
     private val updateEventLock = Mutex()
@@ -28,7 +24,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val selector = Selector.open()
     private val selectorExec = launch(Dispatchers.IO) {
         while (true) {
-            val readyNum = selector.select()
+            val readyNum = runInterruptible { selector.select() }
             if (readyNum == 0) continue
 
             val keys = selector.selectedKeys()
@@ -43,11 +39,11 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
                     updateEventLock.withLock {
                         if (key.isReadable) {
-                            channels[channel]?.readable?.poll()?.resume(channel)
+                            channels[channel]?.readable?.removeFirst()?.resume(channel)
                         }
 
                         if (key.isWritable) {
-                            channels[channel]?.written?.poll()?.resume(channel)
+                            channels[channel]?.writable?.removeFirst()?.resume(channel)
                         }
 
                         key.cancel()
@@ -59,7 +55,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
     suspend fun addReadNotifyJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
         updateEventLock.withLock {
-            channels.getOrPut(channel) { SuspendedEvent() }.readable.push(job)
+            channels.getOrPut(channel) { SuspendedEvent() }.readable.add(job)
             channel.register(selector, SelectionKey.OP_READ)
         }
 
@@ -72,7 +68,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
     suspend fun addWriteNotifyJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
         updateEventLock.withLock {
-            channels.getOrPut(channel) { SuspendedEvent() }.written.push(job)
+            channels.getOrPut(channel) { SuspendedEvent() }.writable.add(job)
             channel.register(selector, SelectionKey.OP_WRITE)
         }
 

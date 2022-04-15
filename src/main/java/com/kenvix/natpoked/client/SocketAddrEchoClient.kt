@@ -12,6 +12,7 @@ import com.kenvix.natpoked.server.SocketAddrEchoServer
 import com.kenvix.web.utils.getUnsignedShort
 import io.ktor.features.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -28,8 +29,8 @@ class SocketAddrEchoClient(
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     @Throws(IOException::class, SocketTimeoutException::class)
-    fun requestEcho(port: Int, address: InetAddress, srcSocket: DatagramSocket? = null,
-                            maxTires: Int = 100): SocketAddrEchoResult {
+    suspend fun requestEcho(port: Int, address: InetAddress, srcSocket: DatagramSocket? = null, maxTires: Int = 100,
+                            manualReceiver: Channel<DatagramPacket>? = null): SocketAddrEchoResult = withContext(Dispatchers.IO) {
         val socket = srcSocket ?: DatagramSocket()
         val oldTimeout = socket.soTimeout
         val addr = InetSocketAddress(address, port)
@@ -45,10 +46,17 @@ class SocketAddrEchoClient(
                 try {
                     val outgoingPacket = DatagramPacket(outgoingData, 0, 4, addr)
                     socket.send(outgoingPacket)
-                    val packet = DatagramPacket(incomingData, 32)
-                    socket.receive(packet)
 
-                    return parseEchoResult(packet)
+                    val packet = if (manualReceiver != null) {
+                        manualReceiver.receive()
+                    } else {
+                        val incomingPacket = DatagramPacket(incomingData, 0, incomingData.size)
+                        socket.receive(incomingPacket)
+                        incomingPacket
+                    }
+
+                    manualReceiver?.close()
+                    return@withContext parseEchoResult(packet)
                 } catch (e: SocketTimeoutException) {
                     logger.info("Echo server $address:$port Socket timeout", e)
                 } catch (e: BadRequestException) {
@@ -104,5 +112,15 @@ class SocketAddrEchoClient(
 
     fun onPacketIncoming(packet: DatagramPacket): Boolean {
         return false
+    }
+
+    companion object {
+        fun isResponsePacket(array: ByteArray): Boolean {
+            if (array.size < 19) return false
+            if (array[0] != 0x7A.toByte() || array[1] != 0x1B.toByte() ||
+                array[2] != 0x4C.toByte() || array[3] != 0xCD.toByte()) return false
+
+            return true
+        }
     }
 }

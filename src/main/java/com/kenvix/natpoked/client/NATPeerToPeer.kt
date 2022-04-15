@@ -12,6 +12,7 @@ import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
@@ -43,6 +44,8 @@ class NATPeerToPeer(
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
     private var useSocketConnect: Boolean = false
+
+    private var pingReceiverChannel: Channel<DatagramPacket>? = null
 
     @Volatile private var isConnected: Boolean = false
 
@@ -123,7 +126,10 @@ class NATPeerToPeer(
             else
                 sourcePort
         } else if (NATClient.lastSelfClientInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
-            NATClient.getOutboundInetSocketAddress(udpSocket).port
+            pingReceiverChannel = Channel(1)
+            NATClient.getOutboundInetSocketAddress(udpSocket, manualReceiver = pingReceiverChannel).port.apply {
+                pingReceiverChannel = null
+            }
         } else {
             throw UnsupportedOperationException("Unsupported NAT Type ${NATClient.lastSelfClientInfo.clientNatType} and upnp is not supported")
         }
@@ -277,6 +283,10 @@ class NATPeerToPeer(
         val addr: InetSocketAddress = packet.socketAddress as InetSocketAddress
         val inArrayBuf: ByteArray = packet.data
         val inArrayBufLen: Int = packet.length
+        if (SocketAddrEchoClient.isResponsePacket(inArrayBuf)) {
+            pingReceiverChannel?.trySend(packet)
+            return
+        }
 
         val inBuf = Unpooled.wrappedBuffer(inArrayBuf, packet.offset, inArrayBufLen)
         val typeIdInt: Int = inBuf.readShort().toInt()

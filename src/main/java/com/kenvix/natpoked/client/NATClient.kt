@@ -14,9 +14,11 @@ import com.kenvix.web.utils.noException
 import io.ktor.network.sockets.*
 import io.ktor.util.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.decodeFromString
 import net.mamoe.yamlkt.Yaml
 import org.slf4j.LoggerFactory
+import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.URL
@@ -68,12 +70,14 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
 
-    fun getOutboundInetSocketAddress(socket: DatagramSocket, maxTries: Int = 20): SocketAddrEchoResult {
+    @Suppress("BlockingMethodInNonBlockingContext")
+    suspend fun getOutboundInetSocketAddress(socket: DatagramSocket, maxTries: Int = 20, manualReceiver: Channel<DatagramPacket>? = null): SocketAddrEchoResult {
         return echoClient.requestEcho(
             AppEnv.EchoPortList[0],
             InetAddress.getByName(brokerClient.brokerHost),
             socket,
-            maxTries
+            maxTries,
+            manualReceiver
         )
     }
 
