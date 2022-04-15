@@ -251,8 +251,8 @@ class NATPeerToPeer(
             buffer.clear()
             buffer.order(ByteOrder.BIG_ENDIAN)
             buffer.putShort(typeIdInt.toShort()) // 2
-            buffer.put(stage) // 1
             buffer.put(currentMyIV) // 16
+            buffer.put(stage) // 1
 
             for (i in 0 until num) {
                 buffer.flip()
