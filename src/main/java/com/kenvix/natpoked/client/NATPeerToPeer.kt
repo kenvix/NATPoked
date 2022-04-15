@@ -47,6 +47,7 @@ class NATPeerToPeer(
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
     private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size)
+    private val keepAliveLock = Mutex()
     private var useSocketConnect: Boolean = false
 
     private var pingReceiverChannel: Channel<DatagramPacket>? = null
@@ -110,14 +111,24 @@ class NATPeerToPeer(
                 while (isActive && isConnected) {
                     try {
                         delay(AppEnv.PeerKeepAliveInterval)
-                        for (i in 0 until AppEnv.PeerKeepAliveMaxFailsNum) {
+                        var isSuccessful = false
+                        retryLoop@ for (i in 0 until AppEnv.PeerKeepAliveMaxFailsNum) {
                             try {
                                 withTimeout(AppEnv.PeerKeepAliveTimeout) {
                                     sendKeepAlivePacket(target)
                                 }
+
+                                isSuccessful = true
+                                break@retryLoop
                             } catch (e: Exception) {
+                                keepAlivePacketContinuation = null
                                 logger.info("Keep alive response packet not received on time", e)
                             }
+                        }
+
+                        if (!isSuccessful) {
+                            logger.warn("All Keep alive response packet not received on time, CONNECTION LOST")
+                            setSocketDisconnect()
                         }
                     } catch (e: Exception) {
                         logger.warn("Unable to send keep alive packet!!!", e)
@@ -131,19 +142,25 @@ class NATPeerToPeer(
 
     private suspend fun sendKeepAlivePacket(target: InetSocketAddress, isReply: Boolean = false) {
         val typeIdInt = TYPE_DATA_CONTROL_KEEPALIVE.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
-        val buffer = keepAliveBuffer
-        buffer.order(ByteOrder.BIG_ENDIAN)
-        buffer.putUnsignedShort(typeIdInt) // 2
-        buffer.put(if (isReply) 1 else 0) // 1
-        buffer.put(currentMyIV) // 16
 
-        buffer.flip()
-        writeRawDatagram(buffer, target)
+        keepAliveLock.withLock {
+            val buffer = keepAliveBuffer
+            buffer.clear()
+            buffer.order(ByteOrder.BIG_ENDIAN)
+            buffer.putShort(typeIdInt.toShort()) // 2
+            buffer.put(currentMyIV) // 16
+            buffer.put(if (isReply) 1 else 0) // 1
+
+            buffer.flip()
+            writeRawDatagram(buffer, target)
+        }
+
         if (isReply) {
             logger.trace("Sent keep alive packet REPLY to $target")
         } else {
             logger.trace("Sent keep alive packet REQUEST to $target")
             suspendCoroutine<Unit> { keepAlivePacketContinuation = it }
+            keepAlivePacketContinuation = null
             logger.trace("Received keep alive response packet")
         }
     }
@@ -229,15 +246,18 @@ class NATPeerToPeer(
      */
     suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 12) {
         val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
-        val buffer = keepAliveBuffer
-        buffer.order(ByteOrder.BIG_ENDIAN)
-        buffer.putUnsignedShort(typeIdInt) // 2
-        buffer.put(stage) // 1
-        buffer.put(currentMyIV) // 16
+        keepAliveLock.withLock {
+            val buffer = keepAliveBuffer
+            buffer.clear()
+            buffer.order(ByteOrder.BIG_ENDIAN)
+            buffer.putShort(typeIdInt.toShort()) // 2
+            buffer.put(stage) // 1
+            buffer.put(currentMyIV) // 16
 
-        for (i in 0 until num) {
-            buffer.flip()
-            writeRawDatagram(buffer, target)
+            for (i in 0 until num) {
+                buffer.flip()
+                writeRawDatagram(buffer, target)
+            }
         }
     }
 
@@ -444,6 +464,7 @@ class NATPeerToPeer(
                                     sendKeepAlivePacket(addr, isReply = true)
                                 } else {
                                     keepAlivePacketContinuation?.resume(Unit)
+                                    keepAlivePacketContinuation = null
                                 }
                             }
 

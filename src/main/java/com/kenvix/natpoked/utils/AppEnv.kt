@@ -11,7 +11,7 @@ import kotlin.time.toDuration
 object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PeerKeepAliveInterval: Long by envOf(10_000L)
     val PeerKeepAliveTimeout: Long by envOf(3500)
-    val PeerKeepAliveMaxFailsNum: Int by envOf(5)
+    val PeerKeepAliveMaxFailsNum: Int by envOf(20)
 
     @Description("是否启用调试模式，生产环境务必为 false")
     val DebugMode: Boolean by envOf(false)
