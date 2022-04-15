@@ -1,11 +1,15 @@
 package com.kenvix.natpoked.test
 
+import com.kenvix.natpoked.utils.network.aWrite
+import com.kenvix.natpoked.utils.network.makeNonBlocking
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 
 fun main() {
-    val datagramChannel = DatagramChannel.open()
+    val datagramChannel = DatagramChannel.open().makeNonBlocking()
     datagramChannel.connect(InetSocketAddress("127.0.0.1", 57002))
     val packet = ByteBuffer.allocate(20)
     packet.put(0x40)
@@ -16,10 +20,12 @@ fun main() {
         packet.put(0x00)
     }
 
-    while (true) {
-        print("w")
-        packet.flip()
-        datagramChannel.write(packet)
-        Thread.sleep(1000)
+    runBlocking {
+        while (true) {
+            print("w")
+            packet.flip()
+            datagramChannel.aWrite(packet)
+            delay(1000)
+        }
     }
 }

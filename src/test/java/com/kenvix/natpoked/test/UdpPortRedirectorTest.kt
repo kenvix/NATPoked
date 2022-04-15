@@ -59,7 +59,7 @@ class UdpPortRedirectorTest {
         val port1 = 5000
         val port2 = 5001
         // portRedirector.bindUdp(natClient, addr1, port1, addr2, port2)
-        natPeerToPeer.connectTo(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 4001))
+        runBlocking {  natPeerToPeer.connectTo(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 4001)) }
         portRedirector.bindUdp(natPeerToPeer, InetSocketAddress(addr2, port2), InetSocketAddress(addr1, port1))
 
         runBlocking {
