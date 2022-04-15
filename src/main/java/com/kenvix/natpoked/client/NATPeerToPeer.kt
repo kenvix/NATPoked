@@ -24,7 +24,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
 import java.util.*
+import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 /**
  * NATPoked Peer
@@ -43,6 +46,7 @@ class NATPeerToPeer(
     private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
+    private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size)
     private var useSocketConnect: Boolean = false
 
     private var pingReceiverChannel: Channel<DatagramPacket>? = null
@@ -51,7 +55,7 @@ class NATPeerToPeer(
 
     //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
-    val sendLock: Mutex = Mutex()
+    private val sendLock: Mutex = Mutex()
 //    val receiveLock: Mutex = Mutex()
 
     private val controlMessageARQ: KCPARQProvider by lazy {
@@ -67,7 +71,7 @@ class NATPeerToPeer(
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
     }
 
-    val udpChannel: DatagramChannel =
+    private val udpChannel: DatagramChannel =
         DatagramChannel.open().apply {
             setOption(StandardSocketOptions.SO_REUSEADDR, true)
             setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.PeerSendBufferSize)
@@ -75,11 +79,11 @@ class NATPeerToPeer(
             configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
         }
 
-    val udpSocket: DatagramSocket = udpChannel.socket()!!.apply {
+    private val udpSocket: DatagramSocket = udpChannel.socket()!!.apply {
         listenUdpSourcePort(config.pokedPort)
     }
 
-    val receiveJob: Job = launch(Dispatchers.IO) {
+    private val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
             try {
                 val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
@@ -91,6 +95,62 @@ class NATPeerToPeer(
                 logger.error("Unable to handle incoming packet!!!", e)
             }
         }
+    }
+
+    private var keepAliveJob: Job? = null
+    @Volatile var keepAlivePacketContinuation: Continuation<Unit>? = null
+
+    private fun startKeepAliveJob(target: InetSocketAddress) {
+        if (keepAliveJob == null) {
+            if (!isConnected)
+                throw IllegalStateException("Peer is not connected yet")
+
+            logger.info("Starting keep alive job")
+            keepAliveJob = launch(Dispatchers.IO) {
+                while (isActive && isConnected) {
+                    try {
+                        delay(AppEnv.PeerKeepAliveInterval)
+                        for (i in 0 until AppEnv.PeerKeepAliveMaxFailsNum) {
+                            try {
+                                withTimeout(AppEnv.PeerKeepAliveTimeout) {
+                                    sendKeepAlivePacket(target)
+                                }
+                            } catch (e: Exception) {
+                                logger.info("Keep alive response packet not received on time", e)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        logger.warn("Unable to send keep alive packet!!!", e)
+                    }
+                }
+            }
+        } else {
+            logger.warn("Keep alive job already started")
+        }
+    }
+
+    private suspend fun sendKeepAlivePacket(target: InetSocketAddress, isReply: Boolean = false) {
+        val typeIdInt = TYPE_DATA_CONTROL_KEEPALIVE.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
+        val buffer = keepAliveBuffer
+        buffer.order(ByteOrder.BIG_ENDIAN)
+        buffer.putUnsignedShort(typeIdInt) // 2
+        buffer.put(if (isReply) 1 else 0) // 1
+        buffer.put(currentMyIV) // 16
+
+        buffer.flip()
+        writeRawDatagram(buffer, target)
+        if (isReply) {
+            logger.trace("Sent keep alive packet REPLY to $target")
+        } else {
+            logger.trace("Sent keep alive packet REQUEST to $target")
+            suspendCoroutine<Unit> { keepAlivePacketContinuation = it }
+            logger.trace("Received keep alive response packet")
+        }
+    }
+
+    private fun stopKeepAliveJob() {
+        keepAliveJob?.cancel("Stop keep alive job")
+        keepAliveJob = null
     }
 
 //    val controlMessageJob: Job = launch(Dispatchers.IO) {
@@ -169,7 +229,7 @@ class NATPeerToPeer(
      */
     suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 12) {
         val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
-        val buffer = ByteBuffer.allocate(2 + 1 + currentMyIV.size)
+        val buffer = keepAliveBuffer
         buffer.order(ByteOrder.BIG_ENDIAN)
         buffer.putUnsignedShort(typeIdInt) // 2
         buffer.put(stage) // 1
@@ -377,6 +437,16 @@ class NATPeerToPeer(
                                 }
                             }
 
+                            TYPE_DATA_CONTROL_KEEPALIVE.typeId -> {
+                                val subType = decryptedBuf.readByte()
+                                if (subType == 0.toByte()) {
+                                    logger.trace("Received peer keepalive REQUEST packet from $addr, size $size, replying ...")
+                                    sendKeepAlivePacket(addr, isReply = true)
+                                } else {
+                                    keepAlivePacketContinuation?.resume(Unit)
+                                }
+                            }
+
                             else -> {
                                 TODO()
                             }
@@ -511,6 +581,8 @@ class NATPeerToPeer(
                 udpChannel.disconnect()
             }
         }
+
+        stopKeepAliveJob()
     }
 
     suspend fun setSocketConnectTo(target: InetSocketAddress) {
@@ -531,6 +603,7 @@ class NATPeerToPeer(
             }
 
             isConnected = true
+            startKeepAliveJob(target)
         } catch (e: Throwable) {
             isConnected = false
             throw e
