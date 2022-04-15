@@ -42,6 +42,9 @@ class NATPeerToPeer(
     private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
+    private var useSocketConnect: Boolean = false
+
+    @Volatile private var isConnected: Boolean = false
 
     //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
@@ -75,12 +78,15 @@ class NATPeerToPeer(
 
     val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
-            val buf: ByteArray =
-                ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
-            val packet = DatagramPacket(buf, 1500)
-            udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
-            logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
-            dispatchIncomingPacket(packet)
+            try {
+                val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
+                val packet = DatagramPacket(buf, 1500)
+                udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
+                logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
+                dispatchIncomingPacket(packet)
+            } catch (e: Exception) {
+                logger.error("Unable to handle incoming packet!!!", e)
+            }
         }
     }
 
@@ -280,7 +286,12 @@ class NATPeerToPeer(
         val mainTypeClass: Short = PeerCommunicationType.getTypeMainClass(typeIdInt)
 
         if (PeerCommunicationType.hasIV(typeIdInt)) {
-            inBuf.readBytes(currentMyIV, 0, ivSize)
+            if (inBuf.readableBytes() < ivSize) {
+                logger.warn("Incoming packet has IV but is too small to contain IV.")
+                return
+            }
+
+            inBuf.readBytes(currentTargetIV, 0, ivSize)
         }
 
         val decryptedBuf = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
@@ -343,9 +354,8 @@ class NATPeerToPeer(
                                     connectJob?.cancel("Connection to peer is established")
 
                                 val stage = decryptedBuf.readByte()
-                                decryptedBuf.readBytes(currentTargetIV, 0, ivSize)
 
-                                if (!udpChannel.isConnected) {
+                                if (!isConnected || !udpChannel.isConnected) {
                                     connectTo(addr)
                                     if (stage == 0.toByte()) {
                                         sendHelloPacket(addr, stage = 1, num = 20)
@@ -485,12 +495,22 @@ class NATPeerToPeer(
         }
     }
 
-    fun connectTo(target: InetSocketAddress) {
-        if (udpChannel.isConnected)
-            udpChannel.disconnect()
+    suspend fun connectTo(target: InetSocketAddress) {
+        isConnected = true
+        if (useSocketConnect) {
+            withContext(Dispatchers.IO) {
+                sendLock.withLock {
+                    if (udpChannel.isConnected)
+                        udpChannel.disconnect()
 
-        udpChannel.connect(target)
-        logger.debug("connectTo: connected to $target")
+                    udpChannel.connect(target)
+                }
+            }
+
+            logger.debug("connectTo: connected to $target")
+        } else {
+            logger.trace("connectTo: requested to connect $target but no need to do it")
+        }
     }
 
     override fun toString(): String {

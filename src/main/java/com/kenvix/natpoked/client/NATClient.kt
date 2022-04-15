@@ -11,6 +11,7 @@ import com.kenvix.web.utils.Getable
 import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
+import io.ktor.network.sockets.*
 import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.serialization.decodeFromString
@@ -118,6 +119,12 @@ object NATClient : CoroutineScope, AutoCloseable {
         }
 
         logger.trace(registerPeerToBroker().toString())
+
+        val testPingServerJob = async(Dispatchers.IO) {
+            val r = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost))
+            logger.debug("Ping server test passed: $r")
+        }
+
         brokerClient.connect()
 
         if (AppEnv.PeerReportToBrokerDelay >= 0) {
@@ -128,6 +135,8 @@ object NATClient : CoroutineScope, AutoCloseable {
                 }
             }
         }
+
+        testPingServerJob.await()
 
         if (AppEnv.AutoConnectToPeerId >= 0) {
             logger.info("Connection request from environment file: CONN --> ${AppEnv.AutoConnectToPeerId}")
