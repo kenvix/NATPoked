@@ -101,4 +101,8 @@ class SocketAddrEchoClient(
             addr, port, time
         )
     }
+
+    fun onPacketIncoming(packet: DatagramPacket): Boolean {
+        return false
+    }
 }

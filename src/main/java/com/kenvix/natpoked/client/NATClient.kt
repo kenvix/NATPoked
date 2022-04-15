@@ -77,6 +77,10 @@ object NATClient : CoroutineScope, AutoCloseable {
         )
     }
 
+    fun checkEchoPacketIncoming() {
+        TODO()
+    }
+
     private fun parseUrl(it: String): UrlParseResult {
         val url = URL(it)
         val port = url.port.run {
