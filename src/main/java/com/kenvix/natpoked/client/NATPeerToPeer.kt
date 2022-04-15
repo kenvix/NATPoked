@@ -365,8 +365,8 @@ class NATPeerToPeer(
 
                                 val stage = decryptedBuf.readByte()
 
-                                if (!isConnected || !udpChannel.isConnected) {
-                                    connectTo(addr)
+                                if (!isConnected) {
+                                    setSocketConnectTo(addr)
                                     if (stage == 0.toByte()) {
                                         sendHelloPacket(addr, stage = 1, num = 20)
                                     }
@@ -505,21 +505,35 @@ class NATPeerToPeer(
         }
     }
 
-    suspend fun connectTo(target: InetSocketAddress) {
-        isConnected = true
-        if (useSocketConnect) {
+    suspend fun setSocketDisconnect() {
+        if (udpChannel.isConnected) {
             withContext(Dispatchers.IO) {
-                sendLock.withLock {
-                    if (udpChannel.isConnected)
-                        udpChannel.disconnect()
+                udpChannel.disconnect()
+            }
+        }
+    }
 
-                    udpChannel.connect(target)
+    suspend fun setSocketConnectTo(target: InetSocketAddress) {
+        try {
+            if (useSocketConnect) {
+                withContext(Dispatchers.IO) {
+                    sendLock.withLock {
+                        if (udpChannel.isConnected)
+                            udpChannel.disconnect()
+
+                        udpChannel.connect(target)
+                    }
                 }
+
+                logger.debug("connectTo: connected to $target")
+            } else {
+                logger.trace("connectTo: requested to connect $target but no need to do it")
             }
 
-            logger.debug("connectTo: connected to $target")
-        } else {
-            logger.trace("connectTo: requested to connect $target but no need to do it")
+            isConnected = true
+        } catch (e: Throwable) {
+            isConnected = false
+            throw e
         }
     }
 
