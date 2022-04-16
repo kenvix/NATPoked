@@ -35,3 +35,15 @@ git submodule update --init --recursive
 chmod +x ./DockerBuild.sh
 ./DockerBuild.sh
 ```
+
+# Technical information
+
+## Packet format
+
+### Port redirector (Encrypted)
+
++------------+--------------------------+------------------+---------------+------------+
+| Type code  | Service name (hashcode)  | Destination port | Source port   | Unused     |
++------------+--------------------------+------------------+---------------+------------+
+| 2 bytes    | 4 bytes                  | 2 bytes          | 2 bytes       | 6 bytes    |
++------------+--------------------------+------------------+---------------+------------+

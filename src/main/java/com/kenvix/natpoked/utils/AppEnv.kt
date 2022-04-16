@@ -118,7 +118,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val KcpRcvWnd: Int by envOf(2048)
 
     @Description("KCP协议配置：最大传输单元MTU")
-    val KcpMtu: Int by envOf(1300)
+    val KcpMtu: Int by envOf(1322)
+    val KcpMode: String by envOf("normal")
 
     @Description("KCP协议配置：最小RTO")
     val KcpMinRto: Int by envOf(100)
