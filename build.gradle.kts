@@ -39,7 +39,7 @@ repositories {
 
 dependencies {
     implementation(fileTree("libs"))
-    implementation(kotlin("stdlib"))
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.6.20")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
     /* Protobuf & GRPC */
@@ -53,7 +53,7 @@ dependencies {
 //    implementation("io.grpc:grpc-netty:$grpcVersion")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.2")
 
     /* Logback */
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
@@ -99,7 +99,7 @@ dependencies {
 
     /* Apache commons */
     implementation("org.apache.commons:commons-lang3:3.12.0")
-    implementation(group = "commons-cli", name = "commons-cli", version = "1.4")
+    implementation(group = "commons-cli", name = "commons-cli", version = "1.5.0")
     implementation("commons-io:commons-io:2.11.0")
     implementation("org.apache.commons:commons-text:1.9")
 
@@ -119,7 +119,7 @@ dependencies {
     implementation("org.apache.commons:commons-math3:3.6.1")
 
     // https://mvnrepository.com/artifact/io.netty/netty-buffer
-    implementation("io.netty:netty-buffer:4.1.73.Final")
+    implementation("io.netty:netty-buffer:4.1.75.Final")
 
     // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
     implementation("org.apache.commons:commons-lang3:3.12.0")

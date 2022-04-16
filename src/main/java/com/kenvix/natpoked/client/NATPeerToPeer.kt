@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import okhttp3.internal.notify
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
@@ -197,7 +198,7 @@ class NATPeerToPeer(
         if (udpChannel.localAddress == null || udpChannel.localAddress.port == 0) {
             listenUdpSourcePort(sourcePort)
         }
-
+        
         if (NATClient.lastSelfClientInfo.clientNatType == NATType.PUBLIC) {
             sourcePort
         } else if (NATClient.lastSelfClientInfo.isUpnpSupported) {
