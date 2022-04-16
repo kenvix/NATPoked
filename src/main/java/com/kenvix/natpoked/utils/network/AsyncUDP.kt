@@ -3,12 +3,15 @@ package com.kenvix.natpoked.utils.network
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.lang.ref.WeakReference
+import java.net.DatagramPacket
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
-import java.util.concurrent.ConcurrentHashMap
+import java.util.*
+import kotlin.collections.ArrayDeque
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -20,7 +23,8 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     )
 
     private val updateEventLock = Mutex()
-    private val channels: MutableMap<DatagramChannel, SuspendedEvent> = ConcurrentHashMap()
+    // Use weak reference to avoid memory leak
+    private val channels: MutableMap<DatagramChannel, SuspendedEvent> = WeakHashMap()
     private val selector = Selector.open()
     private val selectorExec = launch(Dispatchers.IO) {
         while (true) {
@@ -31,7 +35,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
             val it = keys.iterator()
 
             while (it.hasNext()) {
-                val key = it.next()
+                val key: SelectionKey = it.next()
                 it.remove()
 
                 if (key.isValid) {
@@ -55,21 +59,21 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
     suspend fun addReadNotifyJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
         updateEventLock.withLock {
-            channels.getOrPut(channel) { SuspendedEvent() }.readable.add(job)
             channel.register(selector, SelectionKey.OP_READ)
+            channels.getOrPut(channel) { SuspendedEvent() }.readable.add(job)
         }
 
         selector.wakeup()
     }
 
     fun addReadNotifyJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-         launch { addReadNotifyJob(channel, job) }
+        launch { addReadNotifyJob(channel, job) }
     }
 
     suspend fun addWriteNotifyJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
         updateEventLock.withLock {
-            channels.getOrPut(channel) { SuspendedEvent() }.writable.add(job)
             channel.register(selector, SelectionKey.OP_WRITE)
+            channels.getOrPut(channel) { SuspendedEvent() }.writable.add(job)
         }
 
         selector.wakeup()
@@ -77,6 +81,26 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
     fun addWriteNotifyJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
         launch { addWriteNotifyJob(channel, job) }
+    }
+
+    suspend fun unregisterChannelReadJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
+        updateEventLock.withLock {
+            channels[channel]?.readable?.remove(job)
+        }
+    }
+
+    fun unregisterChannelReadJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
+        launch { unregisterChannelReadJob(channel, job) }
+    }
+
+    suspend fun unregisterChannelWriteJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
+        updateEventLock.withLock {
+            channels[channel]?.writable?.remove(job)
+        }
+    }
+
+    fun unregisterChannelWriteJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
+        launch { unregisterChannelWriteJob(channel, job) }
     }
 }
 
@@ -86,53 +110,85 @@ fun DatagramChannel.makeNonBlocking(): DatagramChannel {
 }
 
 suspend fun DatagramChannel.awaitRead() {
-    suspendCoroutine<DatagramChannel> { job ->
-        UDPSelector.addReadNotifyJobAsync(this, job)
+    var cont: Continuation<DatagramChannel>? = null
+    try {
+        suspendCancellableCoroutine<DatagramChannel> { job ->
+            cont = job
+            UDPSelector.addReadNotifyJobAsync(this, job)
+        }
+    } catch (e: CancellationException) {
+        if (cont != null) {
+            UDPSelector.unregisterChannelReadJob(this, cont!!)
+        }
+
+        throw e
     }
 }
 
 suspend fun DatagramChannel.awaitWrite() {
-    suspendCoroutine<DatagramChannel> { job ->
-        UDPSelector.addWriteNotifyJobAsync(this, job)
+    var cont: Continuation<DatagramChannel>? = null
+    try {
+        suspendCancellableCoroutine<DatagramChannel> { job ->
+            cont = job
+            UDPSelector.addWriteNotifyJobAsync(this, job)
+        }
+    } catch (e: CancellationException) {
+        if (cont != null) {
+            UDPSelector.unregisterChannelWriteJobAsync(this, cont!!)
+        }
+
+        throw e
     }
 }
 
 suspend fun DatagramChannel.aRead(dst: ByteBuffer) = withContext(Dispatchers.IO) {
     awaitRead()
-    read(dst)
+    runInterruptible { read(dst) }
 }
 
 suspend fun DatagramChannel.aRead(dsts: Array<ByteBuffer>) = withContext(Dispatchers.IO) {
     awaitRead()
-    read(dsts)
+    runInterruptible { read(dsts) }
 }
 
 suspend fun DatagramChannel.aRead(dsts: Array<ByteBuffer>, offset: Int, length: Int) = withContext(Dispatchers.IO) {
     awaitRead()
-    read(dsts, offset, length)
+    runInterruptible { read(dsts, offset, length) }
 }
 
 suspend fun DatagramChannel.aWrite(src: ByteBuffer) = withContext(Dispatchers.IO) {
     awaitWrite()
-    write(src)
+    runInterruptible { write(src) }
 }
 
 suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>) = withContext(Dispatchers.IO) {
     awaitWrite()
-    write(srcs)
+    runInterruptible { write(srcs) }
 }
 
 suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>, offset: Int, length: Int) = withContext(Dispatchers.IO) {
     awaitWrite()
-    write(srcs, offset, length)
+    runInterruptible { write(srcs, offset, length) }
 }
 
 suspend fun DatagramChannel.aReceive(dst: ByteBuffer) = withContext(Dispatchers.IO) {
     awaitRead()
-    receive(dst)
+    runInterruptible { receive(dst) }
+}
+
+suspend fun DatagramChannel.aReceive(packet: DatagramPacket): Unit = withContext(Dispatchers.IO) {
+    val buf = ByteBuffer.wrap(packet.data, packet.offset, packet.length)
+    val addr = aReceive(buf) as InetSocketAddress
+    packet.address = addr.address
+    packet.port = addr.port
 }
 
 suspend fun DatagramChannel.aSend(src: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
     awaitWrite()
-    send(src, target)
+    runInterruptible { send(src, target) }
+}
+
+suspend fun DatagramChannel.aSend(packet: DatagramPacket): Unit = withContext(Dispatchers.IO) {
+    val buf = ByteBuffer.wrap(packet.data, packet.offset, packet.length)
+    aSend(buf, InetSocketAddress(packet.address, packet.port))
 }

@@ -20,6 +20,7 @@ import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.DatagramChannel
 
 class SocketAddrEchoClient(
     var timeout: Int = 700,
@@ -41,7 +42,6 @@ class SocketAddrEchoClient(
         val incomingData = ByteArray(32)
 
         try {
-
             for (i in 0 until maxTires) {
                 try {
                     val outgoingPacket = DatagramPacket(outgoingData, 0, 4, addr)

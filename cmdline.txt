@@ -1,1 +1,8 @@
--Djava.lang.Integer.IntegerCache.high=65535 -Djava.net.useSystemProxies=true -Djava.net.preferIPv4Stack=true -Dkenvix.natpoked.fastboot=true
+-server
+-Dfile.encoding=UTF-8
+-Djava.lang.Integer.IntegerCache.high=65535
+-Dkenvix.natpoked.debug=false
+-Dkotlinx.coroutines.debug=off
+-XX:+IgnoreUnrecognizedVMOptions
+-XX:+OmitStackTraceInFastThrow
+-XX:-HeapDumpOnOutOfMemoryError
