@@ -118,7 +118,9 @@ suspend fun DatagramChannel.awaitRead() {
         }
     } catch (e: CancellationException) {
         if (cont != null) {
-            UDPSelector.unregisterChannelReadJob(this, cont!!)
+            runBlocking {
+                UDPSelector.unregisterChannelReadJob(this@awaitRead, cont!!)
+            }
         }
 
         throw e
@@ -134,7 +136,9 @@ suspend fun DatagramChannel.awaitWrite() {
         }
     } catch (e: CancellationException) {
         if (cont != null) {
-            UDPSelector.unregisterChannelWriteJobAsync(this, cont!!)
+            runBlocking {
+                UDPSelector.unregisterChannelWriteJob(this@awaitWrite, cont!!)
+            }
         }
 
         throw e
