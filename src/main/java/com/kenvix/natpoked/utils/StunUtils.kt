@@ -1,18 +1,15 @@
 package com.kenvix.natpoked.utils
 
 import com.kenvix.natpoked.contacts.NATType
-import de.javawi.jstun.attribute.*
-import de.javawi.jstun.header.MessageHeader
-import de.javawi.jstun.header.MessageHeaderInterface
-import de.javawi.jstun.header.MessageHeaderParsingException
 import de.javawi.jstun.test.DiscoveryInfo
 import de.javawi.jstun.test.DiscoveryTest
-import de.javawi.jstun.util.UtilityException
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.withTimeout
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.net.*
 import java.time.Duration
 import java.time.temporal.ChronoUnit

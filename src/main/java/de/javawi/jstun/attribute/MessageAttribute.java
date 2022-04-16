@@ -11,11 +11,10 @@
 
 package de.javawi.jstun.attribute;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import de.javawi.jstun.util.Utility;
 import de.javawi.jstun.util.UtilityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class MessageAttribute implements MessageAttributeInterface {

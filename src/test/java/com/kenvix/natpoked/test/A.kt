@@ -1,6 +1,7 @@
 package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.*
+import com.kenvix.web.utils.defaultRpcProtocol
 import com.kenvix.web.utils.readerIndexInArrayOffset
 import io.netty.buffer.Unpooled
 import kotlinx.coroutines.channels.Channel

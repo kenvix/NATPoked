@@ -3,11 +3,9 @@ package com.kenvix.web.server
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.web.utils.ConsoleCommands
 import com.kenvix.web.utils.stringPrintStream
-import io.ktor.application.Application
-import io.ktor.application.ApplicationCallPipeline
-import io.ktor.application.ApplicationFeature
-import io.ktor.util.AttributeKey
-import io.ktor.util.pipeline.PipelinePhase
+import io.ktor.application.*
+import io.ktor.util.*
+import io.ktor.util.pipeline.*
 import kotlinx.coroutines.*
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap

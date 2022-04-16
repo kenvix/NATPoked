@@ -6,9 +6,9 @@
 
 package com.kenvix.web.utils
 
-import io.ktor.application.ApplicationCall
+import io.ktor.application.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.PipelineContext
+import io.ktor.util.pipeline.*
 
 sealed class BaseMiddleware<T: Any> {
     val attributeKey: AttributeKey<T> = AttributeKey(this.javaClass.name)

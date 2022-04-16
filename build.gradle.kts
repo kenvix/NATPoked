@@ -3,9 +3,9 @@ import java.util.Properties
 import com.google.protobuf.gradle.*
 
 plugins {
-    kotlin("jvm") version "1.6.10"
+    kotlin("jvm") version "1.6.20"
     java
-    kotlin("plugin.serialization") version "1.6.10"
+    kotlin("plugin.serialization") version "1.6.20"
     id("com.google.protobuf") version "0.8.18"
     id("org.graalvm.buildtools.native") version "0.9.9"
     id("com.github.johnrengelman.shadow") version "6.1.0"
@@ -57,6 +57,7 @@ dependencies {
 
     /* Logback */
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
+
 
     // https://mvnrepository.com/artifact/org.jetbrains.kotlinx/kotlinx-serialization-json
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")

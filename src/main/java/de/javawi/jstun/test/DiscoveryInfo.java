@@ -12,7 +12,9 @@
 package de.javawi.jstun.test;
 
 import java.io.Serializable;
-import java.net.*;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 
 public class DiscoveryInfo implements Serializable {
 	private InetAddress testIP;

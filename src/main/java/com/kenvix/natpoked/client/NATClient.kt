@@ -2,7 +2,6 @@ package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
-import com.kenvix.natpoked.server.WebServerBasicRoutes
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase64String
@@ -11,8 +10,6 @@ import com.kenvix.web.utils.Getable
 import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.default
 import com.kenvix.web.utils.noException
-import io.ktor.network.sockets.*
-import io.ktor.util.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.decodeFromString
@@ -25,7 +22,6 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
-import kotlin.jvm.Throws
 import kotlin.random.Random
 
 object NATClient : CoroutineScope, AutoCloseable {

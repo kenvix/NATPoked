@@ -12,7 +12,6 @@ import com.kenvix.utils.lang.toUnit
 import com.kenvix.web.server.KtorModule
 import com.kenvix.web.utils.*
 import io.ktor.application.*
-import io.ktor.client.utils.EmptyContent.status
 import io.ktor.features.*
 import io.ktor.http.*
 import io.ktor.http.cio.websocket.*
@@ -26,7 +25,6 @@ import io.ktor.websocket.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
-import java.util.Collections
 import kotlin.time.toJavaDuration
 
 @Suppress("unused", "DuplicatedCode", "UNCHECKED_CAST") // Referenced in application.conf

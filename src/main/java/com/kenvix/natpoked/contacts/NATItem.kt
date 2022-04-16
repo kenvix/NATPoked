@@ -1,7 +1,5 @@
 package com.kenvix.natpoked.contacts
 
-import com.kenvix.natpoked.contacts.PeerCommunicationType.STATUS_ENCRYPTED_CHACHA
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.net.InetAddress
 

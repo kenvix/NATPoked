@@ -1,24 +1,29 @@
 package com.kenvix.natpoked.server
 
 import com.kenvix.natpoked.AppConstants
-import com.kenvix.natpoked.contacts.*
-import com.kenvix.natpoked.server.NATServer.brokerServer
-import com.kenvix.natpoked.server.NATServer.peerConnectionsImpl
-import com.kenvix.natpoked.utils.*
+import com.kenvix.natpoked.contacts.NATClientItem
+import com.kenvix.natpoked.contacts.NATPeerToBrokerConnection
+import com.kenvix.natpoked.contacts.PeerId
+import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.PlatformDetection
+import com.kenvix.natpoked.utils.sha256Of
+import com.kenvix.natpoked.utils.toBase58String
 import com.kenvix.web.server.CachedClasses
 import com.kenvix.web.utils.ProcessUtils
-import io.ktor.application.Application
+import io.ktor.application.*
 import io.ktor.http.cio.websocket.*
-import io.ktor.server.cio.CIO
-import io.ktor.server.engine.embeddedServer
-import kotlinx.coroutines.*
+import io.ktor.server.cio.*
+import io.ktor.server.engine.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.File
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
-import kotlin.math.log
 
 object NATServer : Closeable {
     internal val logger = LoggerFactory.getLogger(javaClass)

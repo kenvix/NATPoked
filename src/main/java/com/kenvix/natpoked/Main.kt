@@ -6,11 +6,10 @@ import com.kenvix.natpoked.server.NATServer
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.ConsoleCommands
 import com.kenvix.web.utils.ExceptionHandler
-import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.error
 import kotlinx.coroutines.*
-import org.slf4j.LoggerFactory
 import org.apache.commons.cli.*
+import org.slf4j.LoggerFactory
 import kotlin.coroutines.CoroutineContext
 import kotlin.system.exitProcess
 

@@ -6,7 +6,7 @@
 
 package com.kenvix.web.server
 
-import io.ktor.application.Application
+import io.ktor.application.*
 
 interface KtorModule {
     fun module(application: Application, testing: Boolean = false)

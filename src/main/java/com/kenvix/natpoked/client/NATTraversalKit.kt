@@ -10,13 +10,13 @@ import com.dosse.upnp.UPnP
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.utils.*
-import io.ktor.util.network.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.net.*
 import java.nio.channels.DatagramChannel
-import kotlin.coroutines.CoroutineContext
-import kotlin.reflect.KVisibility
 
 object NATTraversalKit {
     private val logger = LoggerFactory.getLogger(NATTraversalKit::class.java)

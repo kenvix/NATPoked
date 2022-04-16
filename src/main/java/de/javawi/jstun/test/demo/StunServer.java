@@ -11,36 +11,23 @@
 
 package de.javawi.jstun.test.demo;
 
+import de.javawi.jstun.attribute.*;
+import de.javawi.jstun.attribute.MessageAttributeInterface.MessageAttributeType;
+import de.javawi.jstun.header.MessageHeader;
+import de.javawi.jstun.header.MessageHeaderInterface.MessageHeaderType;
+import de.javawi.jstun.header.MessageHeaderParsingException;
+import de.javawi.jstun.util.Address;
+import de.javawi.jstun.util.UtilityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
+import java.net.*;
 import java.util.Vector;
 import java.util.logging.FileHandler;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import de.javawi.jstun.attribute.ChangeRequest;
-import de.javawi.jstun.attribute.ChangedAddress;
-import de.javawi.jstun.attribute.MappedAddress;
-import de.javawi.jstun.attribute.MessageAttributeException;
-import de.javawi.jstun.attribute.MessageAttributeParsingException;
-import de.javawi.jstun.attribute.ResponseAddress;
-import de.javawi.jstun.attribute.SourceAddress;
-import de.javawi.jstun.attribute.UnknownAttribute;
-import de.javawi.jstun.attribute.UnknownMessageAttributeException;
-import de.javawi.jstun.attribute.MessageAttributeInterface.MessageAttributeType;
-import de.javawi.jstun.header.MessageHeader;
-import de.javawi.jstun.header.MessageHeaderParsingException;
-import de.javawi.jstun.header.MessageHeaderInterface.MessageHeaderType;
-import de.javawi.jstun.util.Address;
-import de.javawi.jstun.util.UtilityException;
 
 /*
  * This class implements a STUN server as described in RFC 3489.

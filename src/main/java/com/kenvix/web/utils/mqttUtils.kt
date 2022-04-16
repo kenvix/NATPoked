@@ -3,7 +3,6 @@ package com.kenvix.web.utils
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.sha256Of
-import com.kenvix.natpoked.utils.toBase58String
 import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.InvalidAuthorizationException
 import okhttp3.internal.toHexString

@@ -7,7 +7,6 @@
 package com.kenvix.natpoked.contacts
 
 import kotlinx.serialization.Serializable
-import kotlin.jvm.Throws
 
 interface IPeerRegistry {
     fun connect()

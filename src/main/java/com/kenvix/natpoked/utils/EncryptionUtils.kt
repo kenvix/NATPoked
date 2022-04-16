@@ -7,7 +7,6 @@ import javax.crypto.KeyGenerator
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import kotlin.jvm.Throws
 
 interface EncryptionUtils {
     fun encrypt(plain: ByteArray, inputOffset: Int = 0, inputLen: Int = plain.size): ByteArray

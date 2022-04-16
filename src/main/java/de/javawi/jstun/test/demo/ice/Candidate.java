@@ -11,12 +11,12 @@
 
 package de.javawi.jstun.test.demo.ice;
 
+import de.javawi.jstun.util.Address;
+import de.javawi.jstun.util.UtilityException;
+
 import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-
-import de.javawi.jstun.util.Address;
-import de.javawi.jstun.util.UtilityException;
 
 public class Candidate implements Comparable {
 	// The ieft-mmusic-ice-12 draft is not non-ambigious about the number of types.

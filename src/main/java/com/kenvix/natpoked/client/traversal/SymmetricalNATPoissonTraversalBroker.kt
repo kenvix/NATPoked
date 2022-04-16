@@ -10,15 +10,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import org.apache.commons.math3.distribution.PoissonDistribution
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import kotlin.math.abs
-import kotlin.math.ln
-import kotlin.math.round
-import kotlin.random.Random
 
 class SymmetricalNATPoissonTraversalBroker {
 

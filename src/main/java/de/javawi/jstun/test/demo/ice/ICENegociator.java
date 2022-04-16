@@ -11,21 +11,6 @@
 
 package de.javawi.jstun.test.demo.ice;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Vector;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import de.javawi.jstun.attribute.MessageAttributeException;
 import de.javawi.jstun.header.MessageHeaderParsingException;
 import de.javawi.jstun.test.DiscoveryInfo;
@@ -33,6 +18,15 @@ import de.javawi.jstun.test.DiscoveryTest;
 import de.javawi.jstun.test.demo.ice.Candidate.CandidateType;
 import de.javawi.jstun.util.Address;
 import de.javawi.jstun.util.UtilityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.*;
 
 public class ICENegociator {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ICENegociator.class);

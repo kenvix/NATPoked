@@ -11,17 +11,13 @@
 
 package de.javawi.jstun.test.demo;
 
+import de.javawi.jstun.test.DiscoveryTest;
+
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.util.Enumeration;
-import java.util.logging.FileHandler;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
-
-import de.javawi.jstun.test.DiscoveryTest;
+import java.util.logging.*;
 
 public class DiscoveryTestDemo implements Runnable {
 	InetAddress iaddress;

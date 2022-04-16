@@ -3,7 +3,6 @@ package com.kenvix.natpoked.server
 import com.kenvix.utils.exception.*
 import com.kenvix.web.utils.JSON
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 
 @Serializable

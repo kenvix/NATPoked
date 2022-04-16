@@ -2,7 +2,6 @@
 package com.kenvix.natpoked.utils
 
 import okhttp3.OkHttpClient
-import java.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 import kotlin.time.toJavaDuration

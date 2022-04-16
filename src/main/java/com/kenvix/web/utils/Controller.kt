@@ -6,7 +6,7 @@
 
 package com.kenvix.web.utils
 
-import io.ktor.routing.Route
+import io.ktor.routing.*
 
 interface Controller {
     fun route(route: Route)
