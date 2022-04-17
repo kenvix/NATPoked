@@ -3,9 +3,11 @@ package com.kenvix.web.utils
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.utils.PlatformDetection
 import kotlinx.coroutines.*
+import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.File
+import java.nio.charset.Charset
 import kotlin.io.path.exists
 
 object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO) {
@@ -69,16 +71,10 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         return processes[name]?.process
     }
 
-    fun runProcess(
-        key: String,
+    fun buildProcess(
         builder: ProcessBuilder,
         redirectDir: Boolean = false,
-        keepAlive: Boolean = false,
-        onProcessDiedHandler: ((Process) -> Unit)? = null,
-    ): Process {
-        if (processes[key] != null && processes[key]!!.process.isAlive)
-            throw IllegalStateException("Process $key is already running, cannot run again")
-
+    ) {
         builder.environment().let { env ->
             env["PATH"]?.let {
                 if (platform.os == PlatformDetection.OS_WINDOWS) {
@@ -104,6 +100,19 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         if (extraPathFile.resolve(builder.command()[0]).exists()) {
             builder.command()[0] = extraPathFile.resolve(builder.command()[0]).toString()
         }
+    }
+
+    fun runProcess(
+        key: String,
+        builder: ProcessBuilder,
+        redirectDir: Boolean = false,
+        keepAlive: Boolean = false,
+        onProcessDiedHandler: ((Process) -> Unit)? = null,
+    ): Process {
+        if (processes[key] != null && processes[key]!!.process.isAlive)
+            throw IllegalStateException("Process $key is already running, cannot run again")
+
+        buildProcess(builder, redirectDir)
 
         val process = builder.start()
         processes[key] = ProcessInfo(process, onProcessDiedHandler)
@@ -142,6 +151,11 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         }
 
         return process
+    }
+
+    fun execAndReadProcessOutput(builder: ProcessBuilder, charset: Charset = Charsets.UTF_8): String {
+        val proc = builder.start()
+        return IOUtils.toString(proc.inputStream, charset)
     }
 
     fun stopProcess(key: String) {

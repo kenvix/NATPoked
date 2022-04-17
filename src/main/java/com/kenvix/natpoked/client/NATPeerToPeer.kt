@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
 import com.kenvix.natpoked.client.redirector.ServiceRedirector
@@ -19,6 +20,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
+import okhttp3.internal.toHexString
+import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
@@ -30,6 +33,7 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import kotlin.io.path.exists
 
 /**
  * NATPoked Peer
@@ -89,6 +93,7 @@ class NATPeerToPeer(
 
     companion object {
         private const val ivSize = 16
+        val wireGuardConfigDirPath = AppConstants.workingPath.resolve("Config").resolve("WireGuard")
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
     }
 
@@ -631,6 +636,23 @@ class NATPeerToPeer(
         }
 
         stopKeepAliveJob()
+    }
+
+    private suspend fun setupWireGuard(role: ClientServerRole) = withContext(Dispatchers.IO) {
+        if (!wireGuardConfigDirPath.exists())
+            wireGuardConfigDirPath.toFile().mkdirs()
+
+        val wireGuardConfigFilePath = wireGuardConfigDirPath
+            .resolve("${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${role.toString().lowercase()}.conf")
+        val wireGuardConfigFile = wireGuardConfigFilePath.toFile()
+        if (!wireGuardConfigFile.exists()) {
+            val templateFileName = if (role == ClientServerRole.CLIENT) "wireguard_client.conf" else "wireguard_server.conf"
+            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("/$templateFileName").assertExist()
+            wireGuardConfigFile.outputStream().use { stream.transferTo(it) }
+        }
+
+        val psk = getKcpTunPreSharedKey().toBase64String()
+
     }
 
     private fun getKcpTunPreSharedKey(): ByteArray {

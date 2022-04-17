@@ -7,6 +7,7 @@
 package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.PlatformDetection
+import com.kenvix.web.utils.ProcessUtils
 import org.junit.jupiter.api.Test
 
 class ExecTest {
@@ -14,5 +15,11 @@ class ExecTest {
     fun testExec() {
         val platformDetection = PlatformDetection.getInstance()
         println("OS: ${platformDetection.os}   Arch: ${platformDetection.arch}")
+    }
+
+    @Test
+    fun testExecWithResult() {
+        val exec = ProcessUtils.execAndReadProcessOutput(ProcessBuilder("nslookup", "qq.com"))
+        println(exec)
     }
 }

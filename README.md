@@ -8,6 +8,8 @@
 
 It can traverse complex NAT networks such as symmetric NAT, and use Poisson sampling and Mean method to quickly predict ports, which may be the most advanced NAT traversal toolkit
 
+It also can be used as a **decentralized** VPN.
+
 ## Install
 
 ### Linux
