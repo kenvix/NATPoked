@@ -19,7 +19,11 @@ class ExecTest {
 
     @Test
     fun testExecWithResult() {
-        val exec = ProcessUtils.execAndReadProcessOutput(ProcessBuilder("nslookup", "qq.com"))
+        val exec = ProcessUtils.execAndReadProcessOutput(
+            ProcessBuilder("wg", "pubkey"),
+            input = "Tlgq/MG44yM3xZBSRreQtvVacS3AoDLdIiWnKlWQMAY=",
+            sendNewLineWhenInputWritten = true, sendTermSignalWhenInputWritten = true
+        )
         println(exec)
     }
 }

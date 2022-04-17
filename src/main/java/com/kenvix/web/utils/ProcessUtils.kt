@@ -153,8 +153,25 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         return process
     }
 
-    fun execAndReadProcessOutput(builder: ProcessBuilder, charset: Charset = Charsets.UTF_8): String {
+    fun execAndReadProcessOutput(
+        builder: ProcessBuilder,
+        charset: Charset = Charsets.UTF_8,
+        input: String? = null,
+        sendNewLineWhenInputWritten: Boolean = false,
+        sendTermSignalWhenInputWritten: Boolean = false
+    ): String {
         val proc = builder.start()
+        if (input != null) {
+            IOUtils.write(input, proc.outputStream, charset)
+            if (sendNewLineWhenInputWritten) {
+                IOUtils.write(System.lineSeparator(), proc.outputStream, charset)
+            }
+            proc.outputStream.flush()
+            if (sendTermSignalWhenInputWritten) {
+                proc.destroy()
+            }
+        }
+
         return IOUtils.toString(proc.inputStream, charset)
     }
 

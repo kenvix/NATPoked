@@ -69,6 +69,8 @@ dependencies {
     // https://mvnrepository.com/artifact/com.google.guava/guava
     implementation("com.google.guava:guava:31.1-jre")
 
+    implementation("org.whispersystems:curve25519-java:0.5.0")
+
 
     /* Ktor server things */
     implementation("io.ktor:ktor-server-cio:$ktorVersion")

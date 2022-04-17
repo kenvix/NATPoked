@@ -273,3 +273,4 @@ class ChaCha20Poly1305(keyBytes: ByteArray, keyOffset: Int = 0): EncryptionUtils
         }
     }
 }
+
