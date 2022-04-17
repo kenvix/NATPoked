@@ -2,6 +2,7 @@ package com.kenvix.natpoked.client.redirector
 
 import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.ServiceName
+import com.kenvix.natpoked.contacts.ClientServerRole
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.AppEnv
@@ -29,14 +30,16 @@ class KcpTunPortRedirector(
         get() = "kcptun_$serviceName"
 
     init {
-        if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
+        if (myPeerPortConfig.role == ClientServerRole.SERVER) {
             channel.connect(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
         } else {
             channel.bind(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
         }
 
+        startRedirector()
+
         val args = ArrayList<String>(32)
-        if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
+        if (myPeerPortConfig.role == ClientServerRole.SERVER) {
             args.add("kcptun_server")
             args.add("--listen")
             args.add("${myPeerPortConfig.srcHost}:${myPeerPortConfig.srcPort}")
@@ -55,7 +58,7 @@ class KcpTunPortRedirector(
         builder.environment()["KCPTUN_KEY"] = preSharedKey
 
         ProcessUtils.runProcess(processKey, builder, keepAlive = true, onProcessDiedHandler = {
-            if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.CLIENT) {
+            if (myPeerPortConfig.role == ClientServerRole.CLIENT) {
                 logger.info("Kcptun client process died, disconnecting socket...")
                 channel.disconnect()
             }
@@ -79,6 +82,6 @@ class KcpTunPortRedirector(
 
     override fun close() {
         ProcessUtils.stopProcess(processKey)
-        receiveAppPacketAndSendJob.cancel()
+        super.close()
     }
 }

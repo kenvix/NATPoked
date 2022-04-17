@@ -24,19 +24,21 @@ import java.util.*
 
 abstract class ServiceRedirector(
     private val peer: NATPeerToPeer,
-    serviceName: ServiceName,
+    private val serviceName: ServiceName,
     private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(
         PeerCommunicationType.TYPE_DATA_DGRAM_SERVICE,
         PeerCommunicationType.TYPE_DATA_DGRAM
     )
 ) : Closeable, CoroutineScope by CoroutineScope(Job() + CoroutineName("ServiceRedirector.$serviceName")) {
-    protected val receiveAppPacketAndSendJob: Job
-    protected val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
-    protected val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
-    protected val sendAppPacketBufferLock = Mutex()
+    protected lateinit var receiveAppPacketAndSendJob: Job
+        private set
+
+    private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
+    private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
+    private val sendAppPacketBufferLock = Mutex()
     protected val channel: DatagramChannel = DatagramChannel.open()
 
-    init {
+    protected fun startRedirector() {
         receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
             while (isActive) {
                 try {
@@ -79,6 +81,11 @@ abstract class ServiceRedirector(
         } else {
             channel.write(buf.nioBuffer())
         }
+    }
+
+    override fun close() {
+        receiveAppPacketAndSendJob.cancel()
+        channel.close()
     }
 
     companion object {

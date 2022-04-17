@@ -3,6 +3,9 @@ package com.kenvix.natpoked.contacts
 import kotlinx.serialization.Serializable
 import java.net.InetAddress
 
+@Serializable
+enum class ClientServerRole { CLIENT, SERVER }
+
 typealias PeerCommunicationTypeId = Short
 enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     STATUS_ENCRYPTED          (0b011_0000_0000_0000), // Any encryptor enabled
