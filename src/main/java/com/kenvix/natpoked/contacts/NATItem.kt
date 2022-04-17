@@ -9,7 +9,6 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     STATUS_ENCRYPTED_AES      (0b001_0000_0000_0000), // AES-256-GCM Enabled
     STATUS_ENCRYPTED_CHACHA   (0b010_0000_0000_0000), // CHACHA20-IETF-POLY1305 Enabled
     STATUS_HAS_IV             (0b100_0000_0000_0000), // Has IV (AES-256-GCM or CHACHA20-IETF-POLY1305)
-    STATUS_ACK_IV             (0b000_0010_0000_0000),
     STATUS_COMPRESSED         (0b000_0001_0000_0000),
 
     INET_TYPE_4               (0b000_0000_0000_0000),
@@ -17,6 +16,8 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
 
     INET_ADDR_REMOTE          (0b000_0000_0000_0000),
     INET_ADDR_LOCALHOST       (0b000_0100_0000_0000),
+
+    INET_AUTO_SERVICE_NAME    (0b000_0010_0000_0000),
 
     TYPE_DATA_DGRAM           (0b000_0000_0001_0000), // 0x0_
     TYPE_DATA_DGRAM_RAW       (0b000_0000_0001_0000),

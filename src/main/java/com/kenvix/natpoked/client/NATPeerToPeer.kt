@@ -1,16 +1,15 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.client.NATClient.portRedirector
+import com.kenvix.natpoked.client.redirector.ServicePortRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
-import com.kenvix.web.utils.JSON
-import com.kenvix.web.utils.getOrFail
-import com.kenvix.web.utils.putUnsignedShort
-import com.kenvix.web.utils.readerIndexInArrayOffset
+import com.kenvix.utils.exception.NotFoundException
+import com.kenvix.web.utils.*
 import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
@@ -58,6 +57,8 @@ class NATPeerToPeer(
     private var pingReceiverChannel: Channel<DatagramPacket>? = null
 
     @Volatile private var isConnected: Boolean = false
+    @Volatile var targetAddr: InetSocketAddress? = null
+        private set
 
     //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
@@ -232,7 +233,7 @@ class NATPeerToPeer(
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
-        udpChannel.write(buffer)
+        udpChannel.send(buffer, targetAddr)
         if (AppEnv.DebugMode && !buffer.isDirect)
             logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
         else
@@ -268,7 +269,7 @@ class NATPeerToPeer(
 
     fun getLocalPort(): Int = udpSocket.localPort
 
-    private fun putTypeFlags(inTypeId: Int, targetAddr: InetAddress, flags: EnumSet<PeerCommunicationType>): Int {
+    internal fun putTypeFlags(inTypeId: Int, targetAddr: InetAddress? = null, flags: EnumSet<PeerCommunicationType>): Int {
         var typeId: Int = inTypeId
         if (STATUS_ENCRYPTED in flags) {
             typeId = typeId or STATUS_ENCRYPTED.typeId.toInt()
@@ -278,12 +279,16 @@ class NATPeerToPeer(
             typeId = typeId or STATUS_COMPRESSED.typeId.toInt()
         }
 
-        if (targetAddr is Inet6Address) {
-            typeId = typeId or INET_TYPE_6.typeId.toInt()
-        }
+        if (targetAddr != null) {
+            if (targetAddr is Inet6Address) {
+                typeId = typeId or INET_TYPE_6.typeId.toInt()
+            }
 
-        if (targetAddr.isStrictLocalHostAddress) {
-            typeId = typeId or INET_ADDR_LOCALHOST.typeId.toInt()
+            if (targetAddr.isStrictLocalHostAddress) {
+                typeId = typeId or INET_ADDR_LOCALHOST.typeId.toInt()
+            }
+        } else {
+            typeId = typeId or INET_AUTO_SERVICE_NAME.typeId.toInt()
         }
 
         if (TYPE_DATA_DGRAM in flags) {
@@ -363,6 +368,7 @@ class NATPeerToPeer(
         return InetSocketAddress(targetAddr, port)
     }
 
+    private val portServicesMap: MutableMap<Int, ServicePortRedirector> = mutableMapOf()
 
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
         val addr: InetSocketAddress = packet.socketAddress as InetSocketAddress
@@ -412,9 +418,10 @@ class NATPeerToPeer(
             try {
                 when (mainTypeClass) {
                     TYPE_DATA_STREAM.typeId -> {
-                        if (size > 3) {
-                            val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-
+                        if (size > 4) {
+                            val serviceNameCode = decryptedBuf.readInt()
+                            val service = portServicesMap[serviceNameCode].assertExist()
+                            launch { service.onReceivedRemotePacket(decryptedBuf) }
                         }
                     }
 
@@ -623,9 +630,11 @@ class NATPeerToPeer(
             }
 
             isConnected = true
+            targetAddr = target
             startKeepAliveJob(target)
         } catch (e: Throwable) {
             isConnected = false
+            targetAddr = null
             throw e
         }
     }
