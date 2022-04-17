@@ -1,14 +1,13 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.client.NATClient.portRedirector
-import com.kenvix.natpoked.client.redirector.ServicePortRedirector
+import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
-import com.kenvix.utils.exception.NotFoundException
 import com.kenvix.web.utils.*
 import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
@@ -19,7 +18,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
-import okhttp3.internal.notify
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
@@ -85,7 +83,7 @@ class NATPeerToPeer(
 //
 //            }
 //        }
-    private val portServicesMap: MutableMap<Int, ServicePortRedirector> = mutableMapOf()
+    private val portServicesMap: MutableMap<Int, KcpTunPortRedirector> = mutableMapOf()
 
     companion object {
         private const val ivSize = 16
@@ -620,9 +618,25 @@ class NATPeerToPeer(
         stopKeepAliveJob()
     }
 
+    fun getKcpTunPreSharedKey(): ByteArray {
+        val psk = ByteArray(targetKey.size)
+        for (i in targetKey.indices) {
+            psk[i] = (targetKey[i].toInt() xor AppEnv.PeerMyPSK[i].toInt()).toByte()
+        }
+
+        return psk
+    }
+
+    private fun startAllPortServices() {
+        config.ports.forEach { (serviceName, portConfig) ->
+            val redirector = KcpTunPortRedirector(this, serviceName, getKcpTunPreSharedKey().toBase64String(), portConfig)
+            portServicesMap[serviceName.serviceNameCode()] = redirector
+        }
+    }
+
     private fun startAllServices() {
         logger.debug("startAllServices")
-
+        startAllPortServices()
     }
 
     suspend fun setSocketConnectTo(target: InetSocketAddress) {

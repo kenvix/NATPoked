@@ -24,7 +24,7 @@ import java.nio.channels.DatagramChannel
 import java.util.*
 import kotlin.collections.ArrayList
 
-class ServicePortRedirector(
+class KcpTunPortRedirector(
     private val peer: NATPeerToPeer,
     private val serviceName: ServiceName,
     private val preSharedKey: String,
@@ -33,7 +33,7 @@ class ServicePortRedirector(
 ): Closeable, CoroutineScope by CoroutineScope(Job() + CoroutineName("KcpTunRedirector.$serviceName")) {
 
     companion object {
-        private val logger = LoggerFactory.getLogger(ServicePortRedirector::class.java)
+        private val logger = LoggerFactory.getLogger(KcpTunPortRedirector::class.java)
     }
 
     private val processKey: String
