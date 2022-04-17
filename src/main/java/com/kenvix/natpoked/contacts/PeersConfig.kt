@@ -58,6 +58,8 @@ data class PeersConfig(
             var dstHost: String = "127.0.0.1",
             var dstPort: Int,
             var role: ClientServerRole,
+            var dscp: Int = -1,
+            var isEncrypted: Boolean = false,
         ) {
             @Serializable
             enum class Protocol { TCP, UDP }

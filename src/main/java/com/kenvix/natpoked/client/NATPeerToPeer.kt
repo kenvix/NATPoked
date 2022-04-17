@@ -2,6 +2,7 @@ package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
+import com.kenvix.natpoked.client.redirector.ServiceRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.server.BrokerMessage
@@ -83,7 +84,7 @@ class NATPeerToPeer(
 //
 //            }
 //        }
-    private val portServicesMap: MutableMap<Int, KcpTunPortRedirector> = mutableMapOf()
+    private val portServicesMap: MutableMap<Int, ServiceRedirector> = mutableMapOf()
     private val portServiceOperationLock = Mutex()
 
     companion object {
@@ -645,10 +646,14 @@ class NATPeerToPeer(
         portServiceOperationLock.withLock {
             config.ports.forEach { (serviceName, portConfig) ->
                 if (serviceName.serviceNameCode() !in portServicesMap) {
-                    logger.info("Starting new port service: $serviceName")
-                    val redirector =
-                        KcpTunPortRedirector(this, serviceName, getKcpTunPreSharedKey().toBase64String(), portConfig)
-                    portServicesMap[serviceName.serviceNameCode()] = redirector
+                    if (portConfig.protocol == PeersConfig.Peer.Port.Protocol.TCP) {
+                        logger.info("Starting new TCP - KcpTunPortRedirector port service: $serviceName")
+                        val redirector =
+                            KcpTunPortRedirector(this, serviceName, getKcpTunPreSharedKey().toBase64String(), portConfig)
+                        portServicesMap[serviceName.serviceNameCode()] = redirector
+                    } else {
+
+                    }
                 }
             }
         }

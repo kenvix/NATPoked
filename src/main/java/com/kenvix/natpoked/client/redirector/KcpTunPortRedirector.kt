@@ -7,6 +7,7 @@ import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.ProcessUtils
+import io.netty.buffer.ByteBuf
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
 import java.util.*
@@ -15,7 +16,7 @@ class KcpTunPortRedirector(
     private val peer: NATPeerToPeer,
     private val serviceName: ServiceName,
     preSharedKey: String,
-    myPeerPortConfig: PeersConfig.Peer.Port,
+    private val myPeerPortConfig: PeersConfig.Peer.Port,
     private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(
         PeerCommunicationType.TYPE_DATA_DGRAM_SERVICE,
         PeerCommunicationType.TYPE_DATA_DGRAM
@@ -40,13 +41,13 @@ class KcpTunPortRedirector(
 
         val args = ArrayList<String>(32)
         if (myPeerPortConfig.role == ClientServerRole.SERVER) {
-            args.add("kcptun_server")
+            args.add("kcptun-server")
             args.add("--listen")
             args.add("${myPeerPortConfig.srcHost}:${myPeerPortConfig.srcPort}")
             args.add("--target")
             args.add("${myPeerPortConfig.dstHost}:${myPeerPortConfig.dstPort}")
         } else {
-            args.add("kcptun_client")
+            args.add("kcptun-client")
             args.add("--localaddr")
             args.add("${myPeerPortConfig.dstHost}:${myPeerPortConfig.dstPort}")
             args.add("--remoteaddr")
@@ -67,7 +68,11 @@ class KcpTunPortRedirector(
 
     private fun appendProtocolArguments(outputList: MutableList<String>) {
         outputList.add("--crypt")
-        outputList.add("aes")
+        if (myPeerPortConfig.isEncrypted) {
+            outputList.add("aes")
+        } else {
+            outputList.add("none")
+        }
         outputList.add("--mtu")
         outputList.add(AppEnv.KcpMtu.toString())
         outputList.add("--mode")
@@ -76,6 +81,10 @@ class KcpTunPortRedirector(
         outputList.add(AppEnv.KcpSndWnd.toString())
         outputList.add("--rcvwnd")
         outputList.add(AppEnv.KcpRcvWnd.toString())
+        if (myPeerPortConfig.dscp >= 0) {
+            outputList.add("--dscp")
+            outputList.add(myPeerPortConfig.dscp.toString())
+        }
         outputList.add("--keepalive")
         outputList.add((maxOf(AppEnv.PeerKeepAliveInterval / 1000, 10)).toString())
     }

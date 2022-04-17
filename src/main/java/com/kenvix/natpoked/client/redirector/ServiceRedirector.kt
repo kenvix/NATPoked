@@ -63,7 +63,7 @@ abstract class ServiceRedirector(
         }
     }
 
-    suspend fun onReceivedRemotePacket(buf: ByteBuf) {
+    open suspend fun onReceivedRemotePacket(buf: ByteBuf) {
         if (!channel.isConnected) {
             logger.warn("Channel is not connected by service app, ignore packet")
             return

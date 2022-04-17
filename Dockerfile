@@ -41,6 +41,7 @@ RUN echo "Begin docker image build ..." \
     openjdk-17-jre-headless \
     mosquitto \
     wireguard \
+    kcptun \
     iproute2 \
     net-tools \
     && echo "Cleaning build cache ..." \
