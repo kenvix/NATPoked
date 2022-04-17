@@ -39,13 +39,19 @@ class KcpTunPortRedirector(
     private val processKey: String
         get() = "kcptun_$serviceName"
 
-    private val channel: DatagramChannel = DatagramChannel.open().makeNonBlocking()
+    private val channel: DatagramChannel = DatagramChannel.open()
     private val receiveAppPacketAndSendJob: Job
     private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     private val sendAppPacketBufferLock = Mutex()
 
     init {
+        if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
+            channel.connect(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
+        } else {
+            channel.bind(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
+        }
+
         val args = ArrayList<String>(32)
         if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
             args.add("kcptun_server")
@@ -66,13 +72,8 @@ class KcpTunPortRedirector(
         builder.environment()["KCPTUN_KEY"] = preSharedKey
 
         ProcessUtils.runProcess(processKey, builder, keepAlive = true)
-        if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
-            channel.connect(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
-        } else {
-            channel.bind(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
-        }
 
-        receiveAppPacketAndSendJob = launch {
+        receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
             while (isActive) {
                 receiveAppPacketBuffer.clear()
                 receiveAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
@@ -81,7 +82,7 @@ class KcpTunPortRedirector(
                 receiveAppPacketBuffer.putUnsignedShort(typeId)
                 receiveAppPacketBuffer.putInt(serviceName.serviceNameCode())
 
-                channel.aReceive(receiveAppPacketBuffer)
+                channel.receive(receiveAppPacketBuffer)
                 receiveAppPacketBuffer.flip()
 
                 peer.writeRawDatagram(receiveAppPacketBuffer)
@@ -101,7 +102,7 @@ class KcpTunPortRedirector(
             buf.readBytes(sendAppPacketBuffer)
 
             sendAppPacketBuffer.flip()
-            channel.aSend(sendAppPacketBuffer, addr)
+            channel.send(sendAppPacketBuffer, addr)
         }
     }
 
@@ -116,8 +117,6 @@ class KcpTunPortRedirector(
         outputList.add(AppEnv.KcpSndWnd.toString())
         outputList.add("--rcvwnd")
         outputList.add(AppEnv.KcpRcvWnd.toString())
-        outputList.add("--autoexpire")
-        outputList.add("0")
         outputList.add("--keepalive")
         outputList.add((maxOf(AppEnv.PeerKeepAliveInterval / 1000, 10)).toString())
     }

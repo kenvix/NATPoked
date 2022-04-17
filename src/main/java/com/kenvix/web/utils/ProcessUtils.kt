@@ -15,6 +15,25 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
     private val extraPathFile: File
     private val logger = LoggerFactory.getLogger(ProcessUtils::class.java)
 
+    data class RunningProcess(
+        val key: String,
+        val pid: Long,
+        val processName: String,
+    )
+
+    // TODO
+    val runningProcessFilePath = "${AppConstants.workingPath}/running_process.json"
+
+    fun saveRunningProcessList() {
+        val list = processes.map { (key, process) ->
+            RunningProcess(
+                key,
+                process.pid(),
+                process.info().arguments().get()[0]
+            )
+        }.toList()
+    }
+
     init {
         Runtime.getRuntime().addShutdownHook(Thread {
             cancel("System exit")
@@ -88,7 +107,7 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         launch(Dispatchers.IO) {
             process.inputStream.bufferedReader().use {
                 while (process.isAlive) {
-                    val line = it.readLine() ?: break
+                    val line = runInterruptible { it.readLine() } ?: break
                     processLoggerStdout.info(line)
                 }
             }
@@ -105,7 +124,7 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         launch(Dispatchers.IO) {
             process.errorStream.bufferedReader().use {
                 while (process.isAlive) {
-                    val line = it.readLine() ?: break
+                    val line = runInterruptible { it.readLine() } ?: break
                     processLoggerStdErr.info(line)
                 }
             }

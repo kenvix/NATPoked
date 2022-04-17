@@ -34,6 +34,8 @@ peers:
         dstHost: 127.0.0.1
         # 目标端口
         dstPort: 443
+        # 角色：作为客户端还是服务端 CLIENT | SERVER
+        role: SERVER
     # WireGuard 配置（可选）
     # 本功能可以让 NATPoked 自动进行简单的 WireGuard 配置，如果需要更高级的 WireGuard 功能，则请使用上面的端口转发功能
     wireGuard:

@@ -84,6 +84,7 @@ class NATPeerToPeer(
 //            }
 //        }
     private val portServicesMap: MutableMap<Int, KcpTunPortRedirector> = mutableMapOf()
+    private val portServiceOperationLock = Mutex()
 
     companion object {
         private const val ivSize = 16
@@ -618,7 +619,7 @@ class NATPeerToPeer(
         stopKeepAliveJob()
     }
 
-    fun getKcpTunPreSharedKey(): ByteArray {
+    private fun getKcpTunPreSharedKey(): ByteArray {
         val psk = ByteArray(targetKey.size)
         for (i in targetKey.indices) {
             psk[i] = (targetKey[i].toInt() xor AppEnv.PeerMyPSK[i].toInt()).toByte()
@@ -627,14 +628,20 @@ class NATPeerToPeer(
         return psk
     }
 
-    private fun startAllPortServices() {
-        config.ports.forEach { (serviceName, portConfig) ->
-            val redirector = KcpTunPortRedirector(this, serviceName, getKcpTunPreSharedKey().toBase64String(), portConfig)
-            portServicesMap[serviceName.serviceNameCode()] = redirector
+    private suspend fun startAllPortServices() {
+        portServiceOperationLock.withLock {
+            config.ports.forEach { (serviceName, portConfig) ->
+                if (serviceName.serviceNameCode() !in portServicesMap) {
+                    logger.info("Starting new port service: $serviceName")
+                    val redirector =
+                        KcpTunPortRedirector(this, serviceName, getKcpTunPreSharedKey().toBase64String(), portConfig)
+                    portServicesMap[serviceName.serviceNameCode()] = redirector
+                }
+            }
         }
     }
 
-    private fun startAllServices() {
+    private suspend fun startAllServices() {
         logger.debug("startAllServices")
         startAllPortServices()
     }
