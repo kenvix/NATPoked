@@ -3,11 +3,9 @@ package com.kenvix.natpoked.utils.network
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.lang.ref.WeakReference
 import java.net.DatagramPacket
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
-import java.nio.channels.AcceptPendingException
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
@@ -15,7 +13,6 @@ import java.util.*
 import kotlin.collections.ArrayDeque
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private data class SuspendedEvent(

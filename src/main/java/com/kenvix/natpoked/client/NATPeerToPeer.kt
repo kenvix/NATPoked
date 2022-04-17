@@ -485,8 +485,12 @@ class NATPeerToPeer(
                                     logger.trace("Received peer keepalive REQUEST packet from $addr, size $size, replying ...")
                                     sendKeepAlivePacket(addr, isReply = true)
                                 } else {
-                                    keepAlivePacketContinuation?.resume(Unit)
-                                    keepAlivePacketContinuation = null
+                                    try {
+                                        keepAlivePacketContinuation?.resume(Unit)
+                                        keepAlivePacketContinuation = null
+                                    } catch (e: Exception) {
+                                        logger.debug("Received peer keepalive REPLY packet from $addr, size $size, but no continuation is already resumed", e)
+                                    }
                                 }
                             }
 
