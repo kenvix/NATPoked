@@ -294,6 +294,11 @@ class NATPeerToPeer(
 
         if (TYPE_DATA_DGRAM in flags) {
             typeId = typeId or TYPE_DATA_DGRAM_RAW.typeId.toInt()
+
+            if (TYPE_DATA_DGRAM_SERVICE in flags)
+                typeId = typeId or TYPE_DATA_DGRAM_SERVICE.typeId.toInt()
+            else if (TYPE_DATA_DGRAM_KCP in flags)
+                typeId = typeId or TYPE_DATA_DGRAM_KCP.typeId.toInt()
         }
 
         if (TYPE_DATA_STREAM in flags) {
@@ -426,11 +431,11 @@ class NATPeerToPeer(
                                 if (size > 4) {
                                     val serviceNameCode = decryptedBuf.readInt()
                                     val service = portServicesMap[serviceNameCode].assertExist()
-                                    launch { service.onReceivedRemotePacket(decryptedBuf) }
+                                    service.onReceivedRemotePacket(decryptedBuf)
                                 }
                             }
 
-                            else -> {
+                            TYPE_DATA_DGRAM_RAW.typeId -> {
                                 if (size > 3) {
                                     val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
                                     if (sockAddr.port != 0) {
@@ -445,6 +450,10 @@ class NATPeerToPeer(
                                         logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
                                     }
                                 }
+                            }
+
+                            else -> {
+                                logger.warn("Received NOT SUPPORTED peer TYPE_DATA_DGRAM packet, size $size: UNKNOWN TYPE")
                             }
                         }
                     }

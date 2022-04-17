@@ -6,9 +6,6 @@ import com.kenvix.natpoked.client.serviceNameCode
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.network.aReceive
-import com.kenvix.natpoked.utils.network.aSend
-import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.ProcessUtils
 import com.kenvix.web.utils.putUnsignedShort
 import io.netty.buffer.ByteBuf
@@ -22,15 +19,17 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
 import java.util.*
-import kotlin.collections.ArrayList
 
 class KcpTunPortRedirector(
     private val peer: NATPeerToPeer,
     private val serviceName: ServiceName,
     private val preSharedKey: String,
     private val myPeerPortConfig: PeersConfig.Peer.Port,
-    private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(PeerCommunicationType.TYPE_DATA_DGRAM_SERVICE, PeerCommunicationType.TYPE_DATA_DGRAM)
-): Closeable, CoroutineScope by CoroutineScope(Job() + CoroutineName("KcpTunRedirector.$serviceName")) {
+    private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(
+        PeerCommunicationType.TYPE_DATA_DGRAM_SERVICE,
+        PeerCommunicationType.TYPE_DATA_DGRAM
+    )
+) : Closeable, CoroutineScope by CoroutineScope(Job() + CoroutineName("KcpTunRedirector.$serviceName")) {
 
     companion object {
         private val logger = LoggerFactory.getLogger(KcpTunPortRedirector::class.java)
@@ -75,34 +74,45 @@ class KcpTunPortRedirector(
 
         receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
             while (isActive) {
-                receiveAppPacketBuffer.clear()
-                receiveAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
-                var typeId: Int = 0
-                typeId = peer.putTypeFlags(typeId, null, flags)
-                receiveAppPacketBuffer.putUnsignedShort(typeId)
-                receiveAppPacketBuffer.putInt(serviceName.serviceNameCode())
+                try {
+                    receiveAppPacketBuffer.clear()
+                    receiveAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
+                    var typeId: Int = 0
+                    typeId = peer.putTypeFlags(typeId, null, flags)
+                    receiveAppPacketBuffer.putUnsignedShort(typeId)
+                    receiveAppPacketBuffer.putInt(serviceName.serviceNameCode())
 
-                channel.receive(receiveAppPacketBuffer)
-                receiveAppPacketBuffer.flip()
+                    val kcpClientAddr = channel.receive(receiveAppPacketBuffer)
+                    if (!channel.isConnected)
+                        channel.connect(kcpClientAddr)
 
-                peer.writeRawDatagram(receiveAppPacketBuffer)
+                    receiveAppPacketBuffer.flip()
+
+                    peer.writeRawDatagram(receiveAppPacketBuffer)
+                } catch (e: Throwable) {
+                    logger.error("Unable to receive app packet!!!", e)
+                }
             }
         }
     }
 
     suspend fun onReceivedRemotePacket(buf: ByteBuf) {
-        sendAppPacketBufferLock.withLock {
-            val addr: InetSocketAddress = peer.targetAddr ?: run {
-                logger.warn("received packet but peer targetAddr is null")
-                return
+        if (!channel.isConnected) {
+            logger.warn("Channel is not connected by KCPTun, ignore packet")
+            return
+        }
+
+        if (buf.hasArray()) {
+            sendAppPacketBufferLock.withLock {
+                sendAppPacketBuffer.clear()
+                sendAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
+                sendAppPacketBuffer.put(buf.array(), buf.arrayOffset() + buf.readerIndex(), buf.readableBytes())
+
+                sendAppPacketBuffer.flip()
+                channel.write(sendAppPacketBuffer)
             }
-
-            sendAppPacketBuffer.clear()
-            sendAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
-            buf.readBytes(sendAppPacketBuffer)
-
-            sendAppPacketBuffer.flip()
-            channel.send(sendAppPacketBuffer, addr)
+        } else {
+            channel.write(buf.nioBuffer())
         }
     }
 
