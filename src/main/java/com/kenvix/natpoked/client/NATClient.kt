@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.client.redirector.PortRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.utils.AppEnv

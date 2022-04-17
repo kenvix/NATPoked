@@ -4,9 +4,10 @@
 // Written by Kenvix <i@kenvix.com>
 //--------------------------------------------------
 
-package com.kenvix.natpoked.client
+package com.kenvix.natpoked.client.redirector
 
 
+import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.RedirectJob
 import com.kenvix.natpoked.contacts.TcpRedirectJob
@@ -33,8 +34,11 @@ class PortRedirector : Closeable, CoroutineScope {
     private val job = Job() + CoroutineName("PortRedirector")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
 
-    val boundTcpChannels: MutableMap<Int, TcpRedirectJob> = mutableMapOf()
-    val boundUdpChannels: MutableMap<Int, RedirectJob<DatagramPacket>> = mutableMapOf()
+    /**
+     * Service Name -> RedirectJob<*>
+     */
+    val boundTcpChannels: MutableMap<InetSocketAddress, TcpRedirectJob> = mutableMapOf()
+    val boundUdpChannels: MutableMap<InetSocketAddress, RedirectJob<DatagramPacket>> = mutableMapOf()
 
     //    val targetTcpChannels: MutableMap<Int, AsynchronousSocketChannel> = mutableMapOf()
     val targetUdpChannels: MutableMap<InetSocketAddress, RedirectJob<DatagramPacket>> = mutableMapOf()
@@ -43,12 +47,13 @@ class PortRedirector : Closeable, CoroutineScope {
     @Throws(IOException::class)
     fun bindTcp(
         client: NATPeerToPeer,
-        port: Int,
+        bindAddr: InetSocketAddress,
         targetAddr: InetSocketAddress,
         flags: EnumSet<PeerCommunicationType>
     ): TcpRedirectJob {
         val channel = AsynchronousServerSocketChannel.open()
-        channel.bind(InetSocketAddress(port))
+        channel.bind(bindAddr)
+        val port = bindAddr.port
 
         val job = TcpRedirectJob(
             channel = channel,
@@ -77,7 +82,7 @@ class PortRedirector : Closeable, CoroutineScope {
             typeFlags = flags,
             targetAddr = targetAddr
         )
-        boundTcpChannels[port] = job
+        boundTcpChannels[bindAddr] = job
         return job
     }
 
@@ -123,7 +128,7 @@ class PortRedirector : Closeable, CoroutineScope {
         logger.trace("Binding udp port: $bindAddr -> $targetAddr")
 
         val job = createUdpRedirectJob(client, targetAddr, channel, flags, bindAddr)
-        boundUdpChannels[bindAddr.port] = job
+        boundUdpChannels[bindAddr] = job
         return job
     }
 
@@ -189,12 +194,17 @@ class PortRedirector : Closeable, CoroutineScope {
         return job
     }
 
-    fun unbindUdp(port: Int) {
-
+    fun unbindUdp(bindAddr: InetSocketAddress) {
+        boundUdpChannels.remove(bindAddr)?.apply {
+            this.readJob.cancel()
+            this.writeJob.cancel()
+            this.sendQueue.close()
+            this.receiveQueue.close()
+        }
     }
 
     suspend fun writeUdpPacket(client: NATPeerToPeer, data: ByteArray, offset: Int, len: Int, addr: InetSocketAddress) {
-        val boundUdp = boundUdpChannels[addr.port]
+        val boundUdp = boundUdpChannels[addr]
         val packet = DatagramPacket(data, offset, len, addr)
         if (boundUdp != null) { // 已设置转发规则并绑定的端口，使用绑定的源地址
             boundUdp.sendQueue.send(packet)

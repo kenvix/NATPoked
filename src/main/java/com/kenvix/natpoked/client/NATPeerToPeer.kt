@@ -6,9 +6,6 @@ import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
-import com.kenvix.natpoked.utils.network.aSend
-import com.kenvix.natpoked.utils.network.aWrite
-import com.kenvix.natpoked.utils.network.awaitRead
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.web.utils.JSON
 import com.kenvix.web.utils.getOrFail
@@ -85,7 +82,7 @@ class NATPeerToPeer(
             setOption(StandardSocketOptions.SO_REUSEADDR, true)
             setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.PeerSendBufferSize)
             setOption(StandardSocketOptions.SO_RCVBUF, AppEnv.PeerReceiveBufferSize)
-            configureBlocking(false) // TODO: Async implement with kotlin coroutine flows
+            configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
         }
 
     private val udpSocket: DatagramSocket = udpChannel.socket()!!.apply {
@@ -97,7 +94,6 @@ class NATPeerToPeer(
             try {
                 val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
                 val packet = DatagramPacket(buf, 1500)
-                udpChannel.awaitRead()    // Async Wait for incoming packet to ensure not blocking
                 udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
                 logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
                 dispatchIncomingPacket(packet)
@@ -228,7 +224,7 @@ class NATPeerToPeer(
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
-        udpChannel.aSend(buffer, target)
+        udpChannel.send(buffer, target)
         if (AppEnv.DebugMode && !buffer.isDirect)
             logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
         else
@@ -236,7 +232,7 @@ class NATPeerToPeer(
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
-        udpChannel.aWrite(buffer)
+        udpChannel.write(buffer)
         if (AppEnv.DebugMode && !buffer.isDirect)
             logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
         else
@@ -244,7 +240,6 @@ class NATPeerToPeer(
     }
 
     suspend fun readRawDatagram(buffer: ByteBuffer): SocketAddress = withContext(Dispatchers.IO) {
-        udpChannel.awaitRead()
         udpChannel.receive(buffer)
     }
 
@@ -419,13 +414,7 @@ class NATPeerToPeer(
                     TYPE_DATA_STREAM.typeId -> {
                         if (size > 3) {
                             val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-                            // TODO: MSG_OOB(URGENT), RST, FIN, ACCEPT
-                            val tcpFlags: Byte = decryptedBuf.readByte()
-                            if (sockAddr.port == 0) { // 端口为 0 表示内部控制类消息
 
-                            } else {
-
-                            }
                         }
                     }
 
