@@ -8,7 +8,7 @@ package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.client.BrokerClient
 import com.kenvix.natpoked.client.NATPeerToPeer
-import com.kenvix.natpoked.client.redirector.PortRedirector
+import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.sha256Of
 import kotlinx.coroutines.*
@@ -50,7 +50,7 @@ class UdpPortRedirectorTest {
 
     @Test
     fun test() {
-        val portRedirector = PortRedirector()
+        val portRedirector = RawUdpPortRedirector()
         val natPeerToPeer = NATPeerToPeer(0, config=PeersConfig.Peer(key = "114514"))
         val brokerClient = BrokerClient("127.0.0.1", 4000, "/")
         natPeerToPeer.listenUdpSourcePort(4001)

@@ -1,6 +1,6 @@
 package com.kenvix.natpoked.client
 
-import com.kenvix.natpoked.client.redirector.PortRedirector
+import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.utils.AppEnv
@@ -34,7 +34,7 @@ object NATClient : CoroutineScope, AutoCloseable {
         get() = peersImpl
     val peerToBrokerKeyBase64Encoded = Random.Default.nextBytes(16).toBase64String()
 
-    val portRedirector: PortRedirector = PortRedirector()
+    val portRedirector: RawUdpPortRedirector = RawUdpPortRedirector()
     private val logger = LoggerFactory.getLogger(NATClient::class.java)
     val peersKey: Getable<PeerId, ByteArray> = object : Getable<PeerId, ByteArray> {
         @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")

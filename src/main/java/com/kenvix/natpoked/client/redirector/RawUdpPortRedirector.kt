@@ -28,9 +28,9 @@ import kotlin.coroutines.CoroutineContext
 
 // TODO: TCP
 /**
- * A [PortRedirector] should be a singleton for a peer
+ * A [RawUdpPortRedirector] should be a singleton for a peer
  */
-class PortRedirector : Closeable, CoroutineScope {
+class RawUdpPortRedirector : Closeable, CoroutineScope {
     private val job = Job() + CoroutineName("PortRedirector")
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
 
@@ -140,7 +140,7 @@ class PortRedirector : Closeable, CoroutineScope {
     ): RedirectJob<DatagramPacket> {
         val channel = DatagramChannel.open()
         if (bindAddr != null) {
-            channel.bind(targetAddr)
+            channel.bind(bindAddr)
         }
 
         channel.connect(targetAddr)
@@ -165,13 +165,13 @@ class PortRedirector : Closeable, CoroutineScope {
 
         val job = UdpRedirectJob(
             channel = channel,
-            // 接收来自本地端口的数据，发往远端
+            // 接收来自本地端口app的数据，发往远端peer
             readJob = launch(Dispatchers.IO) {
                 while (isActive) {
                     receiveUdpLocalPacketAndRedirect(socket, client, flags, targetAddr)
                 }
             },
-            // 接收从远端来的数据，发往本地App的端口
+            // 接收从远端peer来的数据，发往本地App的端口
             writeJob = launch(Dispatchers.IO) {
                 while (isActive) {
                     try {
@@ -244,6 +244,6 @@ class PortRedirector : Closeable, CoroutineScope {
     }
 
     companion object {
-        private val logger = LoggerFactory.getLogger(PortRedirector::class.java)
+        private val logger = LoggerFactory.getLogger(RawUdpPortRedirector::class.java)
     }
 }

@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client.redirector
 
+import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.AppEnv
@@ -13,39 +14,46 @@ import java.nio.channels.DatagramChannel
 class KcpTunRedirector(
     private val peer: NATPeerToPeer,
     private val serviceName: String,
-    private val preshareKey: String,
-    private val config: PeersConfig.Peer.Port
+    private val preSharedKey: String,
+    private val myPeerPortConfig: PeersConfig.Peer.Port,
 ): Closeable, CoroutineScope by CoroutineScope(Job() + CoroutineName("KcpTunRedirector.$serviceName")) {
-    val channel: DatagramChannel = DatagramChannel.open().makeNonBlocking()
 
     private val processKey: String
         get() = "kcptun_$serviceName"
 
     init {
         val args = ArrayList<String>(32)
-        if (config.role == PeersConfig.Peer.Port.Role.SERVER) {
-            channel.connect(InetSocketAddress(config.srcHost, config.srcPort))
-
+        if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
             args.add("kcptun_server")
             args.add("--listen")
-            args.add("${config.srcHost}:${config.srcPort}")
+            args.add("${myPeerPortConfig.srcHost}:${myPeerPortConfig.srcPort}")
             args.add("--target")
-            args.add("${config.dstHost}:${config.dstPort}")
+            args.add("${myPeerPortConfig.dstHost}:${myPeerPortConfig.dstPort}")
         } else {
-            channel.bind(InetSocketAddress(config.srcHost, config.srcPort))
-
             args.add("kcptun_client")
             args.add("--localaddr")
-            args.add("${config.dstHost}:${config.dstPort}")
+            args.add("${myPeerPortConfig.dstHost}:${myPeerPortConfig.dstPort}")
             args.add("--remoteaddr")
-            args.add("${config.srcHost}:${config.srcPort}")
+            args.add("${myPeerPortConfig.srcHost}:${myPeerPortConfig.srcPort}")
         }
 
         appendProtocolArguments(args)
         val builder = ProcessBuilder(args)
-        builder.environment()["KCPTUN_KEY"] = preshareKey
+        builder.environment()["KCPTUN_KEY"] = preSharedKey
 
         ProcessUtils.runProcess(processKey, builder, keepAlive = true)
+        if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.SERVER) {
+            NATClient.portRedirector.connectUdp(
+                client = peer,
+                targetAddr = InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort)
+            )
+        } else {
+            NATClient.portRedirector.bindUdp(
+                client = peer,
+                targetAddr = InetSocketAddress(internalExchangePortConfig.dstHost, internalExchangePortConfig.dstPort),
+                bindAddr = InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort),
+            )
+        }
     }
 
     private fun appendProtocolArguments(outputList: MutableList<String>) {
@@ -67,6 +75,6 @@ class KcpTunRedirector(
 
     override fun close() {
         ProcessUtils.stopProcess(processKey)
-        channel.close()
+
     }
 }

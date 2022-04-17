@@ -51,6 +51,9 @@ data class PeersConfig(
         data class Port(
             var protocol: Protocol = Protocol.TCP,
             var srcHost: String = "127.0.0.1",
+            /**
+             * 对于内部配置，srcPort 为服务端侧绑定的端口
+             */
             var srcPort: Int = 0,
             var dstHost: String = "127.0.0.1",
             var dstPort: Int,
