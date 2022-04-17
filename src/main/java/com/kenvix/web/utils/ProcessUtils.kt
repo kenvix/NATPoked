@@ -9,7 +9,12 @@ import java.io.File
 import kotlin.io.path.exists
 
 object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO) {
-    private val processes: MutableMap<String, Process> = mutableMapOf()
+    data class ProcessInfo(
+        var process: Process,
+        var onProcessDiedHandler: ((Process) -> Unit)? = null
+    )
+
+    private val processes: MutableMap<String, ProcessInfo> = mutableMapOf()
     private val platform: PlatformDetection = PlatformDetection.getInstance()
     private val extraPath: String
     private val extraPathFile: File
@@ -28,8 +33,8 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         val list = processes.map { (key, process) ->
             RunningProcess(
                 key,
-                process.pid(),
-                process.info().arguments().get()[0]
+                process.process.pid(),
+                process.process.info().arguments().get()[0]
             )
         }.toList()
     }
@@ -61,11 +66,17 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
     }
 
     operator fun get(name: String): Process? {
-        return processes[name]
+        return processes[name]?.process
     }
 
-    fun runProcess(key: String, builder: ProcessBuilder, redirectDir: Boolean = false, keepAlive: Boolean = false): Process {
-        if (processes[key] != null && processes[key]!!.isAlive)
+    fun runProcess(
+        key: String,
+        builder: ProcessBuilder,
+        redirectDir: Boolean = false,
+        keepAlive: Boolean = false,
+        onProcessDiedHandler: ((Process) -> Unit)? = null,
+    ): Process {
+        if (processes[key] != null && processes[key]!!.process.isAlive)
             throw IllegalStateException("Process $key is already running, cannot run again")
 
         builder.environment().let { env ->
@@ -95,7 +106,7 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         }
 
         val process = builder.start()
-        processes[key] = process
+        processes[key] = ProcessInfo(process, onProcessDiedHandler)
         val processLoggerControl = LoggerFactory.getLogger("Process.$key.control")
         val processLoggerStdout = LoggerFactory.getLogger("Process.$key.out")
         val processLoggerStdErr = LoggerFactory.getLogger("Process.$key.err")
@@ -134,13 +145,16 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
     }
 
     fun stopProcess(key: String) {
-        processes[key]?.destroy()
+        processes[key]?.apply {
+            process.destroy()
+            onProcessDiedHandler?.invoke(process)
+        }
         processes.remove(key)
     }
 
     override fun close() {
         processes.forEach {
-            it.value.destroy()
+            it.value.process.destroy()
         }
         processes.clear()
     }

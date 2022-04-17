@@ -23,8 +23,8 @@ import java.util.*
 class KcpTunPortRedirector(
     private val peer: NATPeerToPeer,
     private val serviceName: ServiceName,
-    private val preSharedKey: String,
-    private val myPeerPortConfig: PeersConfig.Peer.Port,
+    preSharedKey: String,
+    myPeerPortConfig: PeersConfig.Peer.Port,
     private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(
         PeerCommunicationType.TYPE_DATA_DGRAM_SERVICE,
         PeerCommunicationType.TYPE_DATA_DGRAM
@@ -70,7 +70,12 @@ class KcpTunPortRedirector(
         val builder = ProcessBuilder(args)
         builder.environment()["KCPTUN_KEY"] = preSharedKey
 
-        ProcessUtils.runProcess(processKey, builder, keepAlive = true)
+        ProcessUtils.runProcess(processKey, builder, keepAlive = true, onProcessDiedHandler = {
+            if (myPeerPortConfig.role == PeersConfig.Peer.Port.Role.CLIENT) {
+                logger.info("Kcptun client process died, disconnecting socket...")
+                channel.disconnect()
+            }
+        })
 
         receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
             while (isActive) {
