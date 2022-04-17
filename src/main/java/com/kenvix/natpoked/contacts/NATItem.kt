@@ -22,6 +22,7 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     TYPE_DATA_DGRAM           (0b000_0000_0001_0000), // 0x0_
     TYPE_DATA_DGRAM_RAW       (0b000_0000_0001_0000),
     TYPE_DATA_DGRAM_KCP       (0b000_0000_0001_0001), // KCP without FEC
+    TYPE_DATA_DGRAM_SERVICE   (0b000_0000_0001_0010), // KCP without FEC
 
     TYPE_DATA_STREAM          (0b000_0000_0010_0000), // 0x2_
     TYPE_DATA_STREAM_KCP      (0b000_0000_0000_0000),

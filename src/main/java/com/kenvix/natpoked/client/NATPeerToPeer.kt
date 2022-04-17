@@ -73,6 +73,20 @@ class NATPeerToPeer(
         )
     }
 
+    //    val controlMessageJob: Job = launch(Dispatchers.IO) {
+//        while (isActive) {
+//            val message = controlMessageARQ.receive()
+//            if (message.size < 3) {
+//                logger.warn("Received control message with invalid size ${message.size}")
+//                continue
+//            } else {
+//                val buffer = message.data
+//                val version = buffer.readUnsignedShort()
+//
+//            }
+//        }
+    private val portServicesMap: MutableMap<Int, ServicePortRedirector> = mutableMapOf()
+
     companion object {
         private const val ivSize = 16
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
@@ -103,8 +117,8 @@ class NATPeerToPeer(
             }
         }
     }
-
     private var keepAliveJob: Job? = null
+
     @Volatile var keepAlivePacketContinuation: Continuation<Unit>? = null
 
     private fun startKeepAliveJob(target: InetSocketAddress) {
@@ -176,18 +190,6 @@ class NATPeerToPeer(
         keepAliveJob = null
     }
 
-//    val controlMessageJob: Job = launch(Dispatchers.IO) {
-//        while (isActive) {
-//            val message = controlMessageARQ.receive()
-//            if (message.size < 3) {
-//                logger.warn("Received control message with invalid size ${message.size}")
-//                continue
-//            } else {
-//                val buffer = message.data
-//                val version = buffer.readUnsignedShort()
-//
-//            }
-//        }
 //    }
 
     /**
@@ -200,7 +202,7 @@ class NATPeerToPeer(
         if (udpChannel.localAddress == null || udpChannel.localAddress.port == 0) {
             listenUdpSourcePort(sourcePort)
         }
-        
+
         if (NATClient.lastSelfClientInfo.clientNatType == NATType.PUBLIC) {
             sourcePort
         } else if (NATClient.lastSelfClientInfo.isUpnpSupported) {
@@ -368,8 +370,6 @@ class NATPeerToPeer(
         return InetSocketAddress(targetAddr, port)
     }
 
-    private val portServicesMap: MutableMap<Int, ServicePortRedirector> = mutableMapOf()
-
     private fun dispatchIncomingPacket(packet: DatagramPacket) {
         val addr: InetSocketAddress = packet.socketAddress as InetSocketAddress
         val inArrayBuf: ByteArray = packet.data
@@ -418,26 +418,34 @@ class NATPeerToPeer(
             try {
                 when (mainTypeClass) {
                     TYPE_DATA_STREAM.typeId -> {
-                        if (size > 4) {
-                            val serviceNameCode = decryptedBuf.readInt()
-                            val service = portServicesMap[serviceNameCode].assertExist()
-                            launch { service.onReceivedRemotePacket(decryptedBuf) }
-                        }
+                        TODO("Not implemented")
                     }
 
                     TYPE_DATA_DGRAM.typeId -> {
-                        if (size > 3) {
-                            val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-                            if (sockAddr.port != 0) {
-                                portRedirector.writeUdpPacket(
-                                    this@NATPeerToPeer,
-                                    decryptedBuf.array(),
-                                    decryptedBuf.readerIndexInArrayOffset(),
-                                    decryptedBuf.readableBytes(),
-                                    sockAddr
-                                )
-                            } else {
-                                logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
+                        when ((typeIdInt and 0x3F).toShort()) {
+                            TYPE_DATA_DGRAM_SERVICE.typeId -> {
+                                if (size > 4) {
+                                    val serviceNameCode = decryptedBuf.readInt()
+                                    val service = portServicesMap[serviceNameCode].assertExist()
+                                    launch { service.onReceivedRemotePacket(decryptedBuf) }
+                                }
+                            }
+
+                            else -> {
+                                if (size > 3) {
+                                    val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
+                                    if (sockAddr.port != 0) {
+                                        portRedirector.writeUdpPacket(
+                                            this@NATPeerToPeer,
+                                            decryptedBuf.array(),
+                                            decryptedBuf.readerIndexInArrayOffset(),
+                                            decryptedBuf.readableBytes(),
+                                            sockAddr
+                                        )
+                                    } else {
+                                        logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
+                                    }
+                                }
                             }
                         }
                     }
@@ -612,6 +620,11 @@ class NATPeerToPeer(
         stopKeepAliveJob()
     }
 
+    private fun startAllServices() {
+        logger.debug("startAllServices")
+
+    }
+
     suspend fun setSocketConnectTo(target: InetSocketAddress) {
         try {
             if (useSocketConnect) {
@@ -632,6 +645,7 @@ class NATPeerToPeer(
             isConnected = true
             targetAddr = target
             startKeepAliveJob(target)
+            startAllServices()
         } catch (e: Throwable) {
             isConnected = false
             targetAddr = null

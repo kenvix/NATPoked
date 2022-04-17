@@ -29,7 +29,7 @@ class ServicePortRedirector(
     private val serviceName: ServiceName,
     private val preSharedKey: String,
     private val myPeerPortConfig: PeersConfig.Peer.Port,
-    private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(PeerCommunicationType.TYPE_DATA_STREAM_KCP, PeerCommunicationType.TYPE_DATA_STREAM)
+    private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(PeerCommunicationType.TYPE_DATA_DGRAM_SERVICE, PeerCommunicationType.TYPE_DATA_DGRAM)
 ): Closeable, CoroutineScope by CoroutineScope(Job() + CoroutineName("KcpTunRedirector.$serviceName")) {
 
     companion object {
