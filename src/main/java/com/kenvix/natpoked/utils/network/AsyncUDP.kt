@@ -123,7 +123,17 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
             }.also { readSelector.wakeup() }
         }
 
-        event.readable.receive() // no need to handle cancel event
+        try {
+            event.readable.receive()
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) {
+                updateEventLock.withLock {
+                    event.readableWaitCount--
+                }
+            }
+
+            throw e
+        }
     }
 
     suspend fun addWriteNotifyJob(channel: DatagramChannel) {
@@ -134,7 +144,17 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
             }.also { writeSelector.wakeup() }
         }
 
-        event.writable.receive() // no need to handle cancel event too
+        try {
+            event.writable.receive()
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) {
+                updateEventLock.withLock {
+                    event.writableWaitCount--
+                }
+            }
+
+            throw e
+        }
     }
 }
 
@@ -190,10 +210,9 @@ suspend fun DatagramChannel.aWrite(src: ByteBuffer): Int = withContext(Dispatche
 
     var written: Int
 
-    do {
+    while (kotlin.run { written = write(src); written } == 0) {
         awaitWrite()
-        written = write(src)
-    } while (written == 0)
+    }
 
     return@withContext written
 }
@@ -204,10 +223,9 @@ suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>): Long = withContext(
 
     var written: Long
 
-    do {
+    while (kotlin.run { written = write(srcs); written } == 0L) {
         awaitWrite()
-        written = write(srcs)
-    } while (written == 0L)
+    }
 
     return@withContext written
 }
@@ -218,10 +236,9 @@ suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>, offset: Int, length:
 
     var written: Long
 
-    do {
+    while (kotlin.run { written = write(srcs, offset, length); written } == 0L) {
         awaitWrite()
-        written = write(srcs, offset, length)
-    } while (written == 0L)
+    }
 
     return@withContext written
 }
@@ -250,10 +267,9 @@ suspend fun DatagramChannel.aSend(src: ByteBuffer, target: InetSocketAddress): I
 
     var written: Int
 
-    do {
+    while (kotlin.run { written = send(src, target); written } == 0) {
         awaitWrite()
-        written = send(src, target)
-    } while (written == 0)
+    }
 
     return@withContext written
 }
