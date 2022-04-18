@@ -10,10 +10,10 @@ import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
+import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.*
 import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.Unpooled
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -21,13 +21,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import okhttp3.internal.toHexString
-import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
+import java.nio.channels.SelectionKey
+import java.nio.channels.Selector
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
@@ -59,19 +60,23 @@ class NATPeerToPeer(
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
 
-//    private val receiveBuffers = Array<BufferInfo>(receiveBufferNum) { BufferInfo() }
-    private val receiveBuffers = Array<ByteBuffer>(receiveBufferNum) { ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) } }
+    //    private val receiveBuffers = Array<BufferInfo>(receiveBufferNum) { BufferInfo() }
+    private val receiveBuffers =
+        Array<ByteBuffer>(receiveBufferNum) { ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) } }
 
     private var currentReceiveBufferIndex: AtomicInteger = AtomicInteger(0)
 
-    private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
+    private val keepAliveBuffer =
+        ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
     private val keepAliveLock = Mutex()
     private var useSocketConnect: Boolean = false
 
     private var pingReceiverChannel: Channel<DatagramPacket>? = null
 
-    @Volatile private var isConnected: Boolean = false
-    @Volatile var targetAddr: InetSocketAddress? = null
+    @Volatile
+    private var isConnected: Boolean = false
+    @Volatile
+    var targetAddr: InetSocketAddress? = null
         private set
 
     //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
@@ -104,7 +109,8 @@ class NATPeerToPeer(
 
     companion object {
         private const val ivSize = 16
-        @JvmStatic val debugNetworkTraffic = AppEnv.DebugMode && AppEnv.DebugNetworkTraffic
+        @JvmStatic
+        val debugNetworkTraffic = AppEnv.DebugMode && AppEnv.DebugNetworkTraffic
         val wireGuardConfigDirPath = AppConstants.workingPath.resolve("Config").resolve("WireGuard")
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
         val receiveBufferNum = AppEnv.PeerReceiveBufferNum
@@ -122,22 +128,58 @@ class NATPeerToPeer(
         listenUdpSourcePort(config.pokedPort)
     }
 
-    private val receiveJob: Array<Job> = Array(receiveBufferNum) {
+    private val receiveJob: Array<Job> = Array(if (AppEnv.PeerCommunicationModel.lowercase() == "nio") 1 else receiveBufferNum) {
         launch(Dispatchers.IO) {
-            while (isActive) {
-                try {
-                    val buffer = receiveBuffers[it]
-                    buffer.clear()
+            if (AppEnv.PeerCommunicationModel.lowercase() == "nio") {
+                val buffersChannel = Channel<ByteBuffer>(AppEnv.PeerReceiveBufferNum)
+                for (i in 0 until 10) {
+                    buffersChannel.send(receiveBuffers[i])
+                }
 
-                    val addr = udpChannel.receive(buffer) as InetSocketAddress
-                    if (debugNetworkTraffic) {
-                        logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                udpChannel.makeNonBlocking()
+                val selector = Selector.open()
+                udpChannel.register(selector, SelectionKey.OP_READ)
+
+                while (isActive) {
+                    selector.select()
+                    val keys = selector.selectedKeys()
+                    keys.forEach {
+                        if (it.isReadable) {
+                            val buffer = buffersChannel.receive()
+                            buffer.clear()
+
+                            val addr = udpChannel.receive(buffer) as InetSocketAddress?
+                            if (addr != null) {
+                                if (debugNetworkTraffic) {
+                                    logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                                }
+                                buffer.flip()
+                                launch(Dispatchers.IO) {
+                                    dispatchIncomingPacket(addr, buffer)
+                                    buffersChannel.send(buffer)
+                                }
+                            }
+                        }
                     }
 
-                    buffer.flip()
-                    dispatchIncomingPacket(addr, buffer)
-                } catch (e: Exception) {
-                    logger.error("Unable to handle incoming packet!!!", e)
+                    keys.clear()
+                }
+            } else {
+                while (isActive) {
+                    try {
+                        val buffer = receiveBuffers[it]
+                        buffer.clear()
+
+                        val addr = udpChannel.receive(buffer) as InetSocketAddress
+                        if (debugNetworkTraffic) {
+                            logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                        }
+
+                        buffer.flip()
+                        dispatchIncomingPacket(addr, buffer)
+                    } catch (e: Exception) {
+                        logger.error("Unable to handle incoming packet!!!", e)
+                    }
                 }
             }
         }
@@ -145,7 +187,8 @@ class NATPeerToPeer(
 
     private var keepAliveJob: Job? = null
 
-    @Volatile var keepAlivePacketContinuation: Continuation<Unit>? = null
+    @Volatile
+    var keepAlivePacketContinuation: Continuation<Unit>? = null
 
     private fun startKeepAliveJob(target: InetSocketAddress) {
         if (keepAliveJob == null) {
@@ -267,7 +310,7 @@ class NATPeerToPeer(
             if (!buffer.isDirect)
                 logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
             else
-                logger.debug("$targetPeerId: writeRawDatagram to default",)
+                logger.debug("$targetPeerId: writeRawDatagram to default")
         }
     }
 
@@ -299,7 +342,11 @@ class NATPeerToPeer(
 
     fun getLocalPort(): Int = udpSocket.localPort
 
-    internal fun putTypeFlags(inTypeId: Int, targetAddr: InetAddress? = null, flags: EnumSet<PeerCommunicationType>): Int {
+    internal fun putTypeFlags(
+        inTypeId: Int,
+        targetAddr: InetAddress? = null,
+        flags: EnumSet<PeerCommunicationType>
+    ): Int {
         var typeId: Int = inTypeId
         if (STATUS_ENCRYPTED in flags) {
             typeId = typeId or STATUS_ENCRYPTED.typeId.toInt()
@@ -505,7 +552,10 @@ class NATPeerToPeer(
                                     keepAlivePacketContinuation?.resume(Unit)
                                     keepAlivePacketContinuation = null
                                 } catch (e: Exception) {
-                                    logger.debug("Received peer keepalive REPLY packet from $addr, size $size, but no continuation is already resumed", e)
+                                    logger.debug(
+                                        "Received peer keepalive REPLY packet from $addr, size $size, but no continuation is already resumed",
+                                        e
+                                    )
                                 }
                             }
                         }
@@ -655,8 +705,10 @@ class NATPeerToPeer(
             .resolve("${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${role.toString().lowercase()}.conf")
         val wireGuardConfigFile = wireGuardConfigFilePath.toFile()
         if (!wireGuardConfigFile.exists()) {
-            val templateFileName = if (role == ClientServerRole.CLIENT) "wireguard_client.conf" else "wireguard_server.conf"
-            val stream = Thread.currentThread().contextClassLoader.getResourceAsStream("/$templateFileName").assertExist()
+            val templateFileName =
+                if (role == ClientServerRole.CLIENT) "wireguard_client.conf" else "wireguard_server.conf"
+            val stream =
+                Thread.currentThread().contextClassLoader.getResourceAsStream("/$templateFileName").assertExist()
             wireGuardConfigFile.outputStream().use { stream.transferTo(it) }
         }
 
@@ -680,7 +732,12 @@ class NATPeerToPeer(
                     if (portConfig.protocol == PeersConfig.Peer.Port.Protocol.TCP) {
                         logger.info("Starting new TCP - KcpTunPortRedirector port service: $serviceName")
                         val redirector =
-                            KcpTunPortRedirector(this, serviceName, getKcpTunPreSharedKey().toBase64String(), portConfig)
+                            KcpTunPortRedirector(
+                                this,
+                                serviceName,
+                                getKcpTunPreSharedKey().toBase64String(),
+                                portConfig
+                            )
                         portServicesMap[serviceName.serviceNameCode()] = redirector
                     } else {
 
@@ -728,7 +785,7 @@ class NATPeerToPeer(
     }
 
     override fun close() {
-        //receiveJob.cancel()
+        repeat(receiveJob.count()) { cancel() }
         udpChannel.close()
         coroutineContext.cancel()
     }

@@ -38,7 +38,6 @@ abstract class ServiceRedirector(
         private set
 
     private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
-    private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
     private val sendAppPacketBufferLock = Mutex()
     protected val channel: DatagramChannel = DatagramChannel.open()
 
@@ -72,19 +71,7 @@ abstract class ServiceRedirector(
             return
         }
 
-        if (buf.hasArray()) {
-            sendAppPacketBufferLock.withLock {
-                sendAppPacketBuffer.clear()
-                sendAppPacketBuffer.put(buf)
-
-                sendAppPacketBuffer.flip()
-                val written = channel.write(sendAppPacketBuffer)
-                if (NATPeerToPeer.debugNetworkTraffic)
-                    logger.trace("onReceivedRemotePacket: Sent app packet to service app, size: $written")
-            }
-        } else {
-            channel.write(buf)
-        }
+        channel.write(buf)
     }
 
     override fun close() {
