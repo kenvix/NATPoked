@@ -772,12 +772,13 @@ class NATPeerToPeer(
 
             tempPath.writeText(content)
 
-            portServicesMap["__wireguard".serviceNameCode()] =
-                WireGuardRedirector(
-                    this@NATPeerToPeer,
-                    myPeerConfig = config.wireGuard,
-                    wireGuardConfigFilePath = tempPath
-                )
+            val redirector = WireGuardRedirector(
+                this@NATPeerToPeer,
+                myPeerConfig = config.wireGuard,
+                wireGuardConfigFilePath = tempPath
+            )
+            portServicesMap["__wireguard".serviceNameCode()] = redirector
+            redirector.start()
         }
     }
 

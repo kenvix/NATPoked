@@ -12,6 +12,11 @@ import org.junit.jupiter.api.Test
 
 class ExecTest {
     @Test
+    fun testEnv() {
+        println(System.getenv("PATH"))
+    }
+
+    @Test
     fun testExec() {
         val platformDetection = PlatformDetection.getInstance()
         println("OS: ${platformDetection.os}   Arch: ${platformDetection.arch}")

@@ -18,6 +18,7 @@ import okhttp3.internal.toHexString
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.net.InetSocketAddress
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 
@@ -47,21 +48,29 @@ class WireGuardRedirector(
 
         startRedirector()
 
-        val builder = if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
-            ProcessBuilder(
-                "wireguard.exe",
-                "/installtunnelservice",
-                "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
+        if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
+            val path = Files.createTempFile("natpoked_wg_bootstrap_", ".bat")
+            val commands = "\"${ProcessUtils.extraPathFile.resolve("gsudo.exe").absolutePath}\" wireguard.exe /installtunnelservice \"${wireGuardConfigFilePath.toAbsolutePath()}\""
+            Files.writeString(path, commands)
+            val builder = ProcessBuilder(
+                "cmd.exe",
+                "/D",
+                "/U",
+                "/C",
+                "start",
+                "${path.toAbsolutePath()}"
             )
+
+            ProcessUtils.runProcess(processKey, builder, keepAlive = false)
         } else {
-            ProcessBuilder(
+            val builder = ProcessBuilder(
                 "wg-quick",
                 "up",
                 "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
             )
-        }
 
-        ProcessUtils.runProcess(processKey, builder, keepAlive = false)
+            ProcessUtils.runProcess(processKey, builder, keepAlive = false)
+        }
     }
 
     override fun close() {

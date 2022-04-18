@@ -19,7 +19,8 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
     private val processes: MutableMap<String, ProcessInfo> = mutableMapOf()
     private val platform: PlatformDetection = PlatformDetection.getInstance()
     private val extraPath: String
-    private val extraPathFile: File
+    private val fullPath: String
+    val extraPathFile: File
     private val logger = LoggerFactory.getLogger(ProcessUtils::class.java)
 
     data class RunningProcess(
@@ -57,12 +58,15 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
 
         val path = System.getenv("PATH")
         if (path != null) {
-            if (platform.os == PlatformDetection.OS_WINDOWS) {
-                System.setProperty("PATH", "$path;$extraPath")
+            fullPath = if (platform.os == PlatformDetection.OS_WINDOWS) {
+                "$extraPath;$path"
             } else {
-                System.setProperty("PATH", "$path:$extraPath")
+                "$extraPath:$path"
             }
+
+            System.setProperty("PATH", fullPath)
         } else {
+            fullPath = extraPath
             System.setProperty("PATH", extraPath)
         }
     }
@@ -78,12 +82,12 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         builder.environment().let { env ->
             env["PATH"]?.let {
                 if (platform.os == PlatformDetection.OS_WINDOWS) {
-                    env["PATH"] = "$it;$extraPath"
+                    env["PATH"] = "$it;$fullPath"
                 } else {
-                    env["PATH"] = "$it:$extraPath"
+                    env["PATH"] = "$it:$fullPath"
                 }
             } ?: run {
-                env["PATH"] = extraPath
+                env["PATH"] = fullPath
             }
         }
 
