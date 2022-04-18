@@ -1,6 +1,7 @@
 package com.kenvix.natpoked.client
 
 import com.google.common.primitives.Ints
+import com.google.common.primitives.Longs
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
@@ -746,6 +747,10 @@ class NATPeerToPeer(
                 .replace("$(PeerPreSharedKey)", PeerPreSharedKey)
                 .replace("$(MyPeerPrivateKey)", MyPeerPrivateKey)
                 .replace("$(TargetPeerPublicKey)", TargetPeerPublicKey)
+                .replace("$(MyPeerId)", AppEnv.PeerId.toHexString())
+                .replace("$(TargetPeerId)", targetPeerId.toHexString())
+                .replace("$(NatPokedServiceListenIp)", "127.0.0.1")
+                .replace("$(NatPokedServiceListenPort)", config.wireGuard.listenPort.toString())
 
             if (role == ClientServerRole.CLIENT) {
                 content = content
@@ -790,12 +795,13 @@ class NATPeerToPeer(
         val serverIp: InetAddress
     )
 
-    fun generateWireGuardIp4Address(): ClientServerIpPair {
+    private fun generateWireGuardIp4Address(): ClientServerIpPair {
         val addr = InetAddress.getByName("172.16.0.0").address
-        val id = Ints.toByteArray(((AppEnv.PeerId xor targetPeerId) and 0xFFFFF).toInt())
+        val id = md5Of(Longs.toByteArray(AppEnv.PeerId)).slice(0 until 3) xor md5Of(Longs.toByteArray(targetPeerId)).slice(0 until 3)
+        id[0] = (id[0].toInt() and 0x0F).toByte()
 
-        for (i in addr.indices) {
-            addr[i] = (addr[i].toInt() or id[i].toInt()).toByte()
+        for (i in 1 until 4) {
+            addr[i] = (addr[i].toInt() or id[i-1].toInt()).toByte()
         }
 
         val c = addr.clone()

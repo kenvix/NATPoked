@@ -7,6 +7,7 @@
 package com.kenvix.natpoked.test
 
 import com.google.common.primitives.Ints
+import com.google.common.primitives.Longs
 import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType
@@ -71,10 +72,11 @@ class SerializationTest {
     @Test
     fun generateWireGuardIp4Address() {
         val addr = InetAddress.getByName("172.16.0.0").address
-        val id = Ints.toByteArray(((0x123456L xor 0xabcdef) and 0xFFFFF).toInt())
+        val id = md5Of(Longs.toByteArray(114514)).slice(0 until 3) xor md5Of(Longs.toByteArray(1919810)).slice(0 until 3)
+        id[0] = (id[0].toInt() and 0x0F).toByte()
 
-        for (i in addr.indices) {
-            addr[i] = (addr[i].toInt() or id[i].toInt()).toByte()
+        for (i in 1 until 4) {
+            addr[i] = (addr[i].toInt() or id[i-1].toInt()).toByte()
         }
 
         val c = addr.clone()
@@ -83,8 +85,15 @@ class SerializationTest {
         c[3] = (addr[3].toInt() or 0x01).toByte()
         s[3] = (addr[3].toInt() and 0xFE).toByte()
 
-        println(InetAddress.getByAddress(c).hostAddress)
-        println(InetAddress.getByAddress(s).hostAddress)
+        println("C:" + InetAddress.getByAddress(c))
+        println("S:" + InetAddress.getByAddress(s))
+    }
+
+    @Test
+    fun testConv() {
+        val bytes = Longs.toByteArray(114514)
+        println(bytes.contentToString())
+        assertEquals(8, bytes.size)
     }
 
     @Test

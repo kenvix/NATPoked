@@ -1,5 +1,29 @@
 package com.kenvix.natpoked.utils
 
+infix fun ByteArray.xor(other: ByteArray): ByteArray {
+    if (this.size != other.size)
+        throw IllegalArgumentException("ByteArray size not equal")
+
+    val result = ByteArray(this.size)
+    for (i in this.indices) {
+        result[i] = (this[i].toInt() xor other[i].toInt()).toByte()
+    }
+
+    return result
+}
+
+infix fun List<Byte>.xor(other: List<Byte>): MutableList<Byte> {
+    if (this.size != other.size)
+        throw IllegalArgumentException("ByteArray size not equal")
+
+    val result = ArrayList<Byte>(this.size)
+    for (i in this.indices) {
+        result.add((this[i].toInt() xor other[i].toInt()).toByte())
+    }
+
+    return result
+}
+
 fun parseIntRangeToArray(str: String, spliter: Char = ' '): IntArray {
     val s1 = str.split(spliter).filter { it.isNotEmpty() }
     val v = ArrayList<Any>(s1.size)
