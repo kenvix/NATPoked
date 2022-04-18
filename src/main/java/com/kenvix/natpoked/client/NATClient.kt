@@ -20,6 +20,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.URL
+import java.nio.channels.DatagramChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
@@ -68,11 +69,11 @@ object NATClient : CoroutineScope, AutoCloseable {
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
 
     @Suppress("BlockingMethodInNonBlockingContext")
-    suspend fun getOutboundInetSocketAddress(socket: DatagramSocket, maxTries: Int = 20, manualReceiver: Channel<DatagramPacket>? = null): SocketAddrEchoResult {
+    suspend fun getOutboundInetSocketAddress(channel: DatagramChannel, maxTries: Int = 20, manualReceiver: Channel<DatagramPacket>? = null): SocketAddrEchoResult {
         return echoClient.requestEcho(
             AppEnv.EchoPortList[0],
             InetAddress.getByName(brokerClient.brokerHost),
-            socket,
+            channel,
             maxTries,
             manualReceiver
         )

@@ -54,7 +54,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                                 }
 
                                 if (event.readableWaitCount < 0) {
-                                    throw ConcurrentModificationException("Wait count is negative !!!")
+                                    throw IllegalStateException("Wait count for reader is negative !!!")
                                 }
                             }
 
@@ -98,7 +98,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                                 }
 
                                 if (event.writableWaitCount < 0) {
-                                    throw ConcurrentModificationException("Wait count is negative !!!")
+                                    throw IllegalStateException("Wait count for writer is negative !!!")
                                 }
                             }
 
@@ -125,7 +125,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
         try {
             event.readable.receive()
-        } catch (e: CancellationException) {
+        } catch (e: Exception) {
             withContext(NonCancellable) {
                 updateEventLock.withLock {
                     event.readableWaitCount--
@@ -146,7 +146,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
         try {
             event.writable.receive()
-        } catch (e: CancellationException) {
+        } catch (e: Exception) {
             withContext(NonCancellable) {
                 updateEventLock.withLock {
                     event.writableWaitCount--

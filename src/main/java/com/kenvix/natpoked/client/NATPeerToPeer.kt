@@ -217,7 +217,7 @@ class NATPeerToPeer(
                 sourcePort
         } else if (NATClient.lastSelfClientInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
             pingReceiverChannel = Channel(1)
-            NATClient.getOutboundInetSocketAddress(udpSocket, manualReceiver = pingReceiverChannel).port.apply {
+            NATClient.getOutboundInetSocketAddress(udpChannel, manualReceiver = pingReceiverChannel).port.apply {
                 pingReceiverChannel = null
             }
         } else {
@@ -436,7 +436,10 @@ class NATPeerToPeer(
                             TYPE_DATA_DGRAM_SERVICE.typeId -> {
                                 if (size > 4) {
                                     val serviceNameCode = decryptedBuf.readInt()
-                                    val service = portServicesMap[serviceNameCode].assertExist()
+                                    val service = portServicesMap[serviceNameCode].also {
+                                        if (it == null)
+                                            startAllServices()
+                                    }.assertExist()
                                     service.onReceivedRemotePacket(decryptedBuf)
                                 }
                             }
