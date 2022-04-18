@@ -1,6 +1,7 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
+import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.utils.AppEnv
@@ -17,15 +18,20 @@ import kotlinx.serialization.decodeFromString
 import net.mamoe.yamlkt.Yaml
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
-import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.URL
 import java.nio.channels.DatagramChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
+import kotlin.math.abs
 import kotlin.random.Random
 
+/**
+ * NATPoked Client
+ *
+ * @author Kenvix
+ */
 object NATClient : CoroutineScope, AutoCloseable {
     private val job = Job() + CoroutineName(this.toString())
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
@@ -229,6 +235,26 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     internal fun onBrokerMessage(topicPath: List<String>, typeId: Int, messagePayload: ByteArray) {
 
+    }
+
+    suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        val result = echoClient.requestEcho(
+            AppEnv.EchoPortList.asIterable(),
+            InetAddress.getByName(brokerClient.brokerHost),
+            srcChannel
+        )
+        val endTime = System.currentTimeMillis()
+        val timeElapsed = endTime - startTime
+
+        var avg: Double = 0.0
+        for (i in 1 until result.size) {
+            avg += abs(result[i].port - result[i - 1].port).toDouble() / (result[i].finishedTime - result[i - 1].finishedTime).toDouble()
+        }
+
+        avg /= (result.size - 1).toDouble()
+        val lastPort = result.last().port
+        return@withContext PortAllocationPredictionParam(avg, timeElapsed, lastPort)
     }
 
     override fun close() {

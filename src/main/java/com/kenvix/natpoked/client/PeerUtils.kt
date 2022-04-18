@@ -10,7 +10,7 @@ import kotlin.random.Random
 
 @JvmInline
 value class ServiceName(val name: String) {
-    fun serviceNameCode(): Int = this.hashCode()
+    fun serviceNameCode(): Int = name.hashCode()
 }
 
 suspend fun sendUdpPacket(addr: InetAddress, dstPort: Int = 53, srcPort: Int = 0, packetNum: Int = 1, data: ByteArray? = null)

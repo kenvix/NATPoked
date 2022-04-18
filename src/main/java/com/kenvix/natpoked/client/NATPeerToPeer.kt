@@ -1,6 +1,5 @@
 package com.kenvix.natpoked.client
 
-import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.NATClient.portRedirector
@@ -236,6 +235,7 @@ class NATPeerToPeer(
             logger.warn("Keep alive job already started")
         }
     }
+
 
     private suspend fun sendKeepAlivePacket(target: InetSocketAddress, isReply: Boolean = false) {
         val typeIdInt = TYPE_DATA_CONTROL_KEEPALIVE.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
