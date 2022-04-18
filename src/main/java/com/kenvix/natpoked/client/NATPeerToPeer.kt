@@ -53,6 +53,7 @@ class NATPeerToPeer(
     private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500)
+    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size)
     private val keepAliveLock = Mutex()
     private var useSocketConnect: Boolean = false

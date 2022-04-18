@@ -40,7 +40,7 @@ abstract class ServiceRedirector(
     private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     private val sendAppPacketBufferLock = Mutex()
-    protected val channel: DatagramChannel = DatagramChannel.open().makeNonBlocking()
+    protected val channel: DatagramChannel = DatagramChannel.open()
 
     protected fun startRedirector() {
         receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
@@ -53,7 +53,7 @@ abstract class ServiceRedirector(
                     receiveAppPacketBuffer.putUnsignedShort(typeId)
                     receiveAppPacketBuffer.putInt(serviceName.serviceNameCode())
 
-                    val kcpClientAddr = channel.aReceive(receiveAppPacketBuffer)
+                    val kcpClientAddr = channel.receive(receiveAppPacketBuffer)
                     if (!channel.isConnected)
                         channel.connect(kcpClientAddr)
 
@@ -80,12 +80,12 @@ abstract class ServiceRedirector(
                 sendAppPacketBuffer.put(buf.array(), buf.arrayOffset() + buf.readerIndex(), buf.readableBytes())
 
                 sendAppPacketBuffer.flip()
-                val written = channel.aWrite(sendAppPacketBuffer)
+                val written = channel.write(sendAppPacketBuffer)
                 if (AppEnv.DebugNetworkTraffic)
                     logger.trace("onReceivedRemotePacket: Sent app packet to service app, size: $written")
             }
         } else {
-            channel.aWrite(buf.nioBuffer())
+            channel.write(buf.nioBuffer())
         }
     }
 
