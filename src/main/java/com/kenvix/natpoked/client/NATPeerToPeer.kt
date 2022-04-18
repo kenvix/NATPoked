@@ -52,9 +52,9 @@ class NATPeerToPeer(
     val targetKey = if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha
     private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
-    private val sendBuffer = ByteBuffer.allocateDirect(1500)
-    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
-    private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size)
+    private val sendBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
+    private val receiveBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
+    private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
     private val keepAliveLock = Mutex()
     private var useSocketConnect: Boolean = false
 
@@ -113,9 +113,9 @@ class NATPeerToPeer(
     private val receiveJob: Job = launch(Dispatchers.IO) {
         while (isActive) {
             try {
-                val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
-                val packet = DatagramPacket(buf, 1500)
-                udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
+                val buffer = receiveBuffer
+                buffer.clear()
+                val addr = udpChannel.receive(buffer) // Use classical Socket API to Ensure Array Backend
                 if (AppEnv.DebugNetworkTraffic) {
                     logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
                 }
@@ -174,7 +174,6 @@ class NATPeerToPeer(
         keepAliveLock.withLock {
             val buffer = keepAliveBuffer
             buffer.clear()
-            buffer.order(ByteOrder.BIG_ENDIAN)
             buffer.putShort(typeIdInt.toShort()) // 2
             buffer.put(currentMyIV) // 16
             buffer.put(if (isReply) 1 else 0) // 1
@@ -269,7 +268,6 @@ class NATPeerToPeer(
         keepAliveLock.withLock {
             val buffer = keepAliveBuffer
             buffer.clear()
-            buffer.order(ByteOrder.BIG_ENDIAN)
             buffer.putShort(typeIdInt.toShort()) // 2
             buffer.put(currentMyIV) // 16
             buffer.put(stage) // 1
@@ -327,7 +325,6 @@ class NATPeerToPeer(
         // TODO: ENCRYPT
         sendLock.withLock {
             sendBuffer.clear()
-            sendBuffer.order(ByteOrder.BIG_ENDIAN)
             sendBuffer.putUnsignedShort(typeIdInt)
             buffer.readBytes(sendBuffer)
 
@@ -350,7 +347,6 @@ class NATPeerToPeer(
 
         sendLock.withLock {
             sendBuffer.clear()
-            sendBuffer.order(ByteOrder.BIG_ENDIAN)
 
             sendBuffer.putUnsignedShort(typeId)
             if (!PeerCommunicationType.isLocalHost(typeId)) {

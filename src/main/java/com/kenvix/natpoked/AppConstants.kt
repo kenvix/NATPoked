@@ -3,6 +3,8 @@ package com.kenvix.natpoked
 import ch.qos.logback.classic.Logger
 import com.kenvix.utils.event.EventSet
 import com.kenvix.utils.event.eventSetOf
+import io.netty.channel.EventLoopGroup
+import io.netty.channel.nio.NioEventLoopGroup
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
@@ -15,6 +17,7 @@ object AppConstants {
     val workingPath = Path.of(workingFolder)
     var appMode: AppMode = AppMode.CLIENT
     val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+//    var nettyGroup: EventLoopGroup = NioEventLoopGroup()
 
     enum class AppMode {
         CLIENT, SERVER

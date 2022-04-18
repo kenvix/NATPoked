@@ -37,8 +37,8 @@ abstract class ServiceRedirector(
     protected lateinit var receiveAppPacketAndSendJob: Job
         private set
 
-    private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
-    private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
+    private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
+    private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
     private val sendAppPacketBufferLock = Mutex()
     protected val channel: DatagramChannel = DatagramChannel.open()
 
@@ -47,7 +47,6 @@ abstract class ServiceRedirector(
             while (isActive) {
                 try {
                     receiveAppPacketBuffer.clear()
-                    receiveAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
                     var typeId: Int = 0
                     typeId = peer.putTypeFlags(typeId, null, flags)
                     receiveAppPacketBuffer.putUnsignedShort(typeId)
@@ -76,7 +75,6 @@ abstract class ServiceRedirector(
         if (buf.hasArray()) {
             sendAppPacketBufferLock.withLock {
                 sendAppPacketBuffer.clear()
-                sendAppPacketBuffer.order(ByteOrder.BIG_ENDIAN)
                 sendAppPacketBuffer.put(buf.array(), buf.arrayOffset() + buf.readerIndex(), buf.readableBytes())
 
                 sendAppPacketBuffer.flip()

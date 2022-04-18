@@ -120,7 +120,6 @@ class SocketAddrEchoClient(
     @Suppress("UsePropertyAccessSyntax")
     private fun parseEchoResult(packet: DatagramPacket): SocketAddrEchoResult {
         val buffer = ByteBuffer.wrap(packet.data, 0, packet.length)
-        buffer.order(ByteOrder.BIG_ENDIAN)
 
         if (buffer.getInt() != SocketAddrEchoServer.PacketPrefixResponse)
             throw BadRequestException("Bad response")

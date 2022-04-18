@@ -60,9 +60,7 @@ class SocketAddrEchoServer(
     }
 
     private lateinit var serverJob: Job
-    private val buffer = ByteBuffer.allocateDirect(32).apply {
-        order(ByteOrder.BIG_ENDIAN)
-    }
+    private val buffer = ByteBuffer.allocateDirect(32).apply { order(ByteOrder.BIG_ENDIAN) }
 
     fun startAsync() {
         if (!isActive || this::serverJob.isInitialized)
