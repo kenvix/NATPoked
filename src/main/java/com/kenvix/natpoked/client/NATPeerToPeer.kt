@@ -94,6 +94,7 @@ class NATPeerToPeer(
 
     companion object {
         private const val ivSize = 16
+        @JvmStatic val debugNetworkTraffic = AppEnv.DebugMode && AppEnv.DebugNetworkTraffic
         val wireGuardConfigDirPath = AppConstants.workingPath.resolve("Config").resolve("WireGuard")
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
     }
@@ -115,11 +116,14 @@ class NATPeerToPeer(
             try {
                 val buffer = receiveBuffer
                 buffer.clear()
-                val addr = udpChannel.receive(buffer) // Use classical Socket API to Ensure Array Backend
-                if (AppEnv.DebugNetworkTraffic) {
-                    logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
+
+                val addr = udpChannel.receive(buffer) as InetSocketAddress
+                if (debugNetworkTraffic) {
+                    logger.trace("Received peer packet from $addr size ${buffer.position()}")
                 }
-                dispatchIncomingPacket(packet)
+
+                buffer.flip()
+                dispatchIncomingPacket(addr, buffer)
             } catch (e: Exception) {
                 logger.error("Unable to handle incoming packet!!!", e)
             }
@@ -235,7 +239,7 @@ class NATPeerToPeer(
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, target)
-        if (AppEnv.DebugNetworkTraffic) {
+        if (debugNetworkTraffic) {
             if (!buffer.isDirect)
                 logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
             else
@@ -245,7 +249,7 @@ class NATPeerToPeer(
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, targetAddr)
-        if (AppEnv.DebugNetworkTraffic) {
+        if (debugNetworkTraffic) {
             if (!buffer.isDirect)
                 logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
             else
@@ -361,7 +365,7 @@ class NATPeerToPeer(
         }
     }
 
-    private fun readSockAddr(typeIdInt: Int, decryptedBuf: ByteBuf): InetSocketAddress {
+    private fun readSockAddr(typeIdInt: Int, decryptedBuf: ByteBuffer): InetSocketAddress {
         val targetAddr: InetAddress = if (PeerCommunicationType.isLocalHost(typeIdInt)) {
             if (PeerCommunicationType.isIpv6(typeIdInt))
                 strictLocalHostAddress6
@@ -370,151 +374,136 @@ class NATPeerToPeer(
         } else {
             if (PeerCommunicationType.isIpv6(typeIdInt)) {
                 val bytes: ByteArray = ByteArray(16)
-                decryptedBuf.readBytes(bytes, 0, 16)
+                decryptedBuf.get(bytes, 0, 16)
                 Inet6Address.getByAddress(bytes)
             } else {
                 val bytes: ByteArray = ByteArray(4)
-                decryptedBuf.readBytes(bytes, 0, 4)
+                decryptedBuf.get(bytes, 0, 4)
                 Inet4Address.getByAddress(bytes)
             }
         }
 
-        val port: Int = decryptedBuf.readUnsignedShort()
+        val port: Int = decryptedBuf.getUnsignedShort()
         return InetSocketAddress(targetAddr, port)
     }
 
-    private fun dispatchIncomingPacket(packet: DatagramPacket) {
-        val addr: InetSocketAddress = packet.socketAddress as InetSocketAddress
-        val inArrayBuf: ByteArray = packet.data
-        val inArrayBufLen: Int = packet.length
-        if (SocketAddrEchoClient.isResponsePacket(inArrayBuf)) {
-            pingReceiverChannel?.trySend(packet)
+    private suspend fun dispatchIncomingPacket(addr: InetSocketAddress, buffer: ByteBuffer) {
+        if (SocketAddrEchoClient.isResponsePacket(buffer)) {
+            pingReceiverChannel?.trySend(buffer.toDatagramPacket(addr))
             return
         }
 
-        val inBuf = Unpooled.wrappedBuffer(inArrayBuf, packet.offset, inArrayBufLen)
-        val typeIdInt: Int = inBuf.readShort().toInt()
+        val typeIdInt: Int = buffer.short.toInt()
         if (typeIdInt < 0)
             return
 
         val mainTypeClass: Short = PeerCommunicationType.getTypeMainClass(typeIdInt)
 
         if (PeerCommunicationType.hasIV(typeIdInt)) {
-            if (inBuf.readableBytes() < ivSize) {
+            if (buffer.remaining() < ivSize) {
                 logger.warn("Incoming packet has IV but is too small to contain IV.")
                 return
             }
 
-            inBuf.readBytes(currentTargetIV, 0, ivSize)
+            buffer.get(currentTargetIV, 0, ivSize)
         }
 
-        val decryptedBuf = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
-            Unpooled.wrappedBuffer(
-                aes.decrypt(
-                    inArrayBuf,
-                    currentMyIV,
-                    inBuf.readerIndexInArrayOffset(),
-                    inArrayBufLen - inBuf.readerIndexInArrayOffset()
-                )
-            )
+        val decryptedBuf: ByteBuffer = if (PeerCommunicationType.isEncrypted(typeIdInt)) {
+            val arr = ByteArray(buffer.remaining())
+            buffer.get(arr)
+            aes.decrypt(arr, currentMyIV)
+            ByteBuffer.wrap(arr)
         } else {
-            Unpooled.wrappedBuffer(
-                inArrayBuf,
-                inBuf.readerIndexInArrayOffset(),
-                inArrayBufLen - inBuf.readerIndexInArrayOffset()
-            )
+            buffer
         }
 
-        val size = decryptedBuf.readableBytes()
+        val size = decryptedBuf.remaining()
 
-        launch(Dispatchers.IO) {
-            try {
-                when (mainTypeClass) {
-                    TYPE_DATA_STREAM.typeId -> {
-                        TODO("Not implemented")
-                    }
+        try {
+            when (mainTypeClass) {
+                TYPE_DATA_STREAM.typeId -> {
+                    TODO("Not implemented")
+                }
 
-                    TYPE_DATA_DGRAM.typeId -> {
-                        when ((typeIdInt and 0x3F).toShort()) {
-                            TYPE_DATA_DGRAM_SERVICE.typeId -> {
-                                if (size > 4) {
-                                    val serviceNameCode = decryptedBuf.readInt()
-                                    val service = portServicesMap[serviceNameCode].also {
-                                        if (it == null)
-                                            startAllServices()
-                                    }.assertExist()
-                                    service.onReceivedRemotePacket(decryptedBuf)
-                                }
-                            }
+                TYPE_DATA_DGRAM.typeId -> {
+                    when ((typeIdInt and 0x3F).toShort()) {
+                        TYPE_DATA_DGRAM_SERVICE.typeId -> {
+                            if (size > 4) {
+                                val serviceNameCode = decryptedBuf.int
+                                val service = portServicesMap[serviceNameCode].also {
+                                    if (it == null)
+                                        startAllServices()
+                                }.assertExist()
 
-                            TYPE_DATA_DGRAM_RAW.typeId -> {
-                                if (size > 3) {
-                                    val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
-                                    if (sockAddr.port != 0) {
-                                        portRedirector.writeUdpPacket(
-                                            this@NATPeerToPeer,
-                                            decryptedBuf.array(),
-                                            decryptedBuf.readerIndexInArrayOffset(),
-                                            decryptedBuf.readableBytes(),
-                                            sockAddr
-                                        )
-                                    } else {
-                                        logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
-                                    }
-                                }
-                            }
-
-                            else -> {
-                                logger.warn("Received NOT SUPPORTED peer TYPE_DATA_DGRAM packet, size $size: UNKNOWN TYPE")
+                                service.onReceivedRemotePacket(decryptedBuf)
                             }
                         }
-                    }
 
-                    TYPE_DATA_CONTROL.typeId -> {
-                        when ((typeIdInt and 0x3F).toShort()) {
-                            TYPE_DATA_CONTROL_HELLO.typeId -> {
-                                logger.info("Received peer helloACK packet from $addr, size $size")
-                                if (connectJob?.isActive == true)
-                                    connectJob?.cancel("Connection to peer is established")
-
-                                val stage = decryptedBuf.readByte()
-
-                                if (!isConnected) {
-                                    setSocketConnectTo(addr)
-                                    if (stage == 0.toByte()) {
-                                        sendHelloPacket(addr, stage = 1, num = 20)
-                                    }
-
-                                    logger.info("Connection to peer is established | stage $stage")
+                        TYPE_DATA_DGRAM_RAW.typeId -> {
+                            if (size > 3) {
+                                val sockAddr = readSockAddr(typeIdInt, decryptedBuf)
+                                if (sockAddr.port != 0) {
+                                    portRedirector.writeUdpPacket(
+                                        this@NATPeerToPeer,
+                                        decryptedBuf.toDatagramPacket(sockAddr),
+                                        sockAddr
+                                    )
                                 } else {
-                                    logger.debug("Connection to peer is already established, no need to connect again")
+                                    logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
                                 }
                             }
+                        }
 
-                            TYPE_DATA_CONTROL_KEEPALIVE.typeId -> {
-                                val subType = decryptedBuf.readByte()
-                                if (subType == 0.toByte()) {
-                                    logger.trace("Received peer keepalive REQUEST packet from $addr, size $size, replying ...")
-                                    sendKeepAlivePacket(addr, isReply = true)
-                                } else {
-                                    try {
-                                        keepAlivePacketContinuation?.resume(Unit)
-                                        keepAlivePacketContinuation = null
-                                    } catch (e: Exception) {
-                                        logger.debug("Received peer keepalive REPLY packet from $addr, size $size, but no continuation is already resumed", e)
-                                    }
-                                }
-                            }
-
-                            else -> {
-                                TODO()
-                            }
+                        else -> {
+                            logger.warn("Received NOT SUPPORTED peer TYPE_DATA_DGRAM packet, size $size: UNKNOWN TYPE")
                         }
                     }
                 }
-            } catch (e: Throwable) {
-                logger.error("Unexpected Error while processing incoming packet from $addr", e)
+
+                TYPE_DATA_CONTROL.typeId -> {
+                    when ((typeIdInt and 0x3F).toShort()) {
+                        TYPE_DATA_CONTROL_HELLO.typeId -> {
+                            logger.info("Received peer helloACK packet from $addr, size $size")
+                            if (connectJob?.isActive == true)
+                                connectJob?.cancel("Connection to peer is established")
+
+                            val stage = decryptedBuf.get()
+
+                            if (!isConnected) {
+                                setSocketConnectTo(addr)
+                                if (stage == 0.toByte()) {
+                                    sendHelloPacket(addr, stage = 1, num = 20)
+                                }
+
+                                logger.info("Connection to peer is established | stage $stage")
+                            } else {
+                                logger.debug("Connection to peer is already established, no need to connect again")
+                            }
+                        }
+
+                        TYPE_DATA_CONTROL_KEEPALIVE.typeId -> {
+                            val subType = decryptedBuf.get()
+                            if (subType == 0.toByte()) {
+                                logger.trace("Received peer keepalive REQUEST packet from $addr, size $size, replying ...")
+                                sendKeepAlivePacket(addr, isReply = true)
+                            } else {
+                                try {
+                                    keepAlivePacketContinuation?.resume(Unit)
+                                    keepAlivePacketContinuation = null
+                                } catch (e: Exception) {
+                                    logger.debug("Received peer keepalive REPLY packet from $addr, size $size, but no continuation is already resumed", e)
+                                }
+                            }
+                        }
+
+                        else -> {
+                            TODO()
+                        }
+                    }
+                }
             }
+        } catch (e: Throwable) {
+            logger.error("Unexpected Error while processing incoming packet from $addr", e)
         }
     }
 

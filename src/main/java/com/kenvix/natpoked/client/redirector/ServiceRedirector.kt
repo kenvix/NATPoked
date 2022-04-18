@@ -66,7 +66,7 @@ abstract class ServiceRedirector(
         }
     }
 
-    open suspend fun onReceivedRemotePacket(buf: ByteBuf) {
+    open suspend fun onReceivedRemotePacket(buf: ByteBuffer) {
         if (!channel.isConnected) {
             logger.warn("Channel is not connected by service app, ignore packet")
             return
@@ -75,15 +75,15 @@ abstract class ServiceRedirector(
         if (buf.hasArray()) {
             sendAppPacketBufferLock.withLock {
                 sendAppPacketBuffer.clear()
-                sendAppPacketBuffer.put(buf.array(), buf.arrayOffset() + buf.readerIndex(), buf.readableBytes())
+                sendAppPacketBuffer.put(buf)
 
                 sendAppPacketBuffer.flip()
                 val written = channel.write(sendAppPacketBuffer)
-                if (AppEnv.DebugNetworkTraffic)
+                if (NATPeerToPeer.debugNetworkTraffic)
                     logger.trace("onReceivedRemotePacket: Sent app packet to service app, size: $written")
             }
         } else {
-            channel.write(buf.nioBuffer())
+            channel.write(buf)
         }
     }
 

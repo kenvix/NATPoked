@@ -206,6 +206,11 @@ class RawUdpPortRedirector : Closeable, CoroutineScope {
     suspend fun writeUdpPacket(client: NATPeerToPeer, data: ByteArray, offset: Int, len: Int, addr: InetSocketAddress) {
         val boundUdp = boundUdpChannels[addr]
         val packet = DatagramPacket(data, offset, len, addr)
+        writeUdpPacket(client, packet, addr)
+    }
+
+    suspend fun writeUdpPacket(client: NATPeerToPeer, packet: DatagramPacket, addr: InetSocketAddress) {
+        val boundUdp = boundUdpChannels[addr]
         if (boundUdp != null) { // 已设置转发规则并绑定的端口，使用绑定的源地址
             boundUdp.sendQueue.send(packet)
         } else {

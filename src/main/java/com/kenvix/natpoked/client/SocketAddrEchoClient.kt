@@ -156,5 +156,14 @@ class SocketAddrEchoClient(
 
             return true
         }
+
+        fun isResponsePacket(buffer: ByteBuffer): Boolean {
+            if (buffer.remaining() < 19) return false
+            if (buffer[0] != 0x7A.toByte() || buffer[1] != 0x1B.toByte() ||
+                buffer[2] != 0x4C.toByte() || buffer[3] != 0xCD.toByte()
+            ) return false
+
+            return true
+        }
     }
 }
