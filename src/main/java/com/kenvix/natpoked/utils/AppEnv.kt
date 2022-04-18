@@ -128,6 +128,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("对等端发送缓冲区大小，单位是字节")
     val PeerSendBufferSize: Int by envOf(5 * 1024 * 1024)
 
+    val PeerReceiveBufferNum: Int by envOf(2)
+
     @Description("对等端接收缓冲区大小，单位是字节")
     val PeerReceiveBufferSize: Int by envOf(4 * 1024 * 1024)
 

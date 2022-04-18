@@ -29,6 +29,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
@@ -44,6 +45,10 @@ class NATPeerToPeer(
     val targetPeerId: PeerId,
     private val config: PeersConfig.Peer
 ) : CoroutineScope, AutoCloseable {
+    private data class BufferInfo(
+        val buffer: ByteBuffer = ByteBuffer.allocateDirect(1500),
+        val lock: Mutex = Mutex()
+    )
 
     private val job = Job() + CoroutineName(this.toString())
     override val coroutineContext: CoroutineContext = job + Dispatchers.IO
@@ -53,7 +58,12 @@ class NATPeerToPeer(
     private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
     private val sendBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
-    private val receiveBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
+
+//    private val receiveBuffers = Array<BufferInfo>(receiveBufferNum) { BufferInfo() }
+    private val receiveBuffers = Array<ByteBuffer>(receiveBufferNum) { ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) } }
+
+    private var currentReceiveBufferIndex: AtomicInteger = AtomicInteger(0)
+
     private val keepAliveBuffer = ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
     private val keepAliveLock = Mutex()
     private var useSocketConnect: Boolean = false
@@ -97,6 +107,7 @@ class NATPeerToPeer(
         @JvmStatic val debugNetworkTraffic = AppEnv.DebugMode && AppEnv.DebugNetworkTraffic
         val wireGuardConfigDirPath = AppConstants.workingPath.resolve("Config").resolve("WireGuard")
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
+        val receiveBufferNum = AppEnv.PeerReceiveBufferNum
     }
 
     private val udpChannel: DatagramChannel =
@@ -111,24 +122,27 @@ class NATPeerToPeer(
         listenUdpSourcePort(config.pokedPort)
     }
 
-    private val receiveJob: Job = launch(Dispatchers.IO) {
-        while (isActive) {
-            try {
-                val buffer = receiveBuffer
-                buffer.clear()
+    private val receiveJob: Array<Job> = Array(receiveBufferNum) {
+        launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    val buffer = receiveBuffers[it]
+                    buffer.clear()
 
-                val addr = udpChannel.receive(buffer) as InetSocketAddress
-                if (debugNetworkTraffic) {
-                    logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                    val addr = udpChannel.receive(buffer) as InetSocketAddress
+                    if (debugNetworkTraffic) {
+                        logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                    }
+
+                    buffer.flip()
+                    dispatchIncomingPacket(addr, buffer)
+                } catch (e: Exception) {
+                    logger.error("Unable to handle incoming packet!!!", e)
                 }
-
-                buffer.flip()
-                dispatchIncomingPacket(addr, buffer)
-            } catch (e: Exception) {
-                logger.error("Unable to handle incoming packet!!!", e)
             }
         }
     }
+
     private var keepAliveJob: Job? = null
 
     @Volatile var keepAlivePacketContinuation: Continuation<Unit>? = null
@@ -714,7 +728,7 @@ class NATPeerToPeer(
     }
 
     override fun close() {
-        receiveJob.cancel()
+        //receiveJob.cancel()
         udpChannel.close()
         coroutineContext.cancel()
     }
