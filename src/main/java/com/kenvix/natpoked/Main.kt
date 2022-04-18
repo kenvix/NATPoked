@@ -9,6 +9,7 @@ import com.kenvix.web.utils.ExceptionHandler
 import com.kenvix.web.utils.error
 import kotlinx.coroutines.*
 import org.apache.commons.cli.*
+import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.CoroutineContext
 import kotlin.system.exitProcess
@@ -34,6 +35,7 @@ object Main : CoroutineScope {
 
         registerCommands()
         registerShutdownHandler()
+        checkFiles()
         launch(Dispatchers.IO) { beginReadSystemConsole() }
 
         launch(Dispatchers.IO) {
@@ -61,6 +63,11 @@ object Main : CoroutineScope {
                 }.onFailure { showErrorAndExit(it, 2, "Client initialization failed") }
             }
         }
+    }
+
+    private fun checkFiles() {
+        IOUtils.resourceToURL("/wireguard_client.conf")
+        IOUtils.resourceToURL("/wireguard_server.conf")
     }
 
     @JvmOverloads

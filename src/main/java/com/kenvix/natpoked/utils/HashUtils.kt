@@ -2,7 +2,11 @@ package com.kenvix.natpoked.utils
 
 import java.security.MessageDigest
 
-private val sha256MessageDigest = MessageDigest.getInstance("SHA-256")
+fun hashOf(algo: String, data: ByteArray): ByteArray {
+    val md = MessageDigest.getInstance(algo)
+    md.update(data)
+    return md.digest()
+}
 
 /**
  * 计算字符串的 SHA-256 散列值
@@ -10,13 +14,19 @@ private val sha256MessageDigest = MessageDigest.getInstance("SHA-256")
  * @return Byte array of SHA-256
  */
 fun sha256Of(str: String): ByteArray = str.let { strText ->
-    sha256MessageDigest.update(strText.toByteArray())
-    sha256MessageDigest.digest()
+    hashOf("SHA-256", strText.toByteArray())
 }
 
 fun sha256Of(str: ByteArray): ByteArray = str.let { strText ->
-    sha256MessageDigest.update(strText)
-    sha256MessageDigest.digest()
+    hashOf("SHA-256", strText)
+}
+
+fun md5Of(str: String): ByteArray = str.let { strText ->
+    hashOf("MD5", strText.toByteArray())
+}
+
+fun md5Of(str: ByteArray): ByteArray = str.let { strText ->
+    hashOf("MD5", strText)
 }
 
 /**

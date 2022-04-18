@@ -8,11 +8,16 @@ package com.kenvix.natpoked.client.redirector
 
 import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.ServiceName
+import com.kenvix.natpoked.contacts.ClientServerRole
 import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.AppEnv
+import com.kenvix.natpoked.utils.PlatformDetection
+import com.kenvix.web.utils.ProcessUtils
 import okhttp3.internal.toHexString
 import org.slf4j.LoggerFactory
+import java.io.Closeable
+import java.net.InetSocketAddress
 import java.nio.file.Path
 import java.util.*
 
@@ -32,4 +37,49 @@ class WireGuardRedirector(
 
     private val processKey: String
         get() = "wg_$serviceName"
+
+    fun start() {
+        if (myPeerConfig.role == ClientServerRole.SERVER) {
+            channel.connect(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
+        } else {
+            channel.bind(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
+        }
+
+        startRedirector()
+
+        val builder = if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
+            ProcessBuilder(
+                "wireguard.exe",
+                "/installtunnelservice",
+                "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
+            )
+        } else {
+            ProcessBuilder(
+                "wg-quick",
+                "up",
+                "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
+            )
+        }
+
+        ProcessUtils.runProcess(processKey, builder, keepAlive = false)
+    }
+
+    override fun close() {
+        super.close()
+        val builder = if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
+            ProcessBuilder(
+                "wireguard.exe",
+                "/uninstalltunnelservice",
+                "\"${wireGuardConfigFilePath.fileName}\"",
+            )
+        } else {
+            ProcessBuilder(
+                "wg-quick",
+                "down",
+                "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
+            )
+        }
+
+        ProcessUtils.runProcess(processKey, builder, keepAlive = false)
+    }
 }

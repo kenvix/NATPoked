@@ -158,8 +158,10 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         charset: Charset = Charsets.UTF_8,
         input: String? = null,
         sendNewLineWhenInputWritten: Boolean = false,
-        sendTermSignalWhenInputWritten: Boolean = false
+        sendTermSignalWhenInputWritten: Boolean = false,
+        redirectDir: Boolean = false,
     ): String {
+        buildProcess(builder, redirectDir)
         val proc = builder.start()
         if (input != null) {
             IOUtils.write(input, proc.outputStream, charset)

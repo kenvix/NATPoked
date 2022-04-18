@@ -1,11 +1,11 @@
 package com.kenvix.natpoked.client
 
-import com.google.common.primitives.Bytes
 import com.google.common.primitives.Ints
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
 import com.kenvix.natpoked.client.redirector.ServiceRedirector
+import com.kenvix.natpoked.client.redirector.WireGuardRedirector
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.server.BrokerMessage
@@ -23,6 +23,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import okhttp3.internal.toHexString
+import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
@@ -78,6 +79,7 @@ class NATPeerToPeer(
 
     @Volatile
     private var isConnected: Boolean = false
+
     @Volatile
     var targetAddr: InetSocketAddress? = null
         private set
@@ -112,6 +114,7 @@ class NATPeerToPeer(
 
     companion object {
         private const val ivSize = 16
+
         @JvmStatic
         val debugNetworkTraffic = AppEnv.DebugMode && AppEnv.DebugNetworkTraffic
         val wireGuardConfigDirPath = AppConstants.workingPath.resolve("Config").resolve("WireGuard")
@@ -131,62 +134,63 @@ class NATPeerToPeer(
         listenUdpSourcePort(config.pokedPort)
     }
 
-    private val receiveJob: Array<Job> = Array(if (AppEnv.PeerCommunicationModel.lowercase() == "nio") 1 else receiveBufferNum) {
-        launch(Dispatchers.IO) {
-            if (AppEnv.PeerCommunicationModel.lowercase() == "nio") {
-                val buffersChannel = Channel<ByteBuffer>(AppEnv.PeerReceiveBufferNum)
-                for (i in 0 until 10) {
-                    buffersChannel.send(receiveBuffers[i])
-                }
+    private val receiveJob: Array<Job> =
+        Array(if (AppEnv.PeerCommunicationModel.lowercase() == "nio") 1 else receiveBufferNum) {
+            launch(Dispatchers.IO) {
+                if (AppEnv.PeerCommunicationModel.lowercase() == "nio") {
+                    val buffersChannel = Channel<ByteBuffer>(AppEnv.PeerReceiveBufferNum)
+                    for (i in 0 until 10) {
+                        buffersChannel.send(receiveBuffers[i])
+                    }
 
-                udpChannel.makeNonBlocking()
-                val selector = Selector.open()
-                udpChannel.register(selector, SelectionKey.OP_READ)
+                    udpChannel.makeNonBlocking()
+                    val selector = Selector.open()
+                    udpChannel.register(selector, SelectionKey.OP_READ)
 
-                while (isActive) {
-                    selector.select()
-                    val keys = selector.selectedKeys()
-                    keys.forEach {
-                        if (it.isReadable) {
-                            val buffer = buffersChannel.receive()
-                            buffer.clear()
+                    while (isActive) {
+                        selector.select()
+                        val keys = selector.selectedKeys()
+                        keys.forEach {
+                            if (it.isReadable) {
+                                val buffer = buffersChannel.receive()
+                                buffer.clear()
 
-                            val addr = udpChannel.receive(buffer) as InetSocketAddress?
-                            if (addr != null) {
-                                if (debugNetworkTraffic) {
-                                    logger.trace("Received peer packet from $addr size ${buffer.position()}")
-                                }
-                                buffer.flip()
-                                launch(Dispatchers.IO) {
-                                    dispatchIncomingPacket(addr, buffer)
-                                    buffersChannel.send(buffer)
+                                val addr = udpChannel.receive(buffer) as InetSocketAddress?
+                                if (addr != null) {
+                                    if (debugNetworkTraffic) {
+                                        logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                                    }
+                                    buffer.flip()
+                                    launch(Dispatchers.IO) {
+                                        dispatchIncomingPacket(addr, buffer)
+                                        buffersChannel.send(buffer)
+                                    }
                                 }
                             }
                         }
+
+                        keys.clear()
                     }
+                } else {
+                    while (isActive) {
+                        try {
+                            val buffer = receiveBuffers[it]
+                            buffer.clear()
 
-                    keys.clear()
-                }
-            } else {
-                while (isActive) {
-                    try {
-                        val buffer = receiveBuffers[it]
-                        buffer.clear()
+                            val addr = udpChannel.receive(buffer) as InetSocketAddress
+                            if (debugNetworkTraffic) {
+                                logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                            }
 
-                        val addr = udpChannel.receive(buffer) as InetSocketAddress
-                        if (debugNetworkTraffic) {
-                            logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                            buffer.flip()
+                            dispatchIncomingPacket(addr, buffer)
+                        } catch (e: Exception) {
+                            logger.error("Unable to handle incoming packet!!!", e)
                         }
-
-                        buffer.flip()
-                        dispatchIncomingPacket(addr, buffer)
-                    } catch (e: Exception) {
-                        logger.error("Unable to handle incoming packet!!!", e)
                     }
                 }
             }
         }
-    }
 
     private var keepAliveJob: Job? = null
 
@@ -701,45 +705,75 @@ class NATPeerToPeer(
     }
 
     @Suppress("LocalVariableName")
-    private suspend fun setupWireGuard(role: ClientServerRole) = withContext(Dispatchers.IO) {
-        if (!wireGuardConfigDirPath.exists())
-            wireGuardConfigDirPath.toFile().mkdirs()
+    private suspend fun setupWireGuard() = withContext(Dispatchers.IO) {
+        if (!config.wireGuard.enabled)
+            return@withContext
 
-        val wireGuardConfigFilePath = wireGuardConfigDirPath
-            .resolve("${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${role.toString().lowercase()}.conf")
-        val wireGuardConfigFile = wireGuardConfigFilePath.toFile()
-        if (!wireGuardConfigFile.exists()) {
-            val templateFileName =
-                if (role == ClientServerRole.CLIENT) "wireguard_client.conf" else "wireguard_server.conf"
-            val stream =
-                Thread.currentThread().contextClassLoader.getResourceAsStream("/$templateFileName").assertExist()
-            wireGuardConfigFile.outputStream().use { stream.transferTo(it) }
-        }
+        portServiceOperationLock.withLock {
+            if ("__wireguard".serviceNameCode() in portServicesMap) {
+                return@withContext
+            }
 
-        var content = wireGuardConfigFile.readText()
+            logger.debug("setupWireGuard: installing wireguard service")
 
-        val PeerPreSharedKey = getKcpTunPreSharedKey().toBase64String()
-        val MyPeerPrivateKey = AppEnv.PeerMyPSK.toBase64String()
-        val TargetPeerPublicKey = Curve25519Utils.getPublicKey(config.keySha).toBase64String()
-        val baseIp4 = generateWireGuardIp4Address()
+            val role = config.wireGuard.role
 
-        content = content
-            .replace("$(PeerPreSharedKey)", PeerPreSharedKey)
-            .replace("$(MyPeerPrivateKey)", MyPeerPrivateKey)
-            .replace("$(TargetPeerPublicKey)", TargetPeerPublicKey)
+            if (!wireGuardConfigDirPath.exists())
+                wireGuardConfigDirPath.toFile().mkdirs()
 
-        if (role == ClientServerRole.CLIENT) {
+            val wireGuardConfigFilePath = wireGuardConfigDirPath
+                .resolve(
+                    "${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${
+                        role.toString().lowercase()
+                    }.conf"
+                )
+            val wireGuardConfigFile = wireGuardConfigFilePath.toFile()
+            if (!wireGuardConfigFile.exists()) {
+                val templateFileName =
+                    if (role == ClientServerRole.CLIENT) "wireguard_client.conf" else "wireguard_server.conf"
+                val stream = IOUtils.resourceToURL("/$templateFileName").openStream()
+                wireGuardConfigFile.outputStream().use { stream.transferTo(it) }
+            }
+
+            var content = wireGuardConfigFile.readText()
+
+            val PeerPreSharedKey = getKcpTunPreSharedKey().toBase64String()
+            val MyPeerPrivateKey = AppEnv.PeerMyPSK.toBase64String()
+            val TargetPeerPublicKey = Curve25519Utils.getPublicKey(config.keySha).toBase64String()
+            val baseIp4 = generateWireGuardIp4Address()
+
             content = content
-                .replace("$(MyPeerIp)", baseIp4.clientIp.hostAddress)
-                .replace("$(TargetPeerIp)", baseIp4.serverIp.hostAddress)
-        } else {
-            content = content
-                .replace("$(MyPeerIp)", baseIp4.serverIp.hostAddress)
-                .replace("$(TargetPeerIp)", baseIp4.clientIp.hostAddress)
-        }
+                .replace("$(PeerPreSharedKey)", PeerPreSharedKey)
+                .replace("$(MyPeerPrivateKey)", MyPeerPrivateKey)
+                .replace("$(TargetPeerPublicKey)", TargetPeerPublicKey)
 
-        val tempPath = AppConstants.tempPath.resolve("wg-${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${role.toString().lowercase()}.conf")
-        tempPath.writeText(content)
+            if (role == ClientServerRole.CLIENT) {
+                content = content
+                    .replace("$(MyPeerIp)", baseIp4.clientIp.hostAddress)
+                    .replace("$(TargetPeerIp)", baseIp4.serverIp.hostAddress)
+            } else {
+                content = content
+                    .replace("$(MyPeerIp)", baseIp4.serverIp.hostAddress)
+                    .replace("$(TargetPeerIp)", baseIp4.clientIp.hostAddress)
+            }
+
+            val tempPath = AppConstants.tempPath.resolve(
+                "NATPoked-wg-${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${
+                    role.toString().lowercase()
+                }.conf"
+            )
+            if (AppEnv.DebugMode)
+                logger.trace("Generated wireguard config file: $tempPath - $content")
+
+            tempPath.writeText(content)
+
+            portServicesMap["__wireguard".serviceNameCode()] =
+                WireGuardRedirector(
+                    this@NATPeerToPeer,
+                    myPeerConfig = config.wireGuard,
+                    wireGuardConfigFilePath = tempPath
+                )
+        }
     }
 
     private fun getKcpTunPreSharedKey(): ByteArray {
@@ -798,6 +832,7 @@ class NATPeerToPeer(
     private suspend fun startAllServices() {
         logger.debug("startAllServices")
         startAllPortServices()
+        setupWireGuard()
     }
 
     suspend fun setSocketConnectTo(target: InetSocketAddress) {
