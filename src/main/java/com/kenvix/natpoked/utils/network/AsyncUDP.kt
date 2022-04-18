@@ -50,8 +50,6 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                                 if (key.isReadable && event.readableWaitCount > 0) {
                                     if (event.readable.trySend(Unit).isSuccess) {
                                         event.readableWaitCount--
-                                    } else {
-                                        event.readableWaitCount = 0
                                     }
                                 }
 
@@ -96,8 +94,6 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                                 if (key.isWritable && event.writableWaitCount > 0) {
                                     if (event.writable.trySend(Unit).isSuccess) {
                                         event.writableWaitCount--
-                                    } else {
-                                        event.writableWaitCount = 0
                                     }
                                 }
 
