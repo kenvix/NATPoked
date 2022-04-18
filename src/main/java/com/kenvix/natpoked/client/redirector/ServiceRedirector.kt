@@ -10,6 +10,7 @@ import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.ServiceName
 import com.kenvix.natpoked.client.serviceNameCode
 import com.kenvix.natpoked.contacts.PeerCommunicationType
+import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.network.aReceive
 import com.kenvix.natpoked.utils.network.aWrite
 import com.kenvix.natpoked.utils.network.makeNonBlocking
@@ -80,7 +81,8 @@ abstract class ServiceRedirector(
 
                 sendAppPacketBuffer.flip()
                 val written = channel.aWrite(sendAppPacketBuffer)
-                logger.trace("onReceivedRemotePacket: Sent app packet to service app, size: $written")
+                if (AppEnv.DebugNetworkTraffic)
+                    logger.trace("onReceivedRemotePacket: Sent app packet to service app, size: $written")
             }
         } else {
             channel.aWrite(buf.nioBuffer())

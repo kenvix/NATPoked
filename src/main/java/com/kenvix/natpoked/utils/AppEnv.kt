@@ -15,6 +15,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     @Description("是否启用调试模式，生产环境务必为 false")
     val DebugMode: Boolean by envOf(false)
+    val DebugNetworkTraffic: Boolean by envOf(false)
 
     @Description("中介端地址 (HTTP)，例如 https://example.kenvix.com/path")
     val BrokerUrl: String by envOf("http://127.0.0.1:8000/")

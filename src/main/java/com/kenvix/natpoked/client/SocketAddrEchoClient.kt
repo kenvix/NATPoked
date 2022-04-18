@@ -48,6 +48,12 @@ class SocketAddrEchoClient(
             socketBlocking.soTimeout = timeout
         }
 
+        var channelOldAddr: InetSocketAddress? = null
+        if (channel.isConnected) {
+            channelOldAddr = channel.remoteAddress as InetSocketAddress
+            channel.disconnect()
+        }
+
         //todo: it stuck here, but I don't know why
         //socket.connect(address, port)
         val incomingData = ByteArray(32)
@@ -89,6 +95,10 @@ class SocketAddrEchoClient(
             }
 
             //channel.disconnect()
+
+            if (channelOldAddr != null) {
+                channel.connect(channelOldAddr)
+            }
 
             if (channel !== srcChannel)
                 channel.close()

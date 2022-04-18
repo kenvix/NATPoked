@@ -115,7 +115,9 @@ class NATPeerToPeer(
                 val buf: ByteArray = ByteArray(1500)  // Always use array backend heap buffer for avoiding decryption copy !!!
                 val packet = DatagramPacket(buf, 1500)
                 udpSocket.receive(packet) // Use classical Socket API to Ensure Array Backend
-                logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
+                if (AppEnv.DebugNetworkTraffic) {
+                    logger.trace("Received peer packet from ${packet.address} size ${packet.length}")
+                }
                 dispatchIncomingPacket(packet)
             } catch (e: Exception) {
                 logger.error("Unable to handle incoming packet!!!", e)
@@ -233,18 +235,22 @@ class NATPeerToPeer(
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, target)
-        if (AppEnv.DebugMode && !buffer.isDirect)
-            logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
-        else
-            logger.debug("$targetPeerId: writeRawDatagram to ${target}")
+        if (AppEnv.DebugNetworkTraffic) {
+            if (!buffer.isDirect)
+                logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
+            else
+                logger.debug("$targetPeerId: writeRawDatagram to ${target}")
+        }
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, targetAddr)
-        if (AppEnv.DebugMode && !buffer.isDirect)
-            logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
-        else
-            logger.debug("$targetPeerId: writeRawDatagram to default",)
+        if (AppEnv.DebugNetworkTraffic) {
+            if (!buffer.isDirect)
+                logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
+            else
+                logger.debug("$targetPeerId: writeRawDatagram to default",)
+        }
     }
 
     suspend fun readRawDatagram(buffer: ByteBuffer): SocketAddress = withContext(Dispatchers.IO) {
