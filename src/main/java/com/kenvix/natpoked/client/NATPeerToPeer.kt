@@ -1,5 +1,7 @@
 package com.kenvix.natpoked.client
 
+import com.google.common.primitives.Bytes
+import com.google.common.primitives.Ints
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
@@ -36,6 +38,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.exists
+import kotlin.io.path.writeText
 
 /**
  * NATPoked Peer
@@ -697,6 +700,7 @@ class NATPeerToPeer(
         stopKeepAliveJob()
     }
 
+    @Suppress("LocalVariableName")
     private suspend fun setupWireGuard(role: ClientServerRole) = withContext(Dispatchers.IO) {
         if (!wireGuardConfigDirPath.exists())
             wireGuardConfigDirPath.toFile().mkdirs()
@@ -712,8 +716,30 @@ class NATPeerToPeer(
             wireGuardConfigFile.outputStream().use { stream.transferTo(it) }
         }
 
-        val psk = getKcpTunPreSharedKey().toBase64String()
+        var content = wireGuardConfigFile.readText()
 
+        val PeerPreSharedKey = getKcpTunPreSharedKey().toBase64String()
+        val MyPeerPrivateKey = AppEnv.PeerMyPSK.toBase64String()
+        val TargetPeerPublicKey = Curve25519Utils.getPublicKey(config.keySha).toBase64String()
+        val baseIp4 = generateWireGuardIp4Address()
+
+        content = content
+            .replace("$(PeerPreSharedKey)", PeerPreSharedKey)
+            .replace("$(MyPeerPrivateKey)", MyPeerPrivateKey)
+            .replace("$(TargetPeerPublicKey)", TargetPeerPublicKey)
+
+        if (role == ClientServerRole.CLIENT) {
+            content = content
+                .replace("$(MyPeerIp)", baseIp4.clientIp.hostAddress)
+                .replace("$(TargetPeerIp)", baseIp4.serverIp.hostAddress)
+        } else {
+            content = content
+                .replace("$(MyPeerIp)", baseIp4.serverIp.hostAddress)
+                .replace("$(TargetPeerIp)", baseIp4.clientIp.hostAddress)
+        }
+
+        val tempPath = AppConstants.tempPath.resolve("wg-${AppEnv.PeerId.toHexString()}-${targetPeerId.toHexString()}-${role.toString().lowercase()}.conf")
+        tempPath.writeText(content)
     }
 
     private fun getKcpTunPreSharedKey(): ByteArray {
@@ -723,6 +749,28 @@ class NATPeerToPeer(
         }
 
         return psk
+    }
+
+    data class ClientServerIpPair(
+        val clientIp: InetAddress,
+        val serverIp: InetAddress
+    )
+
+    fun generateWireGuardIp4Address(): ClientServerIpPair {
+        val addr = InetAddress.getByName("172.16.0.0").address
+        val id = Ints.toByteArray(((AppEnv.PeerId xor targetPeerId) and 0xFFFFF).toInt())
+
+        for (i in addr.indices) {
+            addr[i] = (addr[i].toInt() or id[i].toInt()).toByte()
+        }
+
+        val c = addr.clone()
+        val s = addr.clone()
+
+        c[3] = (addr[3].toInt() or 0x01).toByte()
+        s[3] = (addr[3].toInt() and 0xFE).toByte()
+
+        return ClientServerIpPair(InetAddress.getByAddress(c), InetAddress.getByAddress(s))
     }
 
     private suspend fun startAllPortServices() {

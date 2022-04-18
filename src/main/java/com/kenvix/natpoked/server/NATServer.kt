@@ -115,7 +115,7 @@ object NATServer : Closeable {
         echoServer = SocketAddrEchoServer(AppEnv.EchoPortList.asIterable())
         echoServer.startAsync()
 
-        val tempPath = AppConstants.workingPath.resolve("Temp")
+        val tempPath = AppConstants.tempPath
         if (!tempPath.exists()) {
             tempPath.toFile().mkdirs()
         }

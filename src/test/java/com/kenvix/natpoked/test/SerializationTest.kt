@@ -6,6 +6,8 @@
 
 package com.kenvix.natpoked.test
 
+import com.google.common.primitives.Ints
+import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.contacts.PeersConfig
@@ -64,6 +66,25 @@ class SerializationTest {
         val p = "a" maps 114514
         val j = JSON.encodeToString(p)
         assertEquals(114514, JSON.decodeFromString<Map<String, Int>>(j)["a"])
+    }
+
+    @Test
+    fun generateWireGuardIp4Address() {
+        val addr = InetAddress.getByName("172.16.0.0").address
+        val id = Ints.toByteArray(((0x123456L xor 0xabcdef) and 0xFFFFF).toInt())
+
+        for (i in addr.indices) {
+            addr[i] = (addr[i].toInt() or id[i].toInt()).toByte()
+        }
+
+        val c = addr.clone()
+        val s = addr.clone()
+
+        c[3] = (addr[3].toInt() or 0x01).toByte()
+        s[3] = (addr[3].toInt() and 0xFE).toByte()
+
+        println(InetAddress.getByAddress(c).hostAddress)
+        println(InetAddress.getByAddress(s).hostAddress)
     }
 
     @Test

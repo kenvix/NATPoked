@@ -68,12 +68,10 @@ data class PeersConfig(
         @Serializable
         data class WireGuard(
             var enabled: Boolean = false,
-            var privateKey: String = "",
-            var address: String = "",
-            var allowedIPs: String = "",
-            var listenPort: Int = -1,
-            var mtu: Int = 1350,
-            var dns: String = "",
+            var myAddress: String = "",
+            var targetAddress: String = "",
+            var listenPort: Int = 0,
+            var role: ClientServerRole = ClientServerRole.CLIENT,
         )
     }
 

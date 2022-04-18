@@ -15,6 +15,7 @@ object AppConstants {
     val shutdownHandler: EventSet<Unit> = eventSetOf()
     val workingFolder = File("").absolutePath + File.separatorChar
     val workingPath = Path.of(workingFolder)
+    val tempPath = workingPath.resolve("Temp")
     var appMode: AppMode = AppMode.CLIENT
     val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
 //    var nettyGroup: EventLoopGroup = NioEventLoopGroup()
