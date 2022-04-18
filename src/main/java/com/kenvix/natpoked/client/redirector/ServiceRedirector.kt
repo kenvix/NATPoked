@@ -10,6 +10,9 @@ import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.ServiceName
 import com.kenvix.natpoked.client.serviceNameCode
 import com.kenvix.natpoked.contacts.PeerCommunicationType
+import com.kenvix.natpoked.utils.network.aReceive
+import com.kenvix.natpoked.utils.network.aWrite
+import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.putUnsignedShort
 import io.netty.buffer.ByteBuf
 import kotlinx.coroutines.*
@@ -36,7 +39,7 @@ abstract class ServiceRedirector(
     private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     private val sendAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500)
     private val sendAppPacketBufferLock = Mutex()
-    protected val channel: DatagramChannel = DatagramChannel.open()
+    protected val channel: DatagramChannel = DatagramChannel.open().makeNonBlocking()
 
     protected fun startRedirector() {
         receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
@@ -49,7 +52,7 @@ abstract class ServiceRedirector(
                     receiveAppPacketBuffer.putUnsignedShort(typeId)
                     receiveAppPacketBuffer.putInt(serviceName.serviceNameCode())
 
-                    val kcpClientAddr = channel.receive(receiveAppPacketBuffer)
+                    val kcpClientAddr = channel.aReceive(receiveAppPacketBuffer)
                     if (!channel.isConnected)
                         channel.connect(kcpClientAddr)
 
@@ -76,10 +79,11 @@ abstract class ServiceRedirector(
                 sendAppPacketBuffer.put(buf.array(), buf.arrayOffset() + buf.readerIndex(), buf.readableBytes())
 
                 sendAppPacketBuffer.flip()
-                channel.write(sendAppPacketBuffer)
+                val written = channel.aWrite(sendAppPacketBuffer)
+                logger.trace("onReceivedRemotePacket: Sent app packet to service app, size: $written")
             }
         } else {
-            channel.write(buf.nioBuffer())
+            channel.aWrite(buf.nioBuffer())
         }
     }
 

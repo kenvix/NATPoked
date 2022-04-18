@@ -13,11 +13,7 @@ import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.util.*
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.ConcurrentModificationException
-import kotlin.collections.ArrayDeque
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
 
 object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private data class SuspendedEvent(
@@ -31,14 +27,14 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val updateEventLock = Mutex()
     // Use weak reference to avoid memory leak
     private val channels: MutableMap<DatagramChannel, SuspendedEvent> = WeakHashMap()
-    private val selector = Selector.open()
-    private val selectorExec = launch(Dispatchers.IO) {
+    private val readSelector = Selector.open()
+    private val readSelectorExec = launch(Dispatchers.IO) {
         while (true) {
             try {
-                val readyNum = runInterruptible { selector.select() }
+                val readyNum = runInterruptible { readSelector.select() }
                 if (readyNum == 0) continue
 
-                val keys = selector.selectedKeys()
+                val keys = readSelector.selectedKeys()
                 val it = keys.iterator()
 
                 while (it.hasNext()) {
@@ -59,6 +55,44 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                                     }
                                 }
 
+                                if (event.readableWaitCount < 0) {
+                                    throw ConcurrentModificationException("Wait count is negative !!!")
+                                }
+                            }
+
+                            if (event == null || event.readableWaitCount == 0) {
+                                key.cancel()
+                            }
+
+                        }
+                    }
+                }
+            } catch (e: Throwable) {
+                logger.error("Unexpected error during read selector loop", e)
+            }
+        }
+    }
+
+    private val writeSelector = Selector.open()
+    private val writeSelectorExec = launch(Dispatchers.IO) {
+        while (true) {
+            try {
+                val readyNum = runInterruptible { writeSelector.select() }
+                if (readyNum == 0) continue
+
+                val keys = writeSelector.selectedKeys()
+                val it = keys.iterator()
+
+                while (it.hasNext()) {
+                    val key: SelectionKey = it.next()
+                    it.remove()
+
+                    if (key.isValid) {
+                        val channel = key.channel() as DatagramChannel
+
+                        updateEventLock.withLock {
+                            val event = channels[channel]
+                            if (event != null) {
                                 if (key.isWritable && event.writableWaitCount > 0) {
                                     if (event.writable.trySend(Unit).isSuccess) {
                                         event.writableWaitCount--
@@ -67,12 +101,12 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                                     }
                                 }
 
-                                if (event.readableWaitCount < 0 || event.writableWaitCount < 0) {
+                                if (event.writableWaitCount < 0) {
                                     throw ConcurrentModificationException("Wait count is negative !!!")
                                 }
                             }
 
-                            if (event == null || (event.readableWaitCount == 0 && event.writableWaitCount == 0)) {
+                            if (event == null || event.writableWaitCount == 0) {
                                 key.cancel()
                             }
 
@@ -80,17 +114,17 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
                     }
                 }
             } catch (e: Throwable) {
-                logger.error("Unexpected error during selector loop", e)
+                logger.error("Unexpected error during read selector loop", e)
             }
         }
     }
 
     suspend fun addReadNotifyJob(channel: DatagramChannel) {
         val event = updateEventLock.withLock {
-            channel.register(selector, SelectionKey.OP_READ)
+            channel.register(readSelector, SelectionKey.OP_READ)
             channels.getOrPut(channel) { SuspendedEvent() }.apply {
                 readableWaitCount++
-            }.also { selector.wakeup() }
+            }.also { readSelector.wakeup() }
         }
 
         event.readable.receive() // no need to handle cancel event
@@ -98,10 +132,10 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
     suspend fun addWriteNotifyJob(channel: DatagramChannel) {
         val event = updateEventLock.withLock {
-            channel.register(selector, SelectionKey.OP_WRITE)
+            channel.register(writeSelector, SelectionKey.OP_WRITE)
             channels.getOrPut(channel) { SuspendedEvent() }.apply {
                 writableWaitCount++
-            }.also { selector.wakeup() }
+            }.also { writeSelector.wakeup() }
         }
 
         event.writable.receive() // no need to handle cancel event too
