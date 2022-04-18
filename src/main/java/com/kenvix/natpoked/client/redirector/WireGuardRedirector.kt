@@ -50,14 +50,21 @@ class WireGuardRedirector(
 
         if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
             val path = Files.createTempFile("natpoked_wg_bootstrap_", ".bat")
-            val commands = "\"${ProcessUtils.extraPathFile.resolve("gsudo.exe").absolutePath}\" wireguard.exe /installtunnelservice \"${wireGuardConfigFilePath.toAbsolutePath()}\""
+            val commands = """
+chcp 65001
+wireguard.exe /installtunnelservice "${wireGuardConfigFilePath.toAbsolutePath()}"
+timeout /T 3
+net start WireGuardTunnel${'$'}${wireGuardConfigFilePath.fileName.toString().replace(".conf", "")}
+sc config WireGuardTunnel${'$'}${wireGuardConfigFilePath.fileName.toString().replace(".conf", "")} start=demand
+exit 0
+""".trimIndent()
             Files.writeString(path, commands)
             val builder = ProcessBuilder(
+                "gsudo.exe",
                 "cmd.exe",
                 "/D",
                 "/U",
                 "/C",
-                "start",
                 "${path.toAbsolutePath()}"
             )
 
@@ -74,21 +81,35 @@ class WireGuardRedirector(
     }
 
     override fun close() {
-        super.close()
-        val builder = if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
-            ProcessBuilder(
-                "wireguard.exe",
-                "/uninstalltunnelservice",
-                "\"${wireGuardConfigFilePath.fileName}\"",
+        if (PlatformDetection.getInstance().os == PlatformDetection.OS_WINDOWS) {
+            val path = Files.createTempFile("natpoked_wg_kill_", ".bat")
+            val commands = """
+chcp 65001
+net stop WireGuardTunnel${'$'}${wireGuardConfigFilePath.fileName.toString().replace(".conf", "")}
+wireguard.exe /uninstalltunnelservice "${wireGuardConfigFilePath.toAbsolutePath()}"
+exit 0
+""".trimIndent()
+            Files.writeString(path, commands)
+            val builder = ProcessBuilder(
+                "gsudo.exe",
+                "cmd.exe",
+                "/D",
+                "/U",
+                "/C",
+                "${path.toAbsolutePath()}"
             )
+
+            ProcessUtils.runProcess(processKey, builder, keepAlive = false)
         } else {
-            ProcessBuilder(
+            val builder = ProcessBuilder(
                 "wg-quick",
                 "down",
                 "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
             )
+
+            ProcessUtils.runProcess(processKey, builder, keepAlive = false)
         }
 
-        ProcessUtils.runProcess(processKey, builder, keepAlive = false)
+        super.close()
     }
 }

@@ -751,6 +751,7 @@ class NATPeerToPeer(
                 .replace("$(TargetPeerId)", targetPeerId.toHexString())
                 .replace("$(NatPokedServiceListenIp)", "127.0.0.1")
                 .replace("$(NatPokedServiceListenPort)", config.wireGuard.listenPort.toString())
+                .replace("$(MyPeerListenPort)", config.wireGuard.listenPort.toString())
 
             if (role == ClientServerRole.CLIENT) {
                 content = content
@@ -875,8 +876,17 @@ class NATPeerToPeer(
     }
 
     override fun close() {
+        portServicesMap.forEach { (_, service) ->
+            service.close()
+        }
         repeat(receiveJob.count()) { cancel() }
         udpChannel.close()
         coroutineContext.cancel()
+    }
+
+    init {
+        Runtime.getRuntime().addShutdownHook(Thread {
+            close()
+        })
     }
 }
