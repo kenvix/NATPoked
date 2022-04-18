@@ -8,8 +8,10 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import kotlin.random.Random
 
-typealias ServiceName = String
-fun ServiceName.serviceNameCode(): Int = this.hashCode()
+@JvmInline
+value class ServiceName(val name: String) {
+    fun serviceNameCode(): Int = this.hashCode()
+}
 
 suspend fun sendUdpPacket(addr: InetAddress, dstPort: Int = 53, srcPort: Int = 0, packetNum: Int = 1, data: ByteArray? = null)
 = withContext(Dispatchers.IO) {

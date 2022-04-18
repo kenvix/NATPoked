@@ -24,7 +24,7 @@ import java.util.*
 
 class WireGuardRedirector(
     private val peer: NATPeerToPeer,
-    private val serviceName: String = "__wireguard_${AppEnv.PeerId}_${peer.targetPeerId.toHexString()}",
+    private val serviceName: ServiceName = ServiceName("__wireguard_${AppEnv.PeerId}_${peer.targetPeerId.toHexString()}"),
     private val myPeerConfig: PeersConfig.Peer.WireGuard,
     private val wireGuardConfigFilePath: Path,
     private val flags: EnumSet<PeerCommunicationType> = EnumSet.of(

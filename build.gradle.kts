@@ -107,9 +107,9 @@ dependencies {
 
 
     // https://mvnrepository.com/artifact/io.netty/netty-all
-    implementation("io.netty:netty-all:4.1.75.Final") {
-        exclude("org.slf4j:slf4j-simple")
-    }
+//    implementation("io.netty:netty-all:4.1.75.Final") {
+//        exclude("org.slf4j:slf4j-simple")
+//    }
 //
 //    // https://mvnrepository.com/artifact/com.github.l42111996/kcp-base
 //    implementation("com.github.l42111996:kcp-base:1.6") {

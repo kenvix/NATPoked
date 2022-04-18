@@ -8,17 +8,10 @@ package com.kenvix.natpoked.client.redirector
 
 import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.ServiceName
-import com.kenvix.natpoked.client.serviceNameCode
 import com.kenvix.natpoked.contacts.PeerCommunicationType
-import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.network.aReceive
-import com.kenvix.natpoked.utils.network.aWrite
-import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.putUnsignedShort
-import io.netty.buffer.ByteBuf
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.nio.ByteBuffer

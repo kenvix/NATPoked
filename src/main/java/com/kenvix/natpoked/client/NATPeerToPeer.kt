@@ -711,7 +711,7 @@ class NATPeerToPeer(
             return@withContext
 
         portServiceOperationLock.withLock {
-            if ("__wireguard".serviceNameCode() in portServicesMap) {
+            if (ServiceName("__wireguard").serviceNameCode() in portServicesMap) {
                 return@withContext
             }
 
@@ -778,7 +778,7 @@ class NATPeerToPeer(
                 myPeerConfig = config.wireGuard,
                 wireGuardConfigFilePath = tempPath
             )
-            portServicesMap["__wireguard".serviceNameCode()] = redirector
+            portServicesMap[ServiceName("__wireguard").serviceNameCode()] = redirector
             redirector.start()
         }
     }
@@ -818,17 +818,17 @@ class NATPeerToPeer(
     private suspend fun startAllPortServices() {
         portServiceOperationLock.withLock {
             config.ports.forEach { (serviceName, portConfig) ->
-                if (serviceName.serviceNameCode() !in portServicesMap) {
+                if (ServiceName(serviceName).serviceNameCode() !in portServicesMap) {
                     if (portConfig.protocol == PeersConfig.Peer.Port.Protocol.TCP) {
                         logger.info("Starting new TCP - KcpTunPortRedirector port service: $serviceName")
                         val redirector =
                             KcpTunPortRedirector(
                                 this,
-                                serviceName,
+                                ServiceName(serviceName),
                                 getKcpTunPreSharedKey().toBase64String(),
                                 portConfig
                             )
-                        portServicesMap[serviceName.serviceNameCode()] = redirector
+                        portServicesMap[ServiceName(serviceName).serviceNameCode()] = redirector
                     } else {
 
                     }

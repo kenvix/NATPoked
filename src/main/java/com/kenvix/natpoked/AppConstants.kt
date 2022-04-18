@@ -3,8 +3,6 @@ package com.kenvix.natpoked
 import ch.qos.logback.classic.Logger
 import com.kenvix.utils.event.EventSet
 import com.kenvix.utils.event.eventSetOf
-import io.netty.channel.EventLoopGroup
-import io.netty.channel.nio.NioEventLoopGroup
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Path
