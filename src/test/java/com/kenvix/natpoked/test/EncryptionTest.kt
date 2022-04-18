@@ -10,7 +10,6 @@ import com.kenvix.natpoked.utils.*
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.whispersystems.curve25519.Curve25519
-import org.whispersystems.curve25519.java.curve_sigs
 import java.nio.ByteBuffer
 import java.util.*
 
@@ -22,7 +21,10 @@ class EncryptionTest {
         val pair = cipher.generateKeyPair()
         println(pair.privateKey.toBase64String())
         println(pair.publicKey.toBase64String())
-        Assertions.assertEquals(pair.publicKey.toBase64String(), Curve25519Utils.getPublicKey(pair.privateKey).toBase64String())
+        Assertions.assertEquals(
+            pair.publicKey.toBase64String(),
+            Curve25519Utils.getPublicKey(pair.privateKey).toBase64String()
+        )
     }
 
     @Test

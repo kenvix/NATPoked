@@ -1,24 +1,32 @@
 package com.kenvix.natpoked.utils.network
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.InetSocketAddress
+import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.ConcurrentModificationException
 import kotlin.collections.ArrayDeque
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 
 object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private data class SuspendedEvent(
-        var readable: ArrayDeque<Continuation<DatagramChannel>> = ArrayDeque(),
-        var writable: ArrayDeque<Continuation<DatagramChannel>> = ArrayDeque(),
+        val readable: Channel<Unit> = Channel(0),
+        val writable: Channel<Unit> = Channel(0),
+        @Volatile var readableWaitCount: Int = 0,
+        @Volatile var writableWaitCount: Int = 0,
     )
+    private val logger = LoggerFactory.getLogger(this::class.java)
 
     private val updateEventLock = Mutex()
     // Use weak reference to avoid memory leak
@@ -26,79 +34,77 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val selector = Selector.open()
     private val selectorExec = launch(Dispatchers.IO) {
         while (true) {
-            val readyNum = runInterruptible { selector.select() }
-            if (readyNum == 0) continue
+            try {
+                val readyNum = runInterruptible { selector.select() }
+                if (readyNum == 0) continue
 
-            val keys = selector.selectedKeys()
-            val it = keys.iterator()
+                val keys = selector.selectedKeys()
+                val it = keys.iterator()
 
-            while (it.hasNext()) {
-                val key: SelectionKey = it.next()
-                it.remove()
+                while (it.hasNext()) {
+                    val key: SelectionKey = it.next()
+                    it.remove()
 
-                if (key.isValid) {
-                    val channel = key.channel() as DatagramChannel
+                    if (key.isValid) {
+                        val channel = key.channel() as DatagramChannel
 
-                    updateEventLock.withLock {
-                        if (key.isReadable) {
-                            channels[channel]?.readable?.removeFirst()?.resume(channel)
+                        updateEventLock.withLock {
+                            val event = channels[channel]
+                            if (event != null) {
+                                if (key.isReadable && event.readableWaitCount > 0) {
+                                    if (event.readable.trySend(Unit).isSuccess) {
+                                        event.readableWaitCount--
+                                    } else {
+                                        event.readableWaitCount = 0
+                                    }
+                                }
+
+                                if (key.isWritable && event.writableWaitCount > 0) {
+                                    if (event.writable.trySend(Unit).isSuccess) {
+                                        event.writableWaitCount--
+                                    } else {
+                                        event.writableWaitCount = 0
+                                    }
+                                }
+
+                                if (event.readableWaitCount < 0 || event.writableWaitCount < 0) {
+                                    throw ConcurrentModificationException("Wait count is negative !!!")
+                                }
+                            }
+
+                            if (event == null || (event.readableWaitCount == 0 && event.writableWaitCount == 0)) {
+                                key.cancel()
+                            }
+
                         }
-
-                        if (key.isWritable) {
-                            channels[channel]?.writable?.removeFirst()?.resume(channel)
-                        }
-
-                        key.cancel()
                     }
                 }
+            } catch (e: Throwable) {
+                logger.error("Unexpected error during selector loop", e)
             }
         }
     }
 
-    suspend fun addReadNotifyJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        updateEventLock.withLock {
+    suspend fun addReadNotifyJob(channel: DatagramChannel) {
+        val event = updateEventLock.withLock {
             channel.register(selector, SelectionKey.OP_READ)
-            channels.getOrPut(channel) { SuspendedEvent() }.readable.add(job)
+            channels.getOrPut(channel) { SuspendedEvent() }.apply {
+                readableWaitCount++
+            }.also { selector.wakeup() }
         }
 
-        selector.wakeup()
+        event.readable.receive() // no need to handle cancel event
     }
 
-    fun addReadNotifyJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        launch { addReadNotifyJob(channel, job) }
-    }
-
-    suspend fun addWriteNotifyJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        updateEventLock.withLock {
+    suspend fun addWriteNotifyJob(channel: DatagramChannel) {
+        val event = updateEventLock.withLock {
             channel.register(selector, SelectionKey.OP_WRITE)
-            channels.getOrPut(channel) { SuspendedEvent() }.writable.add(job)
+            channels.getOrPut(channel) { SuspendedEvent() }.apply {
+                writableWaitCount++
+            }.also { selector.wakeup() }
         }
 
-        selector.wakeup()
-    }
-
-    fun addWriteNotifyJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        launch { addWriteNotifyJob(channel, job) }
-    }
-
-    suspend fun unregisterChannelReadJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        updateEventLock.withLock {
-            channels[channel]?.readable?.remove(job)
-        }
-    }
-
-    fun unregisterChannelReadJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        launch { unregisterChannelReadJob(channel, job) }
-    }
-
-    suspend fun unregisterChannelWriteJob(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        updateEventLock.withLock {
-            channels[channel]?.writable?.remove(job)
-        }
-    }
-
-    fun unregisterChannelWriteJobAsync(channel: DatagramChannel, job: Continuation<DatagramChannel>) {
-        launch { unregisterChannelWriteJob(channel, job) }
+        event.writable.receive() // no need to handle cancel event too
     }
 }
 
@@ -108,74 +114,97 @@ fun DatagramChannel.makeNonBlocking(): DatagramChannel {
 }
 
 suspend fun DatagramChannel.awaitRead() {
-    var cont: Continuation<DatagramChannel>? = null
-    try {
-        suspendCancellableCoroutine<DatagramChannel> { job ->
-            cont = job
-            UDPSelector.addReadNotifyJobAsync(this, job)
-        }
-    } catch (e: CancellationException) {
-        if (cont != null) {
-            runBlocking {
-                UDPSelector.unregisterChannelReadJob(this@awaitRead, cont!!)
-            }
-        }
-
-        throw e
-    }
+    UDPSelector.addReadNotifyJob(this)
 }
 
 suspend fun DatagramChannel.awaitWrite() {
-    var cont: Continuation<DatagramChannel>? = null
-    try {
-        suspendCancellableCoroutine<DatagramChannel> { job ->
-            cont = job
-            UDPSelector.addWriteNotifyJobAsync(this, job)
-        }
-    } catch (e: CancellationException) {
-        if (cont != null) {
-            runBlocking {
-                UDPSelector.unregisterChannelWriteJob(this@awaitWrite, cont!!)
-            }
-        }
-
-        throw e
-    }
+    UDPSelector.addWriteNotifyJob(this)
 }
 
-suspend fun DatagramChannel.aRead(dst: ByteBuffer) = withContext(Dispatchers.IO) {
-    awaitRead()
-    runInterruptible { read(dst) }
+suspend fun DatagramChannel.aRead(dst: ByteBuffer): Int = withContext(Dispatchers.IO) {
+    var read: Int
+
+    do {
+        awaitRead()
+        read = read(dst)
+    } while (read == 0)
+
+    return@withContext read
 }
 
-suspend fun DatagramChannel.aRead(dsts: Array<ByteBuffer>) = withContext(Dispatchers.IO) {
-    awaitRead()
-    runInterruptible { read(dsts) }
+suspend fun DatagramChannel.aRead(dsts: Array<ByteBuffer>): Long = withContext(Dispatchers.IO) {
+    var read: Long
+
+    do {
+        awaitRead()
+        read = read(dsts)
+    } while (read == 0L)
+
+    return@withContext read
 }
 
-suspend fun DatagramChannel.aRead(dsts: Array<ByteBuffer>, offset: Int, length: Int) = withContext(Dispatchers.IO) {
-    awaitRead()
-    runInterruptible { read(dsts, offset, length) }
+suspend fun DatagramChannel.aRead(dsts: Array<ByteBuffer>, offset: Int, length: Int): Long = withContext(Dispatchers.IO) {
+    var read: Long
+
+    do {
+        awaitRead()
+        read = read(dsts, offset, length)
+    } while (read == 0L)
+
+    return@withContext read
 }
 
-suspend fun DatagramChannel.aWrite(src: ByteBuffer) = withContext(Dispatchers.IO) {
-    awaitWrite()
-    runInterruptible { write(src) }
+suspend fun DatagramChannel.aWrite(src: ByteBuffer): Int = withContext(Dispatchers.IO) {
+    if (!src.hasRemaining())
+        return@withContext 0
+
+    var written: Int
+
+    do {
+        awaitWrite()
+        written = write(src)
+    } while (written == 0)
+
+    return@withContext written
 }
 
-suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>) = withContext(Dispatchers.IO) {
-    awaitWrite()
-    runInterruptible { write(srcs) }
+suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>): Long = withContext(Dispatchers.IO) {
+    if (srcs.all { !it.hasRemaining() })
+        return@withContext 0
+
+    var written: Long
+
+    do {
+        awaitWrite()
+        written = write(srcs)
+    } while (written == 0L)
+
+    return@withContext written
 }
 
-suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>, offset: Int, length: Int) = withContext(Dispatchers.IO) {
-    awaitWrite()
-    runInterruptible { write(srcs, offset, length) }
+suspend fun DatagramChannel.aWrite(srcs: Array<ByteBuffer>, offset: Int, length: Int): Long = withContext(Dispatchers.IO) {
+    if (srcs.slice(offset until  offset + length).all { !it.hasRemaining() })
+        return@withContext 0
+
+    var written: Long
+
+    do {
+        awaitWrite()
+        written = write(srcs, offset, length)
+    } while (written == 0L)
+
+    return@withContext written
 }
 
-suspend fun DatagramChannel.aReceive(dst: ByteBuffer) = withContext(Dispatchers.IO) {
-    awaitRead()
-    runInterruptible { receive(dst) }
+suspend fun DatagramChannel.aReceive(dst: ByteBuffer): SocketAddress = withContext(Dispatchers.IO) {
+    var addr: SocketAddress?
+
+    do {
+        awaitRead()
+        addr = receive(dst)
+    } while (addr == null)
+
+    return@withContext addr
 }
 
 suspend fun DatagramChannel.aReceive(packet: DatagramPacket): Unit = withContext(Dispatchers.IO) {
@@ -185,9 +214,18 @@ suspend fun DatagramChannel.aReceive(packet: DatagramPacket): Unit = withContext
     packet.port = addr.port
 }
 
-suspend fun DatagramChannel.aSend(src: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
-    awaitWrite()
-    runInterruptible { send(src, target) }
+suspend fun DatagramChannel.aSend(src: ByteBuffer, target: InetSocketAddress): Int = withContext(Dispatchers.IO) {
+    if (!src.hasRemaining())
+        return@withContext 0
+
+    var written: Int
+
+    do {
+        awaitWrite()
+        written = send(src, target)
+    } while (written == 0)
+
+    return@withContext written
 }
 
 suspend fun DatagramChannel.aSend(packet: DatagramPacket): Unit = withContext(Dispatchers.IO) {
