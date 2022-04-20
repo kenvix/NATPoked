@@ -14,10 +14,7 @@ import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.CommonRequest
 import com.kenvix.natpoked.utils.*
 import com.kenvix.utils.exception.*
-import com.kenvix.web.utils.JSON
-import com.kenvix.web.utils.aSendPeerMessage
-import com.kenvix.web.utils.checkPeerAuth
-import com.kenvix.web.utils.getMqttChannelBasePath
+import com.kenvix.web.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -207,6 +204,7 @@ class BrokerClient(
                                 }
 
                                 "openPort" -> {
+                                    message.checkCanRespond()
                                     val jsonStr = String(message.payload)
                                     val req: PeerIdReq = JSON.decodeFromString(jsonStr)
                                     logger.trace("MQTT /peer/~/openPort: $jsonStr")
@@ -219,6 +217,7 @@ class BrokerClient(
                                 }
 
                                 "getPortAllocationPredictionParam" -> {
+                                    message.checkCanRespond()
                                     val jsonStr = String(message.payload)
                                     logger.trace("MQTT /peer/~/getPortAllocationPredictionParam: $jsonStr")
                                     val req: PeerIdReq = JSON.decodeFromString(jsonStr)
@@ -238,10 +237,16 @@ class BrokerClient(
                         }
 
                         TOPIC_PING -> {
-
+                            message.checkCanRespond()
+                            logger.trace("MQTT /peer/~/ping")
+                            val peerId = message.properties.userProperties.find { it.key == "fromPeerId" }?.value?.toLong()
+                            if (peerId != null) {
+                                respondPeer(message, NATClient.peersKey[peerId], message.payload)
+                            }
                         }
 
                         TOPIC_RELAY -> {
+
                         }
 
                         TOPIC_RESPONSE -> {

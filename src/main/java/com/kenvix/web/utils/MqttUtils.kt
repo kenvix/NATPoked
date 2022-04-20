@@ -4,6 +4,7 @@ import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase64String
+import com.kenvix.utils.exception.BadRequestException
 import com.kenvix.utils.exception.InvalidAuthorizationException
 import okhttp3.internal.toHexString
 import org.eclipse.paho.mqttv5.client.IMqttToken
@@ -35,8 +36,10 @@ suspend fun MqttAsyncClient.aSendMessage(topic: String, msg: MqttMessage): IMqtt
     }
 }
 
-suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, rawKey: ByteArray, payload: ByteArray, qos: Int = 0,
-                                             props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+suspend fun MqttAsyncClient.aSendPeerMessage(
+    topic: String, rawKey: ByteArray, payload: ByteArray, qos: Int = 0,
+    props: MqttProperties = MqttProperties(), retained: Boolean = false
+): IMqttToken {
     if (props.userProperties == null)
         props.userProperties = arrayListOf()
 
@@ -46,8 +49,10 @@ suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, rawKey: ByteArray, p
     return aSendMessage(topic, msg)
 }
 
-suspend fun MqttAsyncClient.aSendPeerMessage(topic: String, base58EncodedKey: String, payload: ByteArray, qos: Int = 0,
-                                             props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
+suspend fun MqttAsyncClient.aSendPeerMessage(
+    topic: String, base58EncodedKey: String, payload: ByteArray, qos: Int = 0,
+    props: MqttProperties = MqttProperties(), retained: Boolean = false
+): IMqttToken {
     if (props.userProperties == null)
         props.userProperties = arrayListOf()
 
@@ -75,6 +80,16 @@ fun MqttMessage.checkPeerAuth(key: ByteArray) {
             else
                 this
         })
+    }
+}
+
+fun MqttMessage.checkCanRespond() {
+    if (properties.correlationData == null ||
+        properties.correlationData.isEmpty() ||
+        properties.responseTopic == null ||
+        properties.responseTopic.isEmpty()
+    ) {
+        throw BadRequestException("Invalid peer message, no correlation data or response topic")
     }
 }
 
