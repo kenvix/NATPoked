@@ -206,10 +206,14 @@ class BrokerClient(
                                 "openPort" -> {
                                     message.checkCanRespond()
                                     val jsonStr = String(message.payload)
-                                    val req: PeerIdReq = JSON.decodeFromString(jsonStr)
+                                    val req: OpenPortReq = JSON.decodeFromString(jsonStr)
                                     logger.trace("MQTT /peer/~/openPort: $jsonStr")
                                     val port = NATClient.requestPeerOpenPort(req.peerId)
                                     logger.info("Opened port $port for peer ${req.peerId}")
+                                    if (req.alsoSendHelloPacket && req.peerInfo != null) {
+                                        NATClient.requestSendHelloPacketAsync(req.peerId, req.peerInfo)
+                                    }
+
                                     respondPeer(
                                         message, NATClient.peersKey[req.peerId],
                                         CommonJsonResult(200, 0, data = PortReq(port)).toJsonString<PortReq>()

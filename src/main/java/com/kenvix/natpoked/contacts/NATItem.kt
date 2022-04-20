@@ -204,3 +204,10 @@ data class NATClientItem(
 
 
 }
+
+@Serializable
+data class OpenPortReq(
+    val peerId: PeerId,
+    val alsoSendHelloPacket: Boolean = false,
+    val peerInfo: NATClientItem? = null,
+)

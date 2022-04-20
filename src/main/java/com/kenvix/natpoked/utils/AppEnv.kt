@@ -28,6 +28,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val NATType: String by envOf("AUTO")
 
     val PortGuessMaxConcurrentNum: Int by envOf(20)
+    val PortGuessMaxNum: Int by envOf(1000)
 
     @Description("进行端口预测时的发包间隔时间，单位为毫秒")
     val EchoDelay: Long by envOf(15)

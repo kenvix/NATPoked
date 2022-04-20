@@ -646,7 +646,7 @@ class NATPeerToPeer(
             val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
                 "control/openPort",
                 targetKey,
-                JSON.encodeToString(PeerIdReq(AppEnv.PeerId)),
+                JSON.encodeToString(OpenPortReq(AppEnv.PeerId, alsoSendHelloPacket = peerInfo.clientNatType == NATType.RESTRICTED_CONE)),
                 peerId = peerInfo.clientId,
             )
 
@@ -676,12 +676,21 @@ class NATPeerToPeer(
             when (config.natPortGuessModel) {
                 PeersConfig.Peer.GuessModel.POISSON -> {
                     while (!isConnected) {
-                        val now = System.currentTimeMillis() - portParam.testFinishedAt
-                        val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
-                        for (port in ports) {
-                            val addr = InetSocketAddress(peerInfo.clientInetAddress, port)
-                            logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
-                            sendHelloPacket(addr, num = 10)
+                        for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
+                            val now = System.currentTimeMillis() - portParam.testFinishedAt
+
+                            // TODO: CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE
+                            //  CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT
+                            //  STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE
+                            val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
+                            logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
+                            for (port in ports) {
+                                val helloIp6Task = sendHelloIp6Task(port)
+                                val helloIp4Task = sendHelloIp4Task(port)
+                            }
+
+                            if (isConnected) break
+                            delay(AppEnv.PeerFloodingDelay)
                         }
                     }
                 }

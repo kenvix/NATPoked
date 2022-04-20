@@ -13,8 +13,13 @@ value class ServiceName(val name: String) {
     fun serviceNameCode(): Int = name.hashCode()
 }
 
-suspend fun sendUdpPacket(addr: InetAddress, dstPort: Int = 53, srcPort: Int = 0, packetNum: Int = 1, data: ByteArray? = null)
-= withContext(Dispatchers.IO) {
+suspend fun sendUdpPacket(
+    addr: InetAddress,
+    dstPort: Int = 53,
+    srcPort: Int = 0,
+    packetNum: Int = 1,
+    data: ByteArray? = null
+) = withContext(Dispatchers.IO) {
 
     val dataToSend = data ?: ByteArray(100).also { Random.nextBytes(it) }
     DatagramSocket(srcPort).use { socket ->

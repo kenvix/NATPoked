@@ -19,6 +19,7 @@ import net.mamoe.yamlkt.Yaml
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.URL
 import java.nio.channels.DatagramChannel
 import java.nio.file.Files
@@ -279,5 +280,16 @@ object NATClient : CoroutineScope, AutoCloseable {
     suspend fun requestPeerGetPortAllocationPredictionParam(peerId: PeerId): PortAllocationPredictionParam {
         val peer = peers[peerId].assertExist()
         return peer.getPortAllocationPredictionParam()
+    }
+
+    fun requestSendHelloPacketAsync(peerId: PeerId, peerInfo: NATClientItem) {
+        val peer = peers[peerId].assertExist()
+        if (peerInfo.clientInet6Address != null) {
+            launch { peer.sendHelloPacket(InetSocketAddress(peerInfo.clientInetAddress, 53)) }
+        }
+
+        if (peerInfo.clientInetAddress != null) {
+            launch { peer.sendHelloPacket(InetSocketAddress(peerInfo.clientInetAddress, 53)) }
+        }
     }
 }
