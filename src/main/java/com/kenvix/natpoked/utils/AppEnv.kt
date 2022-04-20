@@ -27,8 +27,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
             "网络环境会改变时则应保持 AUTO。可选值: AUTO, PUBLIC, FULL_CONE, RESTRICTED_CONE, PORT_RESTRICTED_CONE, SYMMETRIC")
     val NATType: String by envOf("AUTO")
 
-    @Description("端口预测模型。可选值：PSM, EVM, LSM")
-    val PokedModel: String by envOf("EVM")
+    val PortGuessMaxConcurrentNum: Int by envOf(20)
 
     @Description("进行端口预测时的发包间隔时间，单位为毫秒")
     val EchoDelay: Long by envOf(15)

@@ -7,6 +7,7 @@
 package com.kenvix.natpoked.client
 
 import com.google.common.primitives.Ints
+import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
 import com.kenvix.natpoked.server.CommonJsonResult
@@ -145,8 +146,13 @@ class BrokerClient(
 
         sendPeerMessage(topicSuffix, key, payload, 2, props, peerId, retained)
 
-        return suspendCoroutine<ByteArray> { continuation ->
-            suspendResponses[responseId] = continuation
+        return try {
+            suspendCoroutine<ByteArray> { continuation ->
+                suspendResponses[responseId] = continuation
+            }
+        } catch (e: CancellationException) {
+            suspendResponses.remove(responseId)
+            throw e
         }
     }
 
@@ -165,7 +171,8 @@ class BrokerClient(
 
     private suspend fun respondErrorToPeerIfNeed(message: MqttMessage, e: Exception) {
         if (message.properties.correlationData != null && !message.properties.responseTopic.isNullOrBlank()) {
-            val fromPeerId: Long = message.properties.userProperties.find { it.key == "fromPeerId" }?.value?.toLong() ?: return
+            val fromPeerId: Long =
+                message.properties.userProperties.find { it.key == "fromPeerId" }?.value?.toLong() ?: return
             respondPeer(
                 message, NATClient.peersKey[fromPeerId],
                 JSON.encodeToString(CommonJsonResult<Unit>(status = 1, code = 1, info = e.message ?: "")).toByteArray()
@@ -211,8 +218,21 @@ class BrokerClient(
                                     )
                                 }
 
-                                "guessPort" -> {
-
+                                "getPortAllocationPredictionParam" -> {
+                                    val jsonStr = String(message.payload)
+                                    logger.trace("MQTT /peer/~/getPortAllocationPredictionParam: $jsonStr")
+                                    val req: PeerIdReq = JSON.decodeFromString(jsonStr)
+                                    val predictionParam =
+                                        NATClient.requestPeerGetPortAllocationPredictionParam(req.peerId)
+                                    logger.info("Got port allocation prediction param for peer ${req.peerId}")
+                                    respondPeer(
+                                        message, NATClient.peersKey[req.peerId],
+                                        CommonJsonResult(
+                                            200,
+                                            0,
+                                            data = predictionParam
+                                        ).toJsonString<PortAllocationPredictionParam>()
+                                    )
                                 }
                             }
                         }

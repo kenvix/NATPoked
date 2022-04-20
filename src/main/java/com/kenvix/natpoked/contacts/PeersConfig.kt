@@ -45,7 +45,8 @@ data class PeersConfig(
          */
         var ports: HashMap<String, Port> = hashMapOf(),
         var wireGuard: WireGuard = WireGuard(),
-        @Transient var keySha: ByteArray = sha256Of(key)
+        @Transient var keySha: ByteArray = sha256Of(key),
+        val natPortGuessModel: GuessModel = GuessModel.POISSON,
     ) {
         @Serializable
         data class Port(
@@ -73,6 +74,14 @@ data class PeersConfig(
             var listenPort: Int = 0,
             var role: ClientServerRole = ClientServerRole.CLIENT,
         )
+
+        @Serializable
+        enum class GuessModel {
+            POISSON,
+            EXPONENTIAL,
+            LINEAR,
+            UNKNOWN
+        }
     }
 
     /**

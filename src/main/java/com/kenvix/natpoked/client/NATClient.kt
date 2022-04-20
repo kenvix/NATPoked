@@ -275,4 +275,9 @@ object NATClient : CoroutineScope, AutoCloseable {
             start()
         }
     }
+
+    suspend fun requestPeerGetPortAllocationPredictionParam(peerId: PeerId): PortAllocationPredictionParam {
+        val peer = peers[peerId].assertExist()
+        return peer.getPortAllocationPredictionParam()
+    }
 }

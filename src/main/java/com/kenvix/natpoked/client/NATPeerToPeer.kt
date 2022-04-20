@@ -6,6 +6,8 @@ import com.kenvix.natpoked.client.NATClient.portRedirector
 import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
 import com.kenvix.natpoked.client.redirector.ServiceRedirector
 import com.kenvix.natpoked.client.redirector.WireGuardRedirector
+import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
+import com.kenvix.natpoked.client.traversal.poissonPortGuess
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
 import com.kenvix.natpoked.server.BrokerMessage
@@ -342,6 +344,11 @@ class NATPeerToPeer(
             buffer.put(stage) // 1
 
             for (i in 0 until num) {
+                if (isConnected) {
+                    logger.debug("Already connected. Skip sending hello packet")
+                    break
+                }
+
                 buffer.flip()
                 writeRawDatagram(buffer, target)
             }
@@ -611,6 +618,28 @@ class NATPeerToPeer(
         logger.info("connectPeerAsync: Connecting to peer ${connectReq.targetClientItem.clientId}")
         val peerInfo = connectReq.targetClientItem
 
+        suspend fun sendHelloIp4Task(targetPort: Int) =
+            if (peerInfo.clientInetAddress != null) {
+                withContext(Dispatchers.IO) {
+                    async {
+                        val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
+                        sendHelloPacket(addr, num = 10)
+                    }
+                }
+            } else null
+
+        suspend fun sendHelloIp6Task(targetPort: Int) =
+            if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
+                withContext(Dispatchers.IO) {
+                    async {
+                        val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
+                        sendHelloPacket(addr, num = 10)
+                    }
+                }
+            } else null
+
         if (peerInfo.isUpnpSupported || peerInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
             // 如果对方支持 UPnP 或者对方是 >= RESTRICTED_CONE 类型的 NAT，则直接连接
             // request to open port
@@ -626,29 +655,47 @@ class NATPeerToPeer(
 
             val targetPort = result.data!!.port
 
-            val helloIp6Task = if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
-                withContext(Dispatchers.IO) {
-                    async {
-                        val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
-                        sendHelloPacket(addr, num = 10)
-                    }
-                }
-            } else null
-
-            val helloIp4Task = if (peerInfo.clientInetAddress != null) {
-                withContext(Dispatchers.IO) {
-                    async {
-                        val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
-                        sendHelloPacket(addr, num = 10)
-                    }
-                }
-            } else null
-
-
+            val helloIp6Task = sendHelloIp6Task(targetPort)
+            val helloIp4Task = sendHelloIp4Task(targetPort)
         } else {
+            // 如果对方不支持 UPnP，则需要预测参数
+            // 如果对方是 < RESTRICTED_CONE 类型的 NAT，则需要预测参数
 
+            val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
+                "control/getPortAllocationPredictionParam",
+                targetKey,
+                JSON.encodeToString(PeerIdReq(AppEnv.PeerId)),
+                peerId = peerInfo.clientId,
+            )
+
+            val result = JSON.decodeFromString<CommonJsonResult<PortAllocationPredictionParam>>(resultJson)
+            result.checkException()
+            val portParam = result.data!!
+            val concurrentGuessNum = AppEnv.PortGuessMaxConcurrentNum
+
+            when (config.natPortGuessModel) {
+                PeersConfig.Peer.GuessModel.POISSON -> {
+                    while (!isConnected) {
+                        val now = System.currentTimeMillis() - portParam.testFinishedAt
+                        val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
+                        for (port in ports) {
+                            val addr = InetSocketAddress(peerInfo.clientInetAddress, port)
+                            logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
+                            sendHelloPacket(addr, num = 10)
+                        }
+                    }
+                }
+
+                PeersConfig.Peer.GuessModel.EXPONENTIAL -> {
+
+                }
+
+                PeersConfig.Peer.GuessModel.LINEAR -> {
+
+                }
+
+                else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
+            }
         }
     }
 
@@ -799,11 +846,12 @@ class NATPeerToPeer(
 
     private fun generateWireGuardIp4Address(): ClientServerIpPair {
         val addr = InetAddress.getByName("172.16.0.0").address
-        val id = md5Of(Longs.toByteArray(AppEnv.PeerId)).slice(0 until 3) xor md5Of(Longs.toByteArray(targetPeerId)).slice(0 until 3)
+        val id =
+            md5Of(Longs.toByteArray(AppEnv.PeerId)).slice(0 until 3) xor md5Of(Longs.toByteArray(targetPeerId)).slice(0 until 3)
         id[0] = (id[0].toInt() and 0x0F).toByte()
 
         for (i in 1 until 4) {
-            addr[i] = (addr[i].toInt() or id[i-1].toInt()).toByte()
+            addr[i] = (addr[i].toInt() or id[i - 1].toInt()).toByte()
         }
 
         val c = addr.clone()
@@ -882,6 +930,17 @@ class NATPeerToPeer(
         repeat(receiveJob.count()) { cancel() }
         udpChannel.close()
         coroutineContext.cancel()
+    }
+
+    /**
+     * todo: allow to set custom port guess range
+     */
+    suspend fun getPortAllocationPredictionParam(sourcePort: Int = config.pokedPort): PortAllocationPredictionParam {
+        if (udpChannel.localAddress == null || udpChannel.localAddress.port == 0) {
+            listenUdpSourcePort(sourcePort)
+        }
+
+        return NATClient.getPortAllocationPredictionParam(udpChannel)
     }
 
     init {
