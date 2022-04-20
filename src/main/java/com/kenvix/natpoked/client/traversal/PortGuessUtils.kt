@@ -6,7 +6,8 @@ import kotlin.math.round
 data class PortAllocationPredictionParam(
     val avg: Double,
     val timeElapsed: Long,
-    val lastPort: Int
+    val lastPort: Int,
+    val testFinishedAt: Long,
 )
 
 fun poissonSampling(avg: Double, timeSpan: Long): Int {

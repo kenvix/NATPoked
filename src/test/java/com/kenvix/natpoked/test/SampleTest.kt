@@ -15,8 +15,8 @@ import org.junit.jupiter.api.Test
 class SampleTest {
     @Test
     fun poissonSamplingTest() {
-        println("PSM: " + poissonPortGuess(0.1, 100,800, 50005, 50))
-        println("EVM: " + expectedValuePortGuess(0.1, 100,800, 50005, 50))
+//        println("PSM: " + poissonPortGuess(0.1, 100,800, 50005, 50))
+//        println("EVM: " + expectedValuePortGuess(0.1, 100,800, 50005, 50))
     }
 
     @Test

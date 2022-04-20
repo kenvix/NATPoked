@@ -24,7 +24,6 @@ import java.nio.channels.DatagramChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
-import kotlin.math.abs
 import kotlin.random.Random
 
 /**
@@ -237,10 +236,10 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     }
 
-    suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
+    suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null, echoPortNum: Int = -1): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         val result = echoClient.requestEcho(
-            AppEnv.EchoPortList.asIterable(),
+            AppEnv.EchoPortList.run { if (echoPortNum == -1) asIterable() else this.slice(0 until echoPortNum) },
             InetAddress.getByName(brokerClient.brokerHost),
             srcChannel
         )
@@ -249,12 +248,11 @@ object NATClient : CoroutineScope, AutoCloseable {
 
         var avg: Double = 0.0
         for (i in 1 until result.size) {
-            avg += abs(result[i].port - result[i - 1].port).toDouble() / (result[i].finishedTime - result[i - 1].finishedTime).toDouble()
+            avg += (result[i].port - result[i - 1].port).toDouble() / (result[i].finishedTime - result[i - 1].finishedTime).toDouble()
         }
 
         avg /= (result.size - 1).toDouble()
-        val lastPort = result.last().port
-        return@withContext PortAllocationPredictionParam(avg, timeElapsed, lastPort)
+        return@withContext PortAllocationPredictionParam(avg, timeElapsed, result.last().port, result.last().finishedTime)
     }
 
     override fun close() {
