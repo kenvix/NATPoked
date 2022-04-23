@@ -39,6 +39,15 @@ class WireGuardRedirector(
     private val processKey: String
         get() = "wg_$serviceName"
 
+    protected override fun onConnectionLost() {
+        if (channel.isConnected)
+            channel.disconnect()
+
+        if (myPeerConfig.role == ClientServerRole.SERVER) {
+            channel.connect(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
+        }
+    }
+
     fun start() {
         if (myPeerConfig.role == ClientServerRole.SERVER) {
             channel.connect(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
@@ -111,5 +120,9 @@ exit 0
         }
 
         super.close()
+    }
+
+    override fun toString(): String {
+        return "WireGuardPeer(serviceName=$serviceName, wireGuardConfigFilePath=$wireGuardConfigFilePath, myPeerConfig=$myPeerConfig)"
     }
 }

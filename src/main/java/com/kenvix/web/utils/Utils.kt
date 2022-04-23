@@ -3,6 +3,7 @@
 
 package com.kenvix.web.utils
 
+import com.kenvix.natpoked.utils.AppEnv
 import org.apache.commons.lang3.math.NumberUtils
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
@@ -358,10 +359,11 @@ fun ByteBuffer.putUnsignedInt(position: Int, value: Long) {
     this.putInt(position, (value and 0xffffffffL).toInt())
 }
 
-fun noException(block: () -> Unit) {
+fun ignoreException(block: () -> Unit) {
     try {
         block()
     } catch (e: Exception) {
-        logger.debug("Suppressed internal exception", e)
+        if (AppEnv.DebugMode)
+            logger.trace("Suppressed internal exception", e)
     }
 }

@@ -30,6 +30,11 @@ class KcpTunPortRedirector(
     private val processKey: String
         get() = "kcptun_$serviceName"
 
+    protected override fun onConnectionLost() {
+        if (myPeerPortConfig.role == ClientServerRole.CLIENT && channel.isConnected)
+            channel.disconnect()
+    }
+
     init {
         if (myPeerPortConfig.role == ClientServerRole.SERVER) {
             channel.connect(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
@@ -92,5 +97,9 @@ class KcpTunPortRedirector(
     override fun close() {
         ProcessUtils.stopProcess(processKey)
         super.close()
+    }
+
+    override fun toString(): String {
+        return "KcpTunPortRedirector(serviceName=$serviceName, role=${myPeerPortConfig.role}, flags=$flags)"
     }
 }

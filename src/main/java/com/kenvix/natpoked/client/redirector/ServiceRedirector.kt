@@ -14,6 +14,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import org.slf4j.LoggerFactory
 import java.io.Closeable
+import java.net.PortUnreachableException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
@@ -30,9 +31,11 @@ abstract class ServiceRedirector(
     protected lateinit var receiveAppPacketAndSendJob: Job
         private set
 
-    private val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
-    private val sendAppPacketBufferLock = Mutex()
+    protected val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
+    protected val sendAppPacketBufferLock = Mutex()
     protected val channel: DatagramChannel = DatagramChannel.open()
+
+    protected open fun onConnectionLost() {}
 
     protected fun startRedirector() {
         receiveAppPacketAndSendJob = launch(Dispatchers.IO) {
@@ -51,6 +54,9 @@ abstract class ServiceRedirector(
                     receiveAppPacketBuffer.flip()
 
                     peer.writeRawDatagram(receiveAppPacketBuffer)
+                } catch (e: PortUnreachableException) {
+                    logger.warn("App channel unreachable, disconnecting ....", e)
+                    onConnectionLost()
                 } catch (e: Throwable) {
                     logger.error("Unable to receive app packet!!!", e)
                 }
@@ -59,7 +65,7 @@ abstract class ServiceRedirector(
     }
 
     open suspend fun onReceivedRemotePacket(buf: ByteBuffer) {
-        if (!channel.isConnected) {
+        if (!channel.isConnected && NATPeerToPeer.debugNetworkTraffic) {
             logger.warn("Channel is not connected by service app, ignore packet")
             return
         }
@@ -74,5 +80,9 @@ abstract class ServiceRedirector(
 
     companion object {
         private val logger = LoggerFactory.getLogger(ServiceRedirector::class.java)
+    }
+
+    override fun toString(): String {
+        return "ServiceRedirector(serviceName=$serviceName, flags=$flags)"
     }
 }

@@ -370,7 +370,9 @@ class BrokerClient(
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2)
 
             logger.info("MQTT Connected and subscribed to topics. Root topic: ${getMqttChannelBasePath(AppEnv.PeerId)}")
-            connectCoroutineContinuation?.resume(Unit)
+            ignoreException {
+                connectCoroutineContinuation?.resume(Unit)
+            }
         }
 
         override fun authPacketArrived(reasonCode: Int, properties: MqttProperties?) {

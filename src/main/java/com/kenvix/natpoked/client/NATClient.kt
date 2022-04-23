@@ -11,7 +11,7 @@ import com.kenvix.utils.exception.NotFoundException
 import com.kenvix.web.utils.Getable
 import com.kenvix.web.utils.assertExist
 import com.kenvix.web.utils.default
-import com.kenvix.web.utils.noException
+import com.kenvix.web.utils.ignoreException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.decodeFromString
@@ -176,7 +176,7 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     fun removePeer(targetPeerId: PeerId) {
         if (peersImpl.containsKey(targetPeerId)) {
-            noException {
+            ignoreException {
                 peersImpl[targetPeerId]?.close()
             }
 
