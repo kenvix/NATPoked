@@ -202,10 +202,10 @@ class BrokerClient(
                                 "prepareAsServer" -> {
                                     val jsonStr = String(message.payload)
                                     logger.trace("MQTT /peer/~/prepareAsServer: $jsonStr")
-                                    val clientInfo: BrokerMessage<NATClientItem> = JSON.decodeFromString(jsonStr)
-                                    NATClient.onRequestPrepareAsServer(clientInfo.data)
+                                    val clientInfo: NATClientItem = JSON.decodeFromString(jsonStr)
+                                    NATClient.onRequestPrepareAsServer(clientInfo)
                                     respondPeer(
-                                        message, NATClient.peersKey[clientInfo.peerId],
+                                        message, NATClient.peersKey[clientInfo.clientId],
                                         JSON.encodeToString<CommonJsonResult<Unit>>(CommonJsonResult(200, 0))
                                     )
                                 }
@@ -369,6 +369,7 @@ class BrokerClient(
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/openPort", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/connect", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/guessPort", 2)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/prepareAsServer", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0)

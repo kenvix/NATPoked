@@ -606,7 +606,9 @@ class NATPeerToPeer(
 
                                 logger.info("Connection to peer is established | stage $stage")
                             } else {
-                                sendHelloPacket(addr, stage = 1, num = 1)
+                                if (stage != 2.toByte())
+                                    sendHelloPacket(addr, stage = 2, num = 1)
+
                                 if (debugNetworkTraffic)
                                     logger.debug("Connection to peer is already established, no need to connect again")
                             }
