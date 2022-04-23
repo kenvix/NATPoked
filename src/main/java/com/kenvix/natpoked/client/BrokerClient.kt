@@ -18,7 +18,6 @@ import com.kenvix.web.utils.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -38,11 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlin.random.Random
 
-@Suppress("CAST_NEVER_SUCCEEDS")
-@OptIn(ExperimentalSerializationApi::class)
+
 class BrokerClient(
     val brokerHost: String,
     val brokerPort: Int,
@@ -144,12 +141,11 @@ class BrokerClient(
         sendPeerMessage(topicSuffix, key, payload, 2, props, peerId, retained)
 
         return try {
-            suspendCoroutine<ByteArray> { continuation ->
+            suspendCancellableCoroutine<ByteArray> { continuation ->
                 suspendResponses[responseId] = continuation
             }
-        } catch (e: CancellationException) {
+        } finally {
             suspendResponses.remove(responseId)
-            throw e
         }
     }
 
@@ -201,6 +197,17 @@ class BrokerClient(
                                     logger.trace("MQTT /peer/~/connect: $jsonStr")
                                     val clientInfo: BrokerMessage<NATConnectReq> = JSON.decodeFromString(jsonStr)
                                     NATClient.onRequestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
+                                }
+
+                                "prepareAsServer" -> {
+                                    val jsonStr = String(message.payload)
+                                    logger.trace("MQTT /peer/~/prepareAsServer: $jsonStr")
+                                    val clientInfo: BrokerMessage<NATClientItem> = JSON.decodeFromString(jsonStr)
+                                    NATClient.onRequestPrepareAsServer(clientInfo.data)
+                                    respondPeer(
+                                        message, NATClient.peersKey[clientInfo.peerId],
+                                        JSON.encodeToString<CommonJsonResult<Unit>>(CommonJsonResult(200, 0))
+                                    )
                                 }
 
                                 "openPort" -> {
@@ -256,11 +263,7 @@ class BrokerClient(
                         TOPIC_RESPONSE -> {
                             try {
                                 val responseId = Ints.fromByteArray(message.properties.correlationData) // big endian
-                                val continuation = suspendResponses[responseId]
-                                if (continuation != null) {
-                                    continuation.resume(message.payload)
-                                    suspendResponses.remove(responseId)
-                                }
+                                suspendResponses[responseId]?.resume(message.payload)
 
                                 return
                             } catch (e: Exception) {
@@ -321,12 +324,14 @@ class BrokerClient(
                 .automaticReconnect(true)
                 .build()
 
-            suspendCoroutine<Unit> {
-                connectCoroutineContinuation = it
-                mqttClient.connect(options)
+            try {
+                suspendCancellableCoroutine<Unit> {
+                    connectCoroutineContinuation = it
+                    mqttClient.connect(options)
+                }
+            } finally {
+                connectCoroutineContinuation = null
             }
-
-            connectCoroutineContinuation = null
         }
 
         registerTask.await()

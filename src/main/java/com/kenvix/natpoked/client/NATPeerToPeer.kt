@@ -230,6 +230,8 @@ class NATPeerToPeer(
                         delay(AppEnv.PeerKeepAliveInterval)
                         var isSuccessful = false
                         retryLoop@ for (i in 0 until AppEnv.PeerKeepAliveMaxFailsNum) {
+                            if (!isActive) return@launch
+
                             try {
                                 withTimeout(AppEnv.PeerKeepAliveTimeout) {
                                     sendKeepAlivePacket(target)
@@ -238,19 +240,19 @@ class NATPeerToPeer(
                                 isSuccessful = true
                                 break@retryLoop
                             } catch (e: Exception) {
-                                keepAlivePacketContinuation = null
                                 logger.info("Keep alive response packet not received on time", e)
                             }
                         }
 
-                        if (!isSuccessful) {
+                        if (!isSuccessful && isActive) {
                             logger.warn("All Keep alive response packet not received on time, CONNECTION LOST")
                             connectLock.withLock {
                                 setSocketDisconnect()
                                 onConnectionLost?.invoke(this@NATPeerToPeer)
                             }
                             delay(AppEnv.PeerKeepAliveInterval / 4)
-                            if (!isConnected && isAutoReconnectEnabled) {
+
+                            if (!isConnected && isAutoReconnectEnabled && isActive) {
                                 logger.info("Auto reconnect enabled, reconnecting")
                                 NATClient.requestConnectPeer(targetPeerId)
                             }
@@ -284,8 +286,11 @@ class NATPeerToPeer(
             logger.trace("Sent keep alive packet REPLY to $target")
         } else {
             logger.trace("Sent keep alive packet REQUEST to $target")
-            suspendCoroutine<Unit> { keepAlivePacketContinuation = it }
-            keepAlivePacketContinuation = null
+            try {
+                suspendCancellableCoroutine<Unit> { keepAlivePacketContinuation = it }
+            } finally {
+                keepAlivePacketContinuation = null
+            }
             logger.trace("Received keep alive response packet")
         }
     }
@@ -601,6 +606,7 @@ class NATPeerToPeer(
 
                                 logger.info("Connection to peer is established | stage $stage")
                             } else {
+                                sendHelloPacket(addr, stage = 1, num = 1)
                                 if (debugNetworkTraffic)
                                     logger.debug("Connection to peer is already established, no need to connect again")
                             }
@@ -616,7 +622,6 @@ class NATPeerToPeer(
                             } else {
                                 try {
                                     keepAlivePacketContinuation?.resume(Unit)
-                                    keepAlivePacketContinuation = null
                                 } catch (e: Exception) {
                                     logger.debug(
                                         "Received peer keepalive REPLY packet from $addr, size $size, but no continuation is already resumed",
@@ -668,6 +673,18 @@ class NATPeerToPeer(
     suspend fun connectPeer(connectReq: NATConnectReq) {
         logger.info("connectPeer: Connecting to peer ${connectReq.targetClientItem.clientId}")
         val peerInfo = connectReq.targetClientItem
+
+        val prepareAsServerResultJson: String = withTimeout(AppEnv.PeerKeepAliveTimeout) {
+            NATClient.brokerClient.sendPeerMessageWithResponse(
+                "control/prepareAsServer",
+                targetKey,
+                JSON.encodeToString(NATClient.lastSelfClientInfo),
+                peerId = peerInfo.clientId,
+            )
+        }
+
+        val prepareAsServerResult: CommonJsonResult<PortReq> = JSON.decodeFromString(prepareAsServerResultJson)
+        prepareAsServerResult.checkException()
 
         suspend fun sendHelloIp4Task(targetPort: Int) =
             if (peerInfo.clientInetAddress != null) {
@@ -814,13 +831,13 @@ class NATPeerToPeer(
     }
 
     suspend fun setSocketDisconnect() {
+        stopKeepAliveJob()
+
         if (udpChannel.isConnected) {
             withContext(Dispatchers.IO) {
                 udpChannel.disconnect()
             }
         }
-
-        stopKeepAliveJob()
     }
 
     @Suppress("LocalVariableName")
@@ -1013,6 +1030,15 @@ class NATPeerToPeer(
         }
 
         return NATClient.getPortAllocationPredictionParam(udpChannel)
+    }
+
+    suspend fun prepareAsServer(info: NATClientItem) {
+        if (isConnected) {
+            logger.info("prepareAsServer: already connected but received new connect request, clearing old connection")
+            connectLock.withLock {
+                setSocketDisconnect()
+            }
+        }
     }
 
     init {

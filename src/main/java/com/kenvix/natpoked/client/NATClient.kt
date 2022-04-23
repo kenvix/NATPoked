@@ -299,4 +299,17 @@ object NATClient : CoroutineScope, AutoCloseable {
             launch { peer.sendHelloPacket(InetSocketAddress(peerInfo.clientInetAddress, 53)) }
         }
     }
+
+    @Throws(NotFoundException::class)
+    suspend fun onRequestPrepareAsServer(info: NATClientItem): NATPeerToPeer {
+        val targetPeerId = info.clientId
+        if (!peersImpl.containsKey(targetPeerId)) {
+            throw NotFoundException("Peer not found locally: $targetPeerId")
+        }
+
+        val peer = peers[targetPeerId]!!
+        peer.prepareAsServer(info)
+
+        return peer
+    }
 }

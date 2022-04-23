@@ -6,6 +6,7 @@ import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase64String
 import com.kenvix.utils.exception.BadRequestException
 import com.kenvix.utils.exception.InvalidAuthorizationException
+import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.internal.toHexString
 import org.eclipse.paho.mqttv5.client.IMqttToken
 import org.eclipse.paho.mqttv5.client.MqttActionListener
@@ -17,12 +18,11 @@ import org.slf4j.LoggerFactory
 import java.lang.invoke.MethodHandles
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 
 private val logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
 
 suspend fun MqttAsyncClient.aSendMessage(topic: String, msg: MqttMessage): IMqttToken {
-    return suspendCoroutine<IMqttToken> { continuation ->
+    return suspendCancellableCoroutine<IMqttToken> { continuation ->
         logger.trace("MQTT: Sending message to topic: $topic with msg $msg")
         publish(topic, msg, null, object : MqttActionListener {
             override fun onSuccess(asyncAction: IMqttToken) {
