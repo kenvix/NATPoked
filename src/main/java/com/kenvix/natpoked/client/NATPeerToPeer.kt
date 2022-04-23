@@ -50,7 +50,8 @@ import kotlin.io.path.writeText
  */
 class NATPeerToPeer(
     val targetPeerId: PeerId,
-    private val config: PeersConfig.Peer
+    private val config: PeersConfig.Peer,
+    private val onConnectionLost: ((NATPeerToPeer) -> Unit)? = null,
 ) : CoroutineScope, AutoCloseable {
     private data class BufferInfo(
         val buffer: ByteBuffer = ByteBuffer.allocateDirect(1500),
@@ -80,6 +81,8 @@ class NATPeerToPeer(
 
     @Volatile
     private var isConnected: Boolean = false
+    private val isAutoReconnectEnabled: Boolean
+        get() = config.autoConnect
 
     @Volatile
     var targetAddr: InetSocketAddress? = null
@@ -211,6 +214,10 @@ class NATPeerToPeer(
     @Volatile
     var keepAlivePacketContinuation: Continuation<Unit>? = null
 
+    init {
+
+    }
+
     private fun startKeepAliveJob(target: InetSocketAddress) {
         if (keepAliveJob == null) {
             if (!isConnected)
@@ -240,6 +247,12 @@ class NATPeerToPeer(
                             logger.warn("All Keep alive response packet not received on time, CONNECTION LOST")
                             connectLock.withLock {
                                 setSocketDisconnect()
+                                onConnectionLost?.invoke(this@NATPeerToPeer)
+                            }
+                            delay(AppEnv.PeerKeepAliveInterval / 4)
+                            if (!isConnected && isAutoReconnectEnabled) {
+                                logger.info("Auto reconnect enabled, reconnecting")
+                                NATClient.requestConnectPeer(targetPeerId)
                             }
                         }
                     } catch (e: Exception) {

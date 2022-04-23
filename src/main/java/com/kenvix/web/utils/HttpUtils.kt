@@ -58,7 +58,7 @@ suspend inline fun <reified T> ApplicationCall.respondJson(
     code: Int = 0, status: HttpStatusCode = HttpStatusCode.OK
 ) {
     this.respond(
-        Json.encodeToString(
+        JSON.encodeToString(
             CommonJsonResult(
                 status.value,
                 info = info ?: status.description,
@@ -263,18 +263,18 @@ suspend inline fun <reified T> ApplicationCall.receiveProtobuf(): T {
 }
 
 suspend inline fun <reified T> ApplicationCall.receiveJson(): T {
-    return Json.decodeFromString(receiveText())
+    return JSON.decodeFromString(receiveText())
 }
 
 suspend inline fun <reified T> ApplicationCall.receiveData(): T {
     val type = request.contentType().contentSubtype
     return if (type.contains("json")) {
-        Json.decodeFromString(receiveText())
+        JSON.decodeFromString(receiveText())
     } else if (type.contains("protobuf")) {
         ProtoBuf.decodeFromByteArray(receiveBytes())
     } else {
         if (defaultRpcProtocol == "json")
-            Json.decodeFromString(this.receiveText())
+            JSON.decodeFromString(this.receiveText())
         else
             ProtoBuf.decodeFromByteArray(receiveBytes())
     }

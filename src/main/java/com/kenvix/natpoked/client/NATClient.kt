@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.Main
 import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
 import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
 import com.kenvix.natpoked.contacts.*
@@ -72,6 +73,8 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     val echoClient = SocketAddrEchoClient(AppEnv.EchoTimeout)
 
+    private lateinit var reportLoopJob: Job
+
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
 
     @Suppress("BlockingMethodInNonBlockingContext")
@@ -102,8 +105,6 @@ object NATClient : CoroutineScope, AutoCloseable {
         return UrlParseResult(url.host, port, path, ssl)
     }
 
-    private lateinit var reportLoopJob: Job
-
     suspend fun pokeAll() {
         logger.info("Poking all peers")
         for (peer in peersImpl.values) {
@@ -118,7 +119,13 @@ object NATClient : CoroutineScope, AutoCloseable {
             if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
         }
 
-        peersConfig.peers.forEach { addPeerIfNotExist(it.key, it.value) }
+        peersConfig.peers.forEach {
+            if (AppEnv.AutoConnectToPeerId >= 0 && it.key == AppEnv.AutoConnectToPeerId) {
+                it.value.autoConnect = true
+            }
+
+            addPeerIfNotExist(it.key, it.value)
+        }
 
         if (AppEnv.DebugMode) {
             logger.trace("Peer to broker key: $peerToBrokerKeyBase64Encoded")
@@ -150,11 +157,11 @@ object NATClient : CoroutineScope, AutoCloseable {
 
         testPingServerJob.await()
 
-        if (AppEnv.AutoConnectToPeerId >= 0) {
-            logger.info("Connection request from environment file: CONN --> ${AppEnv.AutoConnectToPeerId}")
-            requestConnectPeer(AppEnv.AutoConnectToPeerId).toString()
+        peersConfig.peers.forEach {
+            if (it.value.autoConnect) {
+                requestConnectPeer(it.key)
+            }
         }
-
         logger.info("NATPoked Client Started")
     }
 

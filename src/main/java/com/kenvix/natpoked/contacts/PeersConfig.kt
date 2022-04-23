@@ -47,6 +47,7 @@ data class PeersConfig(
         var wireGuard: WireGuard = WireGuard(),
         @Transient var keySha: ByteArray = sha256Of(key),
         val natPortGuessModel: GuessModel = GuessModel.POISSON,
+        var autoConnect: Boolean = false,
     ) {
         @Serializable
         data class Port(
