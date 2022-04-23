@@ -75,7 +75,6 @@ class NATPeerToPeer(
     private val keepAliveBuffer =
         ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
     private val keepAliveLock = Mutex()
-    private var useSocketConnect: Boolean = false
 
     private var pingReceiverChannel: Channel<DatagramPacket>? = null
 
@@ -118,10 +117,21 @@ class NATPeerToPeer(
         private const val ivSize = 16
 
         @JvmStatic
-        val debugNetworkTraffic = AppEnv.DebugMode && AppEnv.DebugNetworkTraffic
+        val debugNetworkTrafficVerbose =
+            AppEnv.DebugMode && AppEnv.DebugNetworkTraffic && AppEnv.DebugNetworkTrafficVerbose
+
+        @JvmStatic
+        val debugNetworkTraffic = debugNetworkTrafficVerbose || (AppEnv.DebugMode && AppEnv.DebugNetworkTraffic)
+
+        @JvmStatic
         val wireGuardConfigDirPath = AppConstants.workingPath.resolve("Config").resolve("WireGuard")
         private val logger = LoggerFactory.getLogger(NATPeerToPeer::class.java)
+
+        @JvmStatic
         val receiveBufferNum = AppEnv.PeerReceiveBufferNum
+
+        @JvmStatic
+        private val useSocketConnect: Boolean = AppEnv.PeerUseSocketConnect
     }
 
     private val udpChannel: DatagramChannel =
@@ -159,7 +169,7 @@ class NATPeerToPeer(
 
                                 val addr = udpChannel.receive(buffer) as InetSocketAddress?
                                 if (addr != null) {
-                                    if (debugNetworkTraffic) {
+                                    if (debugNetworkTrafficVerbose) {
                                         logger.trace("Received peer packet from $addr size ${buffer.position()}")
                                     }
                                     buffer.flip()
@@ -180,14 +190,15 @@ class NATPeerToPeer(
                             buffer.clear()
 
                             val addr = udpChannel.receive(buffer) as InetSocketAddress
-                            if (debugNetworkTraffic) {
+                            if (debugNetworkTrafficVerbose) {
                                 logger.trace("Received peer packet from $addr size ${buffer.position()}")
                             }
 
                             buffer.flip()
                             dispatchIncomingPacket(addr, buffer)
                         } catch (e: Exception) {
-                            logger.error("Unable to handle incoming packet!!!", e)
+                            if (debugNetworkTraffic)
+                                logger.error("Unable to handle incoming packet!!!", e)
                         }
                     }
                 }
@@ -306,7 +317,7 @@ class NATPeerToPeer(
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, target)
-        if (debugNetworkTraffic) {
+        if (debugNetworkTrafficVerbose) {
             if (!buffer.isDirect)
                 logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
             else
@@ -316,7 +327,7 @@ class NATPeerToPeer(
 
     suspend fun writeRawDatagram(buffer: ByteBuffer) = withContext(Dispatchers.IO) {
         udpChannel.send(buffer, targetAddr)
-        if (debugNetworkTraffic) {
+        if (debugNetworkTrafficVerbose) {
             if (!buffer.isDirect)
                 logger.debugArray("$targetPeerId: writeRawDatagram to default", buffer.array())
             else
@@ -464,6 +475,7 @@ class NATPeerToPeer(
     }
 
     private suspend fun dispatchIncomingPacket(addr: InetSocketAddress, buffer: ByteBuffer) {
+        // Ping packet is handled by the ping handler
         if (SocketAddrEchoClient.isResponsePacket(buffer)) {
             pingReceiverChannel?.trySend(buffer.toDatagramPacket(addr))
             return
@@ -494,6 +506,11 @@ class NATPeerToPeer(
         }
 
         val size = decryptedBuf.remaining()
+
+        if (!isConnected) {
+            logger.debug("connection state lost, reconnecting")
+            setSocketConnectTo(addr)
+        }
 
         try {
             when (mainTypeClass) {
@@ -539,7 +556,8 @@ class NATPeerToPeer(
                 TYPE_DATA_CONTROL.typeId -> {
                     when ((typeIdInt and 0x3F).toShort()) {
                         TYPE_DATA_CONTROL_HELLO.typeId -> {
-                            logger.info("Received peer helloACK packet from $addr, size $size")
+                            if (debugNetworkTraffic)
+                                logger.debug("Received peer helloACK packet from $addr, size $size")
                             if (connectJob?.isActive == true)
                                 connectJob?.cancel("Connection to peer is established")
 
@@ -553,14 +571,16 @@ class NATPeerToPeer(
 
                                 logger.info("Connection to peer is established | stage $stage")
                             } else {
-                                logger.debug("Connection to peer is already established, no need to connect again")
+                                if (debugNetworkTraffic)
+                                    logger.debug("Connection to peer is already established, no need to connect again")
                             }
                         }
 
                         TYPE_DATA_CONTROL_KEEPALIVE.typeId -> {
                             val subType = decryptedBuf.get()
                             if (subType == 0.toByte()) {
-                                logger.trace("Received peer keepalive REQUEST packet from $addr, size $size, replying ...")
+                                if (debugNetworkTraffic)
+                                    logger.trace("Received peer keepalive REQUEST packet from $addr, size $size, replying ...")
                                 sendKeepAlivePacket(addr, isReply = true)
                             } else {
                                 try {
@@ -646,7 +666,12 @@ class NATPeerToPeer(
             val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
                 "control/openPort",
                 targetKey,
-                JSON.encodeToString(OpenPortReq(AppEnv.PeerId, alsoSendHelloPacket = peerInfo.clientNatType == NATType.RESTRICTED_CONE)),
+                JSON.encodeToString(
+                    OpenPortReq(
+                        AppEnv.PeerId,
+                        alsoSendHelloPacket = peerInfo.clientNatType == NATType.RESTRICTED_CONE
+                    )
+                ),
                 peerId = peerInfo.clientId,
             )
 
