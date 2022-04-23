@@ -358,9 +358,9 @@ class NATPeerToPeer(
             buffer.put(stage) // 1
 
             for (i in 0 until num) {
-                if (isConnected) {
-                    logger.debug("Already connected. Skip sending hello packet")
-                    break
+                if (isConnected && stage == 0.toByte()) {
+                    logger.debug("Already connected. Skip sending hello packet force stage 0")
+                    return
                 }
 
                 buffer.flip()
@@ -570,15 +570,18 @@ class NATPeerToPeer(
                 TYPE_DATA_CONTROL.typeId -> {
                     when ((typeIdInt and 0x3F).toShort()) {
                         TYPE_DATA_CONTROL_HELLO.typeId -> {
-                            if (debugNetworkTraffic)
-                                logger.debug("Received peer helloACK packet from $addr, size $size")
                             if (connectJob?.isActive == true)
                                 connectJob?.cancel("Connection to peer is established")
 
                             val stage = decryptedBuf.get()
+                            if (debugNetworkTraffic)
+                                logger.debug("Received peer helloACK stage $stage packet from $addr, size $size")
 
                             if (!isConnected) {
-                                setSocketConnectTo(addr)
+                                connectLock.withLock {
+                                    setSocketConnectTo(addr)
+                                }
+
                                 if (stage == 0.toByte()) {
                                     sendHelloPacket(addr, stage = 1, num = 20)
                                 }
@@ -960,7 +963,8 @@ class NATPeerToPeer(
 
                 logger.debug("connectTo: connected to $target")
             } else {
-                logger.trace("connectTo: requested to connect $target but no need to do it")
+                if (debugNetworkTraffic)
+                    logger.trace("connectTo: requested to connect $target but no need to do it")
             }
 
             isConnected = true
