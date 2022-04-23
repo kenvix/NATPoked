@@ -88,6 +88,7 @@ class NATPeerToPeer(
     //    private val receiveBuffer = ByteBuffer.allocateDirect(1500)
     private var ivUseCount = 0 // 无需线程安全
     private val sendLock: Mutex = Mutex()
+    private val connectLock: Mutex = Mutex()
 //    val receiveLock: Mutex = Mutex()
 
     private val controlMessageARQ: KCPARQProvider by lazy {
@@ -237,7 +238,9 @@ class NATPeerToPeer(
 
                         if (!isSuccessful) {
                             logger.warn("All Keep alive response packet not received on time, CONNECTION LOST")
-                            setSocketDisconnect()
+                            connectLock.withLock {
+                                setSocketDisconnect()
+                            }
                         }
                     } catch (e: Exception) {
                         logger.warn("Unable to send keep alive packet!!!", e)
@@ -507,26 +510,35 @@ class NATPeerToPeer(
 
         val size = decryptedBuf.remaining()
 
-        if (!isConnected) {
-            logger.debug("connection state lost, reconnecting")
-            setSocketConnectTo(addr)
+        suspend fun markConnectedIfConnectionLost() {
+            if (!isConnected) {
+                logger.debug("markConnectedIfConnectionLost: connection state lost, mark connected ...")
+                connectLock.withLock {
+                    if (!isConnected)
+                        setSocketConnectTo(addr)
+                }
+            }
         }
 
         try {
             when (mainTypeClass) {
                 TYPE_DATA_STREAM.typeId -> {
+                    markConnectedIfConnectionLost()
                     TODO("Not implemented")
                 }
 
                 TYPE_DATA_DGRAM.typeId -> {
+                    markConnectedIfConnectionLost()
                     when ((typeIdInt and 0x3F).toShort()) {
                         TYPE_DATA_DGRAM_SERVICE.typeId -> {
                             if (size > 4) {
                                 val serviceNameCode = decryptedBuf.int
-                                val service = portServicesMap[serviceNameCode].also {
-                                    if (it == null)
-                                        startAllServices()
-                                }.assertExist()
+                                val service = portServicesMap[serviceNameCode]
+                                if (service == null) {
+                                    if (debugNetworkTraffic)
+                                        logger.warn("Received unknown service request: $serviceNameCode")
+                                    return
+                                }
 
                                 service.onReceivedRemotePacket(decryptedBuf)
                             }
@@ -542,13 +554,15 @@ class NATPeerToPeer(
                                         sockAddr
                                     )
                                 } else {
-                                    logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
+                                    if (debugNetworkTraffic)
+                                        logger.trace("Received INVALID peer packet from $sockAddr, size $size: NO TARGET PORT")
                                 }
                             }
                         }
 
                         else -> {
-                            logger.warn("Received NOT SUPPORTED peer TYPE_DATA_DGRAM packet, size $size: UNKNOWN TYPE")
+                            if (debugNetworkTraffic)
+                                logger.warn("Received NOT SUPPORTED peer TYPE_DATA_DGRAM packet, size $size: UNKNOWN TYPE")
                         }
                     }
                 }
@@ -577,6 +591,7 @@ class NATPeerToPeer(
                         }
 
                         TYPE_DATA_CONTROL_KEEPALIVE.typeId -> {
+                            markConnectedIfConnectionLost()
                             val subType = decryptedBuf.get()
                             if (subType == 0.toByte()) {
                                 if (debugNetworkTraffic)
@@ -635,7 +650,7 @@ class NATPeerToPeer(
     }
 
     suspend fun connectPeer(connectReq: NATConnectReq) {
-        logger.info("connectPeerAsync: Connecting to peer ${connectReq.targetClientItem.clientId}")
+        logger.info("connectPeer: Connecting to peer ${connectReq.targetClientItem.clientId}")
         val peerInfo = connectReq.targetClientItem
 
         suspend fun sendHelloIp4Task(targetPort: Int) =
@@ -643,8 +658,11 @@ class NATPeerToPeer(
                 withContext(Dispatchers.IO) {
                     async {
                         val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
-                        sendHelloPacket(addr, num = 10)
+                        while (!isConnected && isActive) {
+                            logger.debug("connectPeer: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
+                            sendHelloPacket(addr, num = 10)
+                            delay(AppEnv.PeerKeepAliveTimeout)
+                        }
                     }
                 }
             } else null
@@ -654,8 +672,11 @@ class NATPeerToPeer(
                 withContext(Dispatchers.IO) {
                     async {
                         val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
-                        sendHelloPacket(addr, num = 10)
+                        while (!isConnected && isActive) {
+                            logger.debug("connectPeer: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
+                            sendHelloPacket(addr, num = 10)
+                            delay(AppEnv.PeerKeepAliveTimeout)
+                        }
                     }
                 }
             } else null
@@ -978,8 +999,8 @@ class NATPeerToPeer(
     }
 
     init {
-        Runtime.getRuntime().addShutdownHook(Thread {
-            close()
-        })
+//        Runtime.getRuntime().addShutdownHook(Thread {
+//            close()
+//        })
     }
 }
