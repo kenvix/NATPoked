@@ -56,7 +56,9 @@ abstract class ServiceRedirector(
 
                     peer.writeRawDatagram(receiveAppPacketBuffer)
                 } catch (e: PortUnreachableException) {
-                    logger.warn("App channel unreachable, disconnecting ....", e)
+                    if (NATPeerToPeer.debugNetworkTraffic)
+                        logger.debug("App channel unreachable", e)
+
                     onConnectionLost()
                 } catch (e: Throwable) {
                     logger.error("Unable to receive app packet!!!", e)

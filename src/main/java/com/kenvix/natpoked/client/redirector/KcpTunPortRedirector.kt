@@ -10,6 +10,7 @@ import com.kenvix.web.utils.ProcessUtils
 import io.netty.buffer.ByteBuf
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
+import java.net.StandardSocketOptions
 import java.util.*
 
 class KcpTunPortRedirector(
@@ -31,11 +32,21 @@ class KcpTunPortRedirector(
         get() = "kcptun_$serviceName"
 
     protected override fun onConnectionLost() {
-        if (myPeerPortConfig.role == ClientServerRole.CLIENT && channel.isConnected)
+        if (myPeerPortConfig.role == ClientServerRole.CLIENT && channel.isConnected) {
+            logger.warn("App channel unreachable, client mode, DISCONNECTING")
             channel.disconnect()
+        } else {
+            val addr = InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort)
+            logger.warn("App channel unreachable, server mode, RECONNECTING $addr")
+            channel.disconnect() // if we don't write this piece of shit it will not work
+            channel.connect(addr)
+        }
     }
 
     init {
+        channel.setOption(StandardSocketOptions.SO_RCVBUF, AppEnv.KcpSndWnd)
+        channel.setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.KcpRcvWnd)
+
         if (myPeerPortConfig.role == ClientServerRole.SERVER) {
             channel.connect(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
         } else {
