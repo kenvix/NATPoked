@@ -32,7 +32,7 @@ abstract class ServiceRedirector(
         private set
 
     protected val receiveAppPacketBuffer: ByteBuffer =
-        ByteBuffer.allocateDirect(1480).apply { order(ByteOrder.BIG_ENDIAN) }
+        ByteBuffer.allocateDirect(1472).apply { order(ByteOrder.BIG_ENDIAN) }
     protected val sendAppPacketBufferLock = Mutex()
     protected val channel: DatagramChannel = DatagramChannel.open()
 

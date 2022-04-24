@@ -54,7 +54,7 @@ class NATPeerToPeer(
     private val onConnectionLost: ((NATPeerToPeer) -> Unit)? = null,
 ) : CoroutineScope, AutoCloseable {
     private data class BufferInfo(
-        val buffer: ByteBuffer = ByteBuffer.allocateDirect(1480),
+        val buffer: ByteBuffer = ByteBuffer.allocateDirect(1472),
         val lock: Mutex = Mutex()
     )
 
@@ -65,11 +65,11 @@ class NATPeerToPeer(
     val targetKey = if (config.key.isBlank()) AppEnv.PeerDefaultPSK else config.keySha
     private val targetMqttKey = sha256Of(targetKey).toBase64String()
     private val aes = AES256GCM(targetKey)
-    private val sendBuffer = ByteBuffer.allocateDirect(1480).apply { order(ByteOrder.BIG_ENDIAN) }
+    private val sendBuffer = ByteBuffer.allocateDirect(1472).apply { order(ByteOrder.BIG_ENDIAN) }
 
     //    private val receiveBuffers = Array<BufferInfo>(receiveBufferNum) { BufferInfo() }
     private val receiveBuffers =
-        Array<ByteBuffer>(receiveBufferNum) { ByteBuffer.allocateDirect(1480).apply { order(ByteOrder.BIG_ENDIAN) } }
+        Array<ByteBuffer>(receiveBufferNum) { ByteBuffer.allocateDirect(1472).apply { order(ByteOrder.BIG_ENDIAN) } }
 
     private var currentReceiveBufferIndex: AtomicInteger = AtomicInteger(0)
 
@@ -88,7 +88,7 @@ class NATPeerToPeer(
     var targetAddr: InetSocketAddress? = null
         private set
 
-    //    private val receiveBuffer = ByteBuffer.allocateDirect(1480)
+    //    private val receiveBuffer = ByteBuffer.allocateDirect(1472)
     private var ivUseCount = 0 // 无需线程安全
     private val sendLock: Mutex = Mutex()
     private val connectLock: Mutex = Mutex()
