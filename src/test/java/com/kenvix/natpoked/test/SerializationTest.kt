@@ -3,6 +3,7 @@
 //--------------------------------------------------
 // Written by Kenvix <i@kenvix.com>
 //--------------------------------------------------
+@file:UseSerializers(InetAddressSerializer::class, Inet6AddressSerializer::class, Inet4AddressSerializer::class, URLSerializer::class, URISerializer::class)
 
 package com.kenvix.natpoked.test
 
@@ -16,11 +17,7 @@ import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.server.ErrorResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.web.utils.JSON
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToHexString
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import net.mamoe.yamlkt.Yaml
@@ -29,6 +26,8 @@ import org.junit.jupiter.api.Test
 import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
+import java.net.URI
+import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
@@ -52,6 +51,27 @@ class SerializationTest {
 
         println(Json.encodeToString(testItem))
         println(ProtoBuf.encodeToHexString(testItem))
+    }
+
+    @Serializable
+    data class TestInetAddressSerialization(
+        val ip4: InetAddress,
+        val ip6: InetAddress,
+        val url: URL,
+        val uri: URI,
+    )
+
+    @Test
+    fun testInetAddressSerialization() {
+        val obj = TestInetAddressSerialization(
+            Inet4Address.getByName("223.5.5.5"),
+            Inet6Address.getByName("fe80::1"),
+            URL("https://www.baidu.com:443/path/to/file.html?a=1&b=2#fragment"),
+            URI("https://www.baidu.com:443/path/to/file.html?a=1&b=2#fragment"),
+        )
+        val json = JSON.encodeToString(obj)
+        println(json)
+        println(JSON.decodeFromString<TestInetAddressSerialization>(json))
     }
 
     @Test
