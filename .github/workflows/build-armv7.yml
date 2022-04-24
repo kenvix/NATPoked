@@ -24,6 +24,18 @@ jobs:
       - name: submodules-init
         uses: snickerbockers/submodules-init@v4
 
+      - name: Download Universal JAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app.jar
+          path: build/output
+
+      - name: Run Docker Prebuild shell
+        run: |
+          echo "Prebuild shell"
+          ls -al
+          mkdir -p ./build/output
+
       - name: Set Up QEMU
         uses: docker/setup-qemu-action@v1
 
@@ -47,8 +59,10 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile-RuntimeOnly
           platforms: linux/arm/v7
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
       

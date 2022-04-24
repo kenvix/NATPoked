@@ -180,6 +180,7 @@ tasks {
 
     withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
         archiveBaseName.set(archivesBaseName)
+        archiveFileName.set("$archivesBaseName.jar")
 
         destinationDirectory.set(file("${buildDir}/output"))
         isZip64 = true
