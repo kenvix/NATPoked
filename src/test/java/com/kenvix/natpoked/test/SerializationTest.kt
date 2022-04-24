@@ -44,7 +44,7 @@ class SerializationTest {
         assertEquals("fe000000000000000000000000000001", ip6.address.toHexString())
         val testItem = NATClientItem(
             0x1145141919810L,
-            ip4.address,
+            ip4,
             clientLastContactTime = System.currentTimeMillis(),
             clientNatType = NATType.FULL_CONE
         )

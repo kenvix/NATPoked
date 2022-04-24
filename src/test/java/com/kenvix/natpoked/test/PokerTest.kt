@@ -19,7 +19,7 @@ import java.net.InetAddress
 class PokerTest {
     @Test
     fun testPublic4Poke() {
-        val localhost = InetAddress.getByName("127.0.0.1").address
+        val localhost = InetAddress.getByName("127.0.0.1")
         val peerConfig2 = PeersConfig.Peer("key2", 3002)
         val peerConfig1 = PeersConfig.Peer("key1", 3001)
 

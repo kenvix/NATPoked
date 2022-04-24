@@ -61,7 +61,7 @@ object NATClient : CoroutineScope, AutoCloseable {
         }
 
     val isIp6Supported
-        get() = lastSelfClientInfo.clientPublicIp6Address != null
+        get() = lastSelfClientInfo.clientInet6Address != null
     val isUpnpOrFullCone
         get() = lastSelfClientInfo.isUpnpSupported || lastSelfClientInfo.clientNatType == NATType.FULL_CONE
 
@@ -198,8 +198,8 @@ object NATClient : CoroutineScope, AutoCloseable {
         } else {
             NATClientItem(
                 AppEnv.PeerId,
-                InetAddress.getByName(peersConfig.my.nat.clientPublicIpAddress).address,
-                InetAddress.getByName(peersConfig.my.nat.clientPublicIp6Address).address,
+                peersConfig.my.nat.clientInetAddress,
+                peersConfig.my.nat.clientInet6Address,
                 clientNatType = peersConfig.my.nat.clientNatType,
                 isValueChecked = peersConfig.my.nat.isValueChecked
             )

@@ -94,9 +94,9 @@ object NATTraversalKit {
 
         NATClientItem(
             clientId = AppEnv.PeerId,
-            clientPublicIpAddress = natType.publicInetAddress?.address,
-            clientPublicIp6Address = getDefaultGatewayAddress6().run {
-                if (!isLoopbackAddress && !isLinkLocalAddress && !isSiteLocalAddress) address else null
+            clientInetAddress = natType.publicInetAddress,
+            clientInet6Address = getDefaultGatewayAddress6().run {
+                if (!isLoopbackAddress && !isLinkLocalAddress && !isSiteLocalAddress) this else null
             },
             clientNatType = natType.natType,
             isValueChecked = false,

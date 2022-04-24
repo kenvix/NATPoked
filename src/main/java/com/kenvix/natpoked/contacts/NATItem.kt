@@ -1,6 +1,10 @@
+@file:UseSerializers(InetAddressSerializer::class, Inet6AddressSerializer::class, Inet4AddressSerializer::class, URLSerializer::class, URISerializer::class)
+
 package com.kenvix.natpoked.contacts
 
+import com.kenvix.natpoked.utils.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseSerializers
 import java.net.InetAddress
 
 @Serializable
@@ -138,20 +142,14 @@ data class NATConnectReq(
 @Serializable
 data class NATClientItem(
     val clientId: PeerId,
-    val clientPublicIpAddress: ByteArray? = null,
-    val clientPublicIp6Address: ByteArray? = null,
+    val clientInetAddress: InetAddress? = null,
+    val clientInet6Address: InetAddress? = null,
     val clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
     val isValueChecked: Boolean = false,
     val isUpnpSupported: Boolean = false,
     var peersConfig: PeersConfig? = null
 ) {
-    val clientInetAddress: InetAddress?
-        get() = if (clientPublicIpAddress == null) null else InetAddress.getByAddress(clientPublicIpAddress)
-
-    val clientInet6Address: InetAddress?
-        get() = if (clientPublicIp6Address == null) null else InetAddress.getByAddress(clientPublicIp6Address)
-
     companion object {
         @JvmStatic
         val natTypeComparator: Comparator<NATClientItem> = Comparator { a, b ->
@@ -161,48 +159,6 @@ data class NATClientItem(
         @JvmStatic
         val UNKNOWN = NATClientItem(0, null)
     }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as NATClientItem
-
-        if (clientId != other.clientId) return false
-        if (clientPublicIpAddress != null) {
-            if (other.clientPublicIpAddress == null) return false
-            if (!clientPublicIpAddress.contentEquals(other.clientPublicIpAddress)) return false
-        } else if (other.clientPublicIpAddress != null) return false
-        if (clientPublicIp6Address != null) {
-            if (other.clientPublicIp6Address == null) return false
-            if (!clientPublicIp6Address.contentEquals(other.clientPublicIp6Address)) return false
-        } else if (other.clientPublicIp6Address != null) return false
-        if (clientLastContactTime != other.clientLastContactTime) return false
-        if (clientNatType != other.clientNatType) return false
-        if (isValueChecked != other.isValueChecked) return false
-        if (isUpnpSupported != other.isUpnpSupported) return false
-        if (peersConfig != other.peersConfig) return false
-        if (clientInetAddress != other.clientInetAddress) return false
-        if (clientInet6Address != other.clientInet6Address) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        var result = clientId.hashCode()
-        result = 31 * result + (clientPublicIpAddress?.contentHashCode() ?: 0)
-        result = 31 * result + (clientPublicIp6Address?.contentHashCode() ?: 0)
-        result = 31 * result + clientLastContactTime.hashCode()
-        result = 31 * result + clientNatType.hashCode()
-        result = 31 * result + isValueChecked.hashCode()
-        result = 31 * result + isUpnpSupported.hashCode()
-        result = 31 * result + (peersConfig?.hashCode() ?: 0)
-        result = 31 * result + (clientInetAddress?.hashCode() ?: 0)
-        result = 31 * result + (clientInet6Address?.hashCode() ?: 0)
-        return result
-    }
-
-
 }
 
 @Serializable

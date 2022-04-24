@@ -72,6 +72,8 @@ internal object WebServerBasicRoutes : KtorModule {
                         val data: NATClientItem = call.receiveInternalData()
                         if (data.peersConfig == null || data.peersConfig?.peers == null || data.peersConfig?.peers?.size == 0)
                             logger.info("Excuse me? PeersConfig is empty.")
+                        if (data.clientInet6Address == null && data.clientInetAddress == null)
+                            throw BadRequestException("Both Client IPv4 and IPv6 address is empty.")
 
                         val peerKey = call.request.headers["Peer-Key"]
                         NATServer.addPeerConnection(data, peerKey ?: "")

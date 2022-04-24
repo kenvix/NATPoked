@@ -3,12 +3,15 @@
 //--------------------------------------------------
 // Written by Kenvix <i@kenvix.com>
 //--------------------------------------------------
+@file:UseSerializers(InetAddressSerializer::class, Inet6AddressSerializer::class, Inet4AddressSerializer::class, URLSerializer::class, URISerializer::class)
 
 package com.kenvix.natpoked.contacts
 
-import com.kenvix.natpoked.utils.sha256Of
+import com.kenvix.natpoked.utils.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.UseSerializers
+import java.net.InetAddress
 
 @Suppress("unused", "ArrayInDataClass")
 @Serializable
@@ -25,8 +28,8 @@ data class PeersConfig(
         @Serializable
         data class Nat(
             val auto: Boolean = true,
-            val clientPublicIpAddress: String = "",
-            val clientPublicIp6Address: String = "",
+            val clientInetAddress: InetAddress? = null,
+            val clientInet6Address: InetAddress? = null,
             val clientNatType: NATType = NATType.UNKNOWN,
             val isUpnpSupported: Boolean = false,
             val isValueChecked: Boolean = false,

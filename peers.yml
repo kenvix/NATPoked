@@ -10,8 +10,8 @@ my:
     auto: true
     clientNatType: FULLCONE
     isUpnpSupported: true
-    clientPublicIpAddress:
-    clientPublicIp6Address:
+    clientInetAddress:
+    clientInet6Address:
 # 对等端配置
 peers:
   # peer id (64位整数)
@@ -19,6 +19,8 @@ peers:
     key: passwordpasswordpasswordpassword
     # NATPoked 用于打洞 P2P 通信的端口（可选，必须唯一，若不填则随机绑定）
     pokedPort: 57000
+    # 自动连接到此 peer 并保持连接
+    autoConnect: true
 
     # 端口服务转发配置（可选）
     ports:
