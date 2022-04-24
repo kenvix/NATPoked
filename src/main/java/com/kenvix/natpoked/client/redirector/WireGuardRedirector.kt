@@ -40,19 +40,23 @@ class WireGuardRedirector(
         get() = "wg_$serviceName"
 
     protected override fun onConnectionLost() {
-        if (channel.isConnected)
+        if (myPeerConfig.role == ClientServerRole.CLIENT) {
+            logger.warn("WireGuard channel unreachable, client mode, DISCONNECTING")
             channel.disconnect()
-
-        if (myPeerConfig.role == ClientServerRole.SERVER) {
-            channel.connect(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
+        } else {
+            val addr = InetSocketAddress("127.0.0.1", myPeerConfig.listenPort)
+            logger.warn("WireGuard channel unreachable, server mode, RECONNECTING $addr")
+            channel.disconnect() // if we don't write this piece of shit it will not work
+            channel.connect(addr)
         }
     }
 
     fun start() {
+        val addr = InetSocketAddress("127.0.0.1", myPeerConfig.listenPort)
         if (myPeerConfig.role == ClientServerRole.SERVER) {
-            channel.connect(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
+            channel.connect(addr)
         } else {
-            channel.bind(InetSocketAddress("127.0.0.1", myPeerConfig.listenPort))
+            channel.bind(addr)
         }
 
         startRedirector()

@@ -14,6 +14,18 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import java.net.*
 
+/**
+ * InetAddress serializer for kotlinx.serialization
+ *
+ * Usage:
+ *
+ * Add below line at the top of your file:
+ * ```kotlin
+ * @file:UseSerializers(InetAddressSerializer::class, Inet6AddressSerializer::class, Inet4AddressSerializer::class)
+ * ```
+ *
+ * @author Kenvix
+ */
 object InetAddressSerializer : KSerializer<InetAddress> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("InetAddress") {}
 

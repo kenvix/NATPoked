@@ -32,7 +32,7 @@ class KcpTunPortRedirector(
         get() = "kcptun_$serviceName"
 
     protected override fun onConnectionLost() {
-        if (myPeerPortConfig.role == ClientServerRole.CLIENT && channel.isConnected) {
+        if (myPeerPortConfig.role == ClientServerRole.CLIENT) {
             logger.warn("App channel unreachable, client mode, DISCONNECTING")
             channel.disconnect()
         } else {

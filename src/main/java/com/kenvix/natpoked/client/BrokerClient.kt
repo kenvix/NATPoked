@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
-import kotlin.math.log
 import kotlin.random.Random
 
 
@@ -374,15 +373,15 @@ class BrokerClient(
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
             logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
 
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/openPort", 2)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/connect", 2)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/disconnect", 2)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/guessPort", 2)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/prepareAsServer", 2)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0)
-            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2)
+            val subscriptionResultArray = arrayOf(
+                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/#", 2),
+                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2),
+                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0),
+                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0),
+                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2),
+            )
+
+            subscriptionResultArray.forEach { it.waitForCompletion() }
 
             logger.info("MQTT Connected and subscribed to topics. Root topic: ${getMqttChannelBasePath(AppEnv.PeerId)}")
             ignoreException {

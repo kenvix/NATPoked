@@ -21,6 +21,20 @@ import kotlin.coroutines.resumeWithException
 
 private val logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass())
 
+suspend fun MqttAsyncClient.aSubscribe(topic: String, qos: Int = 0, userContext: Any? = null): IMqttToken {
+    return suspendCancellableCoroutine<IMqttToken> { continuation ->
+        subscribe(topic, qos, userContext, object : MqttActionListener {
+            override fun onSuccess(asyncActionToken: IMqttToken) {
+                continuation.resume(asyncActionToken)
+            }
+
+            override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
+                continuation.resumeWithException(exception)
+            }
+        })
+    }
+}
+
 suspend fun MqttAsyncClient.aSendMessage(topic: String, msg: MqttMessage): IMqttToken {
     return suspendCancellableCoroutine<IMqttToken> { continuation ->
         logger.trace("MQTT: Sending message to topic: $topic with msg $msg")
