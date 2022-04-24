@@ -97,8 +97,8 @@ class RawUdpPortRedirector : Closeable, CoroutineScope {
         targetAddr: InetSocketAddress
     ) = withContext(Dispatchers.IO) {
         try {
-            val buffer = ByteArray(1500)
-            val packet = DatagramPacket(buffer, 1500)
+            val buffer = ByteArray(1480)
+            val packet = DatagramPacket(buffer, 1480)
             socket.receive(packet)
 
             // Socket AppA 是否已经连接？已经连接的 Socket 目的地址是否和 Datagram 的源地址一致？

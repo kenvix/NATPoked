@@ -373,15 +373,27 @@ class BrokerClient(
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
             logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
 
-            val subscriptionResultArray = arrayOf(
-                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/#", 2),
-                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2),
-                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0),
-                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0),
-                mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2),
-            )
+            while (isActive) {
+                try {
+                    val subscriptionResultArray = arrayOf(
+                        mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/#", 2),
+                        mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2),
+                        mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RELAY, 0),
+                        mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_PING, 0),
+                        mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_TEST, 2),
+                    )
 
-            subscriptionResultArray.forEach { it.waitForCompletion() }
+                    subscriptionResultArray.forEach {
+                        it.waitForCompletion()
+                        if (NATPeerToPeer.debugNetworkTraffic)
+                            logger.trace("MQTT Subscription: ${it.topics.contentToString()} with QOS ${it.grantedQos.contentToString()} result: ${it.isComplete}")
+                    }
+
+                    break
+                } catch (e: Exception) {
+                    logger.error("MQTT Subscription failed, retry ...", e)
+                }
+            }
 
             logger.info("MQTT Connected and subscribed to topics. Root topic: ${getMqttChannelBasePath(AppEnv.PeerId)}")
             ignoreException {

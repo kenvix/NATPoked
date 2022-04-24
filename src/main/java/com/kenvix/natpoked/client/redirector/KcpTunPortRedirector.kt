@@ -44,8 +44,8 @@ class KcpTunPortRedirector(
     }
 
     init {
-        channel.setOption(StandardSocketOptions.SO_RCVBUF, AppEnv.KcpSndWnd)
-        channel.setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.KcpRcvWnd)
+        channel.setOption(StandardSocketOptions.SO_RCVBUF, AppEnv.KcpSndWnd * 1280)
+        channel.setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.KcpRcvWnd * 1280)
 
         if (myPeerPortConfig.role == ClientServerRole.SERVER) {
             channel.connect(InetSocketAddress(myPeerPortConfig.srcHost, myPeerPortConfig.srcPort))
