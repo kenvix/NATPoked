@@ -5,7 +5,7 @@
 # This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
 # For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
 
-name: Universal Jar
+name: Build Application
 
 on:
   workflow_dispatch:
@@ -111,6 +111,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x64
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
+
   build-docker-x86:
     runs-on: ubuntu-latest
     name: Build Linux x84 Docker Image
@@ -163,3 +164,166 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x86
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+
+  build-docker-aarch64:
+    runs-on: ubuntu-latest
+    name: Build Linux aarch64 Docker Image
+    needs: [ build-jar ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: submodules-init
+        uses: snickerbockers/submodules-init@v4
+
+      - name: Download Universal JAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app.zip
+          path: build/output
+
+      - name: Run Docker Prebuild shell
+        run: |
+          echo "Prebuild shell"
+          ls -al
+          mkdir -p ./build/output
+
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set Up Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set Up Cache
+        uses: actions/cache@v2
+        id: buildx-cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx
+
+      - name: Buildx
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile-RuntimeOnly
+          platforms: linux/arm64/v8
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-aarch64
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+
+  build-docker-armv7:
+    runs-on: ubuntu-latest
+    name: Build Linux armv7 Docker Image
+    needs: [ build-jar ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: submodules-init
+        uses: snickerbockers/submodules-init@v4
+
+      - name: Download Universal JAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app.zip
+          path: build/output
+
+      - name: Run Docker Prebuild shell
+        run: |
+          echo "Prebuild shell"
+          ls -al
+          mkdir -p ./build/output
+
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set Up Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set Up Cache
+        uses: actions/cache@v2
+        id: buildx-cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx
+
+      - name: Buildx
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile-RuntimeOnly
+          platforms: linux/arm/v7
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+      
+
+  build-docker-mips64le:
+    runs-on: ubuntu-latest
+    name: Build Linux mips64le Docker Image
+    needs: [ build-jar ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: submodules-init
+        uses: snickerbockers/submodules-init@v4
+
+      - name: Download Universal JAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app.zip
+          path: build/output
+
+      - name: Run Docker Prebuild shell
+        run: |
+          echo "Prebuild shell"
+          ls -al
+          mkdir -p ./build/output
+
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set Up Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set Up Cache
+        uses: actions/cache@v2
+        id: buildx-cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx
+
+      - name: Buildx
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile-RuntimeOnly
+          platforms: linux/mips64le
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-mips64le
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
