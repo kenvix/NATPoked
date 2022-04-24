@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import org.eclipse.paho.mqttv5.client.*
+import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence
 import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
@@ -27,7 +28,7 @@ class BrokerServer(
     val port: Int
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
-    private val mqttClient: MqttAsyncClient = MqttAsyncClient("ws://127.0.0.1:$port/mqtt", "server")
+    private val mqttClient: MqttAsyncClient = MqttAsyncClient("ws://127.0.0.1:$port/mqtt", "server", MemoryPersistence())
 
     suspend fun sendPeerMessage(peerId: PeerId, topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
                                 props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {

@@ -26,6 +26,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.internal.toHexString
 import okio.ByteString
 import org.eclipse.paho.mqttv5.client.*
+import org.eclipse.paho.mqttv5.client.persist.MemoryPersistence
 import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
@@ -320,7 +321,7 @@ class BrokerClient(
                 "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
             logger.debug("Connecting to MQTT server: $serverURI")
 
-            mqttClient = MqttAsyncClient(serverURI, AppEnv.PeerId.toHexString())
+            mqttClient = MqttAsyncClient(serverURI, AppEnv.PeerId.toHexString(), MemoryPersistence())
             mqttClient.setCallback(MqttEventHandler())
 
             val options = MqttConnectionOptionsBuilder()
