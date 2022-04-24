@@ -11,6 +11,7 @@ import okhttp3.internal.toHexString
 import org.eclipse.paho.mqttv5.client.IMqttToken
 import org.eclipse.paho.mqttv5.client.MqttActionListener
 import org.eclipse.paho.mqttv5.client.MqttAsyncClient
+import org.eclipse.paho.mqttv5.client.MqttConnectionOptions
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
 import org.eclipse.paho.mqttv5.common.packet.UserProperty
@@ -24,6 +25,34 @@ private val logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass(
 suspend fun MqttAsyncClient.aSubscribe(topic: String, qos: Int = 0, userContext: Any? = null): IMqttToken {
     return suspendCancellableCoroutine<IMqttToken> { continuation ->
         subscribe(topic, qos, userContext, object : MqttActionListener {
+            override fun onSuccess(asyncActionToken: IMqttToken) {
+                continuation.resume(asyncActionToken)
+            }
+
+            override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
+                continuation.resumeWithException(exception)
+            }
+        })
+    }
+}
+
+suspend fun MqttAsyncClient.aDisconnect(timeout: Long = 0L): IMqttToken {
+    return suspendCancellableCoroutine<IMqttToken> { continuation ->
+        disconnect(timeout, object : MqttActionListener {
+            override fun onSuccess(asyncActionToken: IMqttToken) {
+                continuation.resume(asyncActionToken)
+            }
+
+            override fun onFailure(asyncActionToken: IMqttToken, exception: Throwable) {
+                continuation.resumeWithException(exception)
+            }
+        })
+    }
+}
+
+suspend fun MqttAsyncClient.aConnect(options: MqttConnectionOptions): IMqttToken {
+    return suspendCancellableCoroutine<IMqttToken> { continuation ->
+        connect(options, object : MqttActionListener {
             override fun onSuccess(asyncActionToken: IMqttToken) {
                 continuation.resume(asyncActionToken)
             }

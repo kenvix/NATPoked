@@ -310,7 +310,6 @@ class NATPeerToPeer(
         keepAliveJob = null
     }
 
-//    }
 
     /**
      * 尝试监听一个端口，并返回外网端口。
@@ -1025,11 +1024,12 @@ class NATPeerToPeer(
     }
 
     override fun close() {
+        launch(NonCancellable) { setSocketDisconnect() }
+
         portServicesMap.forEach { (_, service) ->
             service.close()
         }
         repeat(receiveJob.count()) { cancel() }
-        udpChannel.close()
         coroutineContext.cancel()
     }
 

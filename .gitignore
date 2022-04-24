@@ -1,3 +1,7 @@
+# NatPoked Resources
+Temp/*
+Config/*
+Library/*
 *.socket
 
 ### Java template

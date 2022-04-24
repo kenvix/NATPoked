@@ -509,7 +509,7 @@ class BrokerClient(
 
         if (this::mqttClient.isInitialized) {
             launch(NonCancellable) {
-                mqttClient.disconnect()
+                mqttClient.aDisconnect(AppEnv.PeerKeepAliveTimeout)
                 mqttClient.close()
             }
         }
