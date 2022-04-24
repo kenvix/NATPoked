@@ -1,0 +1,165 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-gradle
+
+name: Universal Jar
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+env:
+  OUTPUT_NAME: natpoked.jar
+
+concurrency:
+  group: universal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-jar:
+    runs-on: ubuntu-latest
+    name: Build Universal JAR
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: submodules-init
+      uses: snickerbockers/submodules-init@v4
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v2
+      with:
+        java-version: '11'
+        distribution: 'zulu'
+
+    # Runs a set of commands using the runners shell
+    - name: Run Prebuild shell
+      run: |
+        echo "Prebuild shell"
+        ls -al
+        chmod +x ./gradlew
+        
+    - name: Build with Gradle
+      uses: gradle/gradle-build-action@937999e9cc2425eddc7fd62d1053baf041147db7
+      with:
+        arguments: shadowJar
+    
+    - name: Upload a Build Artifact
+      uses: actions/upload-artifact@v3.0.0
+      with:
+        # Artifact name
+        name: app.zip
+        # A file, directory or wildcard pattern that describes what to upload
+        path: build/output/${{ env.OUTPUT_NAME }}
+        # The desired behavior if no files are found using the provided path.
+
+  build-docker-x64:
+    runs-on: ubuntu-latest
+    name: Build Linux x64 Docker Image
+    needs: [build-jar]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: submodules-init
+        uses: snickerbockers/submodules-init@v4
+
+      - name: Download Universal JAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app.zip
+          path: build/output
+
+      - name: Run Docker Prebuild shell
+        run: |
+          echo "Prebuild shell"
+          ls -al
+          mkdir -p ./build/output
+
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set Up Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set Up Cache
+        uses: actions/cache@v2
+        id: buildx-cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx
+
+      - name: Buildx
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile-RuntimeOnly
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x64
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+
+  build-docker-x86:
+    runs-on: ubuntu-latest
+    name: Build Linux x84 Docker Image
+    needs: [ build-jar ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: submodules-init
+        uses: snickerbockers/submodules-init@v4
+
+      - name: Download Universal JAR Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: app.zip
+          path: build/output
+
+      - name: Run Docker Prebuild shell
+        run: |
+          echo "Prebuild shell"
+          ls -al
+          mkdir -p ./build/output
+
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set Up Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Set Up Cache
+        uses: actions/cache@v2
+        id: buildx-cache
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx
+
+      - name: Buildx
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: Dockerfile-RuntimeOnly
+          platforms: linux/386
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x86
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
