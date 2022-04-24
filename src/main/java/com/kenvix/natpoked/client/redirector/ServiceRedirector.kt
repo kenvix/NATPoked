@@ -17,6 +17,7 @@ import java.io.Closeable
 import java.net.PortUnreachableException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.DatagramChannel
 import java.util.*
 
@@ -60,6 +61,9 @@ abstract class ServiceRedirector(
                         logger.debug("App channel unreachable", e)
 
                     onConnectionLost()
+                } catch (_: ClosedChannelException) {
+                    if (NATPeerToPeer.debugNetworkTraffic)
+                        logger.trace("Closing ServiceRedirector UDP channel: App $serviceName")
                 } catch (e: Throwable) {
                     logger.error("Unable to receive app packet!!!", e)
                 }

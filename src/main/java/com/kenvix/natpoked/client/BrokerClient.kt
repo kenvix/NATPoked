@@ -7,7 +7,6 @@
 package com.kenvix.natpoked.client
 
 import com.google.common.primitives.Ints
-import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
@@ -255,7 +254,8 @@ class BrokerClient(
                         TOPIC_PING -> {
                             message.checkCanRespond()
                             logger.trace("MQTT /peer/~/ping")
-                            val peerId = message.properties.userProperties.find { it.key == "fromPeerId" }?.value?.toLong()
+                            val peerId =
+                                message.properties.userProperties.find { it.key == "fromPeerId" }?.value?.toLong()
                             if (peerId != null) {
                                 respondPeer(message, NATClient.peersKey[peerId], message.payload)
                             }
@@ -297,7 +297,8 @@ class BrokerClient(
         }
     }
 
-    @Volatile private var connectCoroutineContinuation: Continuation<Unit>? = null
+    @Volatile
+    private var connectCoroutineContinuation: Continuation<Unit>? = null
     suspend fun connect() = withContext(Dispatchers.IO) {
 //        if (::websocket.isInitialized) {
 //            websocket.close(1000, "Reconnecting")
@@ -475,15 +476,6 @@ class BrokerClient(
         return getRequestResult<Unit?>(rsp)
     }
 
-    init {
-        AppConstants.shutdownHandler += {
-            launch(NonCancellable) {
-                logger.debug("Unregistering peer")
-                logger.trace(unregisterPeer().toString())
-            }
-        }
-    }
-
     suspend fun getPeerInfo(clientId: PeerId): NATClientItem {
         val rsp = requestAPI<Unit>("/peers/$clientId", "GET")
         return getRequestResult<NATClientItem>(rsp).data!!
@@ -510,8 +502,22 @@ class BrokerClient(
     }
 
     override fun close() {
+        launch(NonCancellable) {
+            logger.debug("Unregistering peer")
+            logger.trace(unregisterPeer().toString())
+        }
+
+        if (this::mqttClient.isInitialized) {
+            launch(NonCancellable) {
+                mqttClient.disconnect()
+                mqttClient.close()
+            }
+        }
+
+        if (this::websocket.isInitialized)
+            websocket.close(1000, "Closed by NATPoked client")
+
         coroutineContext.cancel()
-        websocket.close(1000, "Closed by NATPoked client")
     }
 
     private inner class BrokerWebSocketListener : WebSocketListener() {

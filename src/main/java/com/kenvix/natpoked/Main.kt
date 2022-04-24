@@ -49,6 +49,7 @@ object Main : CoroutineScope {
                 runCatching {
                     logger.info("Starting NATPoked client(peer) (PeerId=${AppEnv.PeerId}) ...")
 
+                    NATClient.registerShutdownHandler()
                     NATClient.start()
 
                     if (cmd.hasOption("connect")) {

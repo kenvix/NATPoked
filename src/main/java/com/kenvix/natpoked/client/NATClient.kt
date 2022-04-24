@@ -1,5 +1,6 @@
 package com.kenvix.natpoked.client
 
+import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.Main
 import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
 import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
@@ -268,6 +269,11 @@ object NATClient : CoroutineScope, AutoCloseable {
             reportLoopJob.cancel()
         }
 
+        peers.forEach { (_, peer) ->
+            peer.close()
+        }
+
+        brokerClient.close()
         coroutineContext.cancel()
     }
 
@@ -279,9 +285,14 @@ object NATClient : CoroutineScope, AutoCloseable {
     fun main(args: Array<String>) {
         logger.info("NATPoked Client -- Standalone Mode")
         logger.warn("Stand-alone mode is not recommended for production use")
+        registerShutdownHandler()
         runBlocking {
             start()
         }
+    }
+
+    fun registerShutdownHandler() {
+        AppConstants.shutdownHandler += { close() }
     }
 
     suspend fun requestPeerGetPortAllocationPredictionParam(peerId: PeerId): PortAllocationPredictionParam {

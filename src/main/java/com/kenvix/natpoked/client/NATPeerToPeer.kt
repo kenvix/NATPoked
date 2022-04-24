@@ -31,6 +31,7 @@ import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.ClosedChannelException
 import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
@@ -200,6 +201,9 @@ class NATPeerToPeer(
 
                             buffer.flip()
                             dispatchIncomingPacket(addr, buffer)
+                        } catch (_: ClosedChannelException) {
+                            if (debugNetworkTraffic)
+                                logger.trace("Closing UDP channel: Peer $targetPeerId")
                         } catch (e: Exception) {
                             if (debugNetworkTraffic)
                                 logger.error("Unable to handle incoming packet!!!", e)
@@ -257,6 +261,12 @@ class NATPeerToPeer(
                                 NATClient.requestConnectPeer(targetPeerId)
                             }
                         }
+                    } catch (_: ClosedChannelException) {
+                        if (debugNetworkTraffic)
+                            logger.trace("Closing keep alive UDP channel: Peer $targetPeerId")
+                    } catch (_: CancellationException) {
+                        if (debugNetworkTraffic)
+                            logger.trace("Cancelling keep alive job: Peer $targetPeerId")
                     } catch (e: Exception) {
                         logger.warn("Unable to send keep alive packet!!!", e)
                     }
