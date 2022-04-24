@@ -7,6 +7,7 @@
 package com.kenvix.natpoked.client
 
 import com.google.common.primitives.Ints
+import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.server.BrokerMessage
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
+import kotlin.math.log
 import kotlin.random.Random
 
 
@@ -199,6 +201,10 @@ class BrokerClient(
                                     NATClient.onRequestPeerConnect(clientInfo.peerId, clientInfo.type, clientInfo.data)
                                 }
 
+                                "disconnect" -> {
+
+                                }
+
                                 "prepareAsServer" -> {
                                     val jsonStr = String(message.payload)
                                     logger.trace("MQTT /peer/~/prepareAsServer: $jsonStr")
@@ -285,6 +291,8 @@ class BrokerClient(
         } catch (e: RequestException) {
             logger.warn("Peer wrong data:", e)
             respondErrorToPeerIfNeed(message, e)
+        } catch (e: TimeoutCancellationException) {
+            logger.warn("Peer MQTT operation timeout. Is the peer down?", e)
         } catch (e: Throwable) {
             logger.error("Unexpected error:", e)
         }
@@ -368,6 +376,7 @@ class BrokerClient(
 
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/openPort", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/connect", 2)
+            mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/disconnect", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/guessPort", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + "control/prepareAsServer", 2)
             mqttClient.subscribe(getMqttChannelBasePath(AppEnv.PeerId) + TOPIC_RESPONSE, 2)
@@ -450,9 +459,18 @@ class BrokerClient(
 
     suspend fun registerPeer(ifaceId: Int = -1) = registerPeer(NATClient.getLocalNatClientItem(ifaceId))
 
-    suspend fun unregisterPeer(clientId: PeerId): CommonJsonResult<*> {
+    suspend fun unregisterPeer(clientId: PeerId = AppEnv.PeerId): CommonJsonResult<*> {
         val rsp = requestAPI<Unit>("/peers/$clientId", "DELETE")
         return getRequestResult<Unit?>(rsp)
+    }
+
+    init {
+        AppConstants.shutdownHandler += {
+            launch(NonCancellable) {
+                logger.debug("Unregistering peer")
+                logger.trace(unregisterPeer().toString())
+            }
+        }
     }
 
     suspend fun getPeerInfo(clientId: PeerId): NATClientItem {

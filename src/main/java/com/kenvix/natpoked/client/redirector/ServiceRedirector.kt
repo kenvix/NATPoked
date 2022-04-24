@@ -31,7 +31,8 @@ abstract class ServiceRedirector(
     protected lateinit var receiveAppPacketAndSendJob: Job
         private set
 
-    protected val receiveAppPacketBuffer: ByteBuffer = ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
+    protected val receiveAppPacketBuffer: ByteBuffer =
+        ByteBuffer.allocateDirect(1500).apply { order(ByteOrder.BIG_ENDIAN) }
     protected val sendAppPacketBufferLock = Mutex()
     protected val channel: DatagramChannel = DatagramChannel.open()
 
@@ -65,8 +66,9 @@ abstract class ServiceRedirector(
     }
 
     open suspend fun onReceivedRemotePacket(buf: ByteBuffer) {
-        if (!channel.isConnected && NATPeerToPeer.debugNetworkTraffic) {
-            logger.warn("Channel is not connected by service app, ignore packet")
+        if (!channel.isConnected) {
+            if (NATPeerToPeer.debugNetworkTraffic)
+                logger.warn("Channel is not connected by service app, ignore packet")
             return
         }
 
