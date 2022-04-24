@@ -15,9 +15,10 @@ on:
 
 env:
   OUTPUT_NAME: natpoked.jar
+  IMAGE_NAME: natpoked
 
 concurrency:
-  group: universal-${{ github.ref }}
+  group: build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -109,7 +110,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x64
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
 
   build-docker-x86:
@@ -163,7 +163,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x86
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
 
   build-docker-aarch64:
@@ -217,7 +216,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-aarch64
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
 
   build-docker-armv7:
@@ -271,7 +269,6 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
       
 
   build-docker-mips64le:
@@ -325,5 +322,26 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-mips64le
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
 
+  docker-manifest:
+    runs-on: ubuntu-latest
+    name: Docker Manifest
+    needs: [ build-docker-x86, build-docker-x64, build-docker-aarch64, build-docker-armv7, build-docker-mips64le ]
+    steps:
+      - name: Login DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Run Docker Manifest shell
+        run: |
+          echo "Docker Manifest shell"
+          docker manifest create --insecure ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x86 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x64 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-aarch64 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7 ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-mips64le
+          docker manifest annotate ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x86 --os linux --arch 386
+          docker manifest annotate ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-x64 --os linux --arch amd64
+          docker manifest annotate ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-aarch64 --os linux --arch arm --variant v8
+          docker manifest annotate ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-armv7 --os linux --arch arm --variant v7
+          docker manifest annotate ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-mips64le --os linux --arch mips64le
+          
+          docker manifest push -p --insecure ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
