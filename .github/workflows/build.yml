@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build-jar:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Universal JAR
 
     steps:
@@ -60,7 +60,7 @@ jobs:
         # The desired behavior if no files are found using the provided path.
 
   build-docker-x64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Linux x64 Docker Image
     needs: [build-jar]
     steps:
@@ -80,7 +80,8 @@ jobs:
         run: |
           echo "Prebuild shell"
           ls -al
-          mkdir -p ./build/output
+          mkdir -p ./build/output || true
+          ls -al ./build/output
 
       - name: Set Up QEMU
         uses: docker/setup-qemu-action@v1
@@ -113,7 +114,7 @@ jobs:
 
 
   build-docker-x86:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Linux x84 Docker Image
     needs: [ build-jar ]
     steps:
@@ -133,7 +134,8 @@ jobs:
         run: |
           echo "Prebuild shell"
           ls -al
-          mkdir -p ./build/output
+          mkdir -p ./build/output || true
+          ls -al ./build/output
 
       - name: Set Up QEMU
         uses: docker/setup-qemu-action@v1
@@ -166,7 +168,7 @@ jobs:
 
 
   build-docker-aarch64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Linux aarch64 Docker Image
     needs: [ build-jar ]
     steps:
@@ -186,7 +188,8 @@ jobs:
         run: |
           echo "Prebuild shell"
           ls -al
-          mkdir -p ./build/output
+          mkdir -p ./build/output || true
+          ls -al ./build/output
 
       - name: Set Up QEMU
         uses: docker/setup-qemu-action@v1
@@ -219,7 +222,7 @@ jobs:
 
 
   build-docker-armv7:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Linux armv7 Docker Image
     needs: [ build-jar ]
     steps:
@@ -239,7 +242,8 @@ jobs:
         run: |
           echo "Prebuild shell"
           ls -al
-          mkdir -p ./build/output
+          mkdir -p ./build/output || true
+          ls -al ./build/output
 
       - name: Set Up QEMU
         uses: docker/setup-qemu-action@v1
@@ -272,7 +276,7 @@ jobs:
       
 
   build-docker-mips64le:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Build Linux mips64le Docker Image
     needs: [ build-jar ]
     steps:
@@ -292,7 +296,8 @@ jobs:
         run: |
           echo "Prebuild shell"
           ls -al
-          mkdir -p ./build/output
+          mkdir -p ./build/output || true
+          ls -al ./build/output
 
       - name: Set Up QEMU
         uses: docker/setup-qemu-action@v1
@@ -324,7 +329,7 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest-mips64le
 
   docker-manifest:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     name: Docker Manifest
     needs: [ build-docker-x86, build-docker-x64, build-docker-aarch64, build-docker-armv7, build-docker-mips64le ]
     steps:

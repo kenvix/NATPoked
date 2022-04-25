@@ -45,13 +45,18 @@ RUN echo "Begin docker image build ..." \
     iproute2 \
     net-tools \
     && echo "Cleaning build cache ..." \
+    && (mkdir -p /data/app || true) \
+    && (mkdir -p /data/config || true) \
     && cd /data/config \
-    && apt-get clean \
-    && rm -rf /tmp/* \
+    && (apt-get clean || true) \
+    && (rm -rf /tmp/* || true) \
+    && echo "Finishing build ..." \
+    && (mv /data/app/*.jar /data/app/app.jar || true) \
     && echo "Dockerfile build success"
 
 
 WORKDIR /data/config
 ENV LANG en_US.UTF-8
+ENV IsRunningInDocker true
 
 CMD ["java", "-jar", "/data/app/app.jar"]

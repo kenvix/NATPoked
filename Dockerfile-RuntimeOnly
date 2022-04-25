@@ -28,5 +28,6 @@ RUN echo "Begin docker image build ..." \
 
 WORKDIR /data/config
 ENV LANG en_US.UTF-8
+ENV IsRunningInDocker true
 
 CMD ["java", "-jar", "/data/app/app.jar"]
