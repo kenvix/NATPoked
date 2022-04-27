@@ -148,7 +148,6 @@ object NATServer : Closeable {
         fun launchMqttBrokerAsync() = async {
             mqttConfig.await()
             logger.info("Starting MQTT Broker")
-
             var mqttBrokerConfig = """
 listener ${AppEnv.ServerMqttPort}
 socket_domain ipv4
@@ -158,11 +157,9 @@ socket_domain ipv6
 protocol websockets
 allow_anonymous false
 password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
-    """.trimIndent()
+    """
 
-            if (PlatformDetection.getInstance().os in arrayOf(PlatformDetection.OS_LINUX, PlatformDetection.OS_OSX, PlatformDetection.OS_SOLARIS)) {
-                mqttBrokerConfig = "listener 0 \"${tempPath.resolve("mqtt.sock").toAbsolutePath()}\"\n$this"
-            }
+            mqttBrokerConfig = mqttBrokerConfig.trimIndent()
 
             val mqttConf = tempPath.resolve("mqtt.conf")
             mqttConf.toFile().writeText(mqttBrokerConfig)

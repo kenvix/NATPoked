@@ -5,7 +5,7 @@ services:
     container_name: natpoked
     restart: unless-stopped
     volumes:
-      - /home/config/natpoked:/data/config
+      - /home/config/natpoked:/data/Config
     environment:
       - DebugMode=true
       - DebugNetworkTraffic=true

@@ -136,6 +136,7 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
                 }
             }
 
+            process.waitFor()
             processLoggerControl.info("Process $key: PID #${process.pid()} exited with code ${process.exitValue()}")
 
             if (this@ProcessUtils.isActive && keepAlive) {
