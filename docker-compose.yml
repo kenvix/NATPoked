@@ -19,6 +19,7 @@ services:
       - PortGuessMaxNum=55000
       - ServerHttpHost=0.0.0.0
       - ServerKey=bG5Ryqh8ArJico
+      - TZ=Asia/Shanghai
     cap_add:
       - NET_ADMIN
       - SYS_MODULE

@@ -173,6 +173,7 @@ password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
             )
         }
 
+        mqttConfig.await()
         val mqtt = launchMqttBrokerAsync()
         mqtt.await()
 
