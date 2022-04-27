@@ -160,7 +160,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE, NATType.RESTRICTED_CONE -> {
-                                    requestPeerMakeConnection(my, serverRolePeer.client, )
+                                    requestPeerMakeConnection(my, serverRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -170,11 +170,11 @@ internal object WebServerBasicRoutes : KtorModule {
 
 
                                 NATType.PORT_RESTRICTED_CONE, NATType.SYMMETRIC -> {
-                                    requestPeerMakeConnection(my, clientRolePeer.client)
+                                    requestPeerMakeConnection(my, targetPeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
-                                    requestPeerMakeConnection(my, serverRolePeer.client)
+                                    requestPeerMakeConnection(targetPeer, my.client)
                                     serverRolePeer.setConnectionStage(clientRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
@@ -266,11 +266,15 @@ internal object WebServerBasicRoutes : KtorModule {
     }
 
     private suspend fun requestPeerMakeConnection(myPeer: NATPeerToBrokerConnection, targetPeerClientInfo: NATClientItem, targetPorts: List<Int>? = null) {
+        if (targetPeerClientInfo.clientId == myPeer.client.clientId) {
+            throw BadRequestException("Cannot connect to self: targetPeerClientInfo.clientId == myPeer.client.clientId")
+        }
+
         val infoCopy = targetPeerClientInfo.copy()
         infoCopy.peersConfig = null
         val myPeerId = myPeer.client.clientId
 
-        val peerConfigCopy: PeersConfig.Peer = targetPeerClientInfo.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer $targetPeerClientInfo->$myPeerId config not found")
+        val peerConfigCopy: PeersConfig.Peer = targetPeerClientInfo.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer ${targetPeerClientInfo.clientId}->$myPeerId config not found")
         peerConfigCopy.key = ""
         peerConfigCopy.keySha = emptyByteArray()
 

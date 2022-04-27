@@ -246,22 +246,7 @@ object NATClient : CoroutineScope, AutoCloseable {
     }
 
     suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null, echoPortNum: Int = -1): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
-        val startTime = System.currentTimeMillis()
-        val result = echoClient.requestEcho(
-            AppEnv.EchoPortList.run { if (echoPortNum == -1) asIterable() else this.slice(0 until echoPortNum) },
-            InetAddress.getByName(brokerClient.brokerHost),
-            srcChannel
-        )
-        val endTime = System.currentTimeMillis()
-        val timeElapsed = endTime - startTime
-
-        var avg: Double = 0.0
-        for (i in 1 until result.size) {
-            avg += (result[i].port - result[i - 1].port).toDouble() / (result[i].finishedTime - result[i - 1].finishedTime).toDouble()
-        }
-
-        avg /= (result.size - 1).toDouble()
-        return@withContext PortAllocationPredictionParam(avg, timeElapsed, result.last().port, result.last().finishedTime)
+        return@withContext com.kenvix.natpoked.client.traversal.getPortAllocationPredictionParam(echoClient, AppEnv.EchoPortList.asIterable(), srcChannel, echoPortNum)
     }
 
     override fun close() {

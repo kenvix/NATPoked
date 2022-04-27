@@ -99,7 +99,7 @@ class BrokerServer(
         override fun connectComplete(reconnect: Boolean, serverURI: String?) {
             logger.info("Server Connect completed: [is_reconnect? $reconnect]: $serverURI")
 
-            mqttClient.subscribe("/server", 2)
+            mqttClient.subscribe("/server", 2).waitForCompletion()
 
             logger.info("Server MQTT Connected and subscribed to topics")
         }

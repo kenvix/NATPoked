@@ -1,14 +1,27 @@
 package com.kenvix.natpoked.client.traversal
 
+import com.kenvix.natpoked.client.NATClient
+import com.kenvix.natpoked.client.SocketAddrEchoClient
+import com.kenvix.natpoked.utils.AppEnv
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
 import org.apache.commons.math3.distribution.PoissonDistribution
+import java.net.InetAddress
+import java.nio.channels.DatagramChannel
 import kotlin.math.round
 
+@Serializable
 data class PortAllocationPredictionParam(
     val avg: Double,
     val timeElapsed: Long,
     val lastPort: Int,
     val testFinishedAt: Long,
-)
+    val firstPort: Int = -1,
+) {
+    val trend: Int
+        get() = if (avg > 0) 1 else if (avg < 0) -1 else 0
+}
 
 fun poissonSampling(avg: Double, timeSpan: Long): Int {
     return PoissonDistribution(avg, timeSpan.toDouble()).sample()
@@ -59,4 +72,24 @@ fun expectedValuePortGuess(now: Long, param: PortAllocationPredictionParam, gues
             if (this < 1024) this + 1024 else this
         }
     }
+}
+
+suspend fun getPortAllocationPredictionParam(echoClient: SocketAddrEchoClient, ports: Iterable<Int>, srcChannel: DatagramChannel? = null, echoPortNum: Int = -1): PortAllocationPredictionParam = withContext(
+    Dispatchers.IO) {
+    val startTime = System.currentTimeMillis()
+    val result = echoClient.requestEcho(
+        ports,
+        InetAddress.getByName(NATClient.brokerClient.brokerHost),
+        srcChannel
+    )
+    val endTime = System.currentTimeMillis()
+    val timeElapsed = endTime - startTime
+
+    var avg: Double = 0.0
+    for (i in 1 until result.size) {
+        avg += (result[i].port - result[i - 1].port).toDouble() / (result[i].finishedTime - result[i - 1].finishedTime).toDouble()
+    }
+
+    avg /= (result.size - 1).toDouble()
+    return@withContext PortAllocationPredictionParam(avg, timeElapsed, result.last().port, result.last().finishedTime, firstPort = result.first().port)
 }
