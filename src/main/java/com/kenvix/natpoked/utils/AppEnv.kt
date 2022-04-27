@@ -30,6 +30,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     val PortGuessMaxConcurrentNum: Int by envOf(20)
     val PortGuessMaxNum: Int by envOf(1000)
+    val PortGuessSkipLowPorts: Boolean by envOf(true)
 
     @Description("进行端口预测时的发包间隔时间，单位为毫秒")
     val EchoDelay: Long by envOf(15)
@@ -39,6 +40,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PeerReportToBrokerDelay: Int by envOf(5 * 60)
 
     val PeerFloodingDelay: Long by envOf(32)
+    val PeerFloodingWaitFinished: Boolean by envOf(false)
 
     @Description("是否启用 UPnP 功能")
     val UPnPEnabled: Boolean by envOf(true)

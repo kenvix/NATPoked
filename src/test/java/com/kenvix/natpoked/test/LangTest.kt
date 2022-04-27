@@ -24,8 +24,10 @@ class LangTest {
     }
 
     @Test
-    fun resumeTest() {
-
+    fun modTest() {
+        println(52 % 30)
+        println(-52 % 30)
+        println(Math.floorMod(-52, 30))
     }
 
     @Test

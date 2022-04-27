@@ -7,6 +7,8 @@ import com.kenvix.natpoked.client.redirector.KcpTunPortRedirector
 import com.kenvix.natpoked.client.redirector.ServiceRedirector
 import com.kenvix.natpoked.client.redirector.WireGuardRedirector
 import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
+import com.kenvix.natpoked.client.traversal.expectedValuePortGuess
+import com.kenvix.natpoked.client.traversal.linearPortGuess
 import com.kenvix.natpoked.client.traversal.poissonPortGuess
 import com.kenvix.natpoked.contacts.*
 import com.kenvix.natpoked.contacts.PeerCommunicationType.*
@@ -15,7 +17,10 @@ import com.kenvix.natpoked.server.CommonJsonResult
 import com.kenvix.natpoked.utils.*
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import com.kenvix.natpoked.utils.network.makeNonBlocking
-import com.kenvix.web.utils.*
+import com.kenvix.web.utils.JSON
+import com.kenvix.web.utils.getOrFail
+import com.kenvix.web.utils.getUnsignedShort
+import com.kenvix.web.utils.putUnsignedShort
 import io.ktor.util.network.*
 import io.netty.buffer.ByteBuf
 import kotlinx.coroutines.*
@@ -40,7 +45,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
 import kotlin.math.abs
@@ -79,7 +83,8 @@ class NATPeerToPeer(
         ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
     private val keepAliveLock = Mutex()
 
-    @Volatile private var pingReceiverChannel: Channel<DatagramPacket>? = null
+    @Volatile
+    private var pingReceiverChannel: Channel<DatagramPacket>? = null
 
     @Volatile
     private var isConnected: Boolean = false
@@ -729,6 +734,17 @@ class NATPeerToPeer(
                 }
             } else null
 
+        suspend fun sendSimpleHelloPacket(targetPort: Int) {
+            while (!isConnected && isActive) {
+                val helloIp6Task = sendHelloIp6Task(targetPort)
+                val helloIp4Task = sendHelloIp4Task(targetPort)
+                helloIp6Task?.await()
+                helloIp4Task?.await()
+                if (isConnected || !isActive) break
+                delay(AppEnv.PeerFloodingDelay)
+            }
+        }
+
         if (peerInfo.isUpnpSupported || peerInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
             // 如果对方支持 UPnP 或者对方是 >= RESTRICTED_CONE 类型的 NAT，则直接连接
             // request to open port
@@ -748,9 +764,7 @@ class NATPeerToPeer(
             result.checkException()
 
             val targetPort = result.data!!.port
-
-            val helloIp6Task = sendHelloIp6Task(targetPort)
-            val helloIp4Task = sendHelloIp4Task(targetPort)
+            sendSimpleHelloPacket(targetPort)
         } else {
             // 如果对方不支持 UPnP，则需要预测参数
             // 如果对方是 < RESTRICTED_CONE 类型的 NAT，则需要预测参数
@@ -773,12 +787,11 @@ class NATPeerToPeer(
                 if (debugNetworkTraffic)
                     logger.debug("Average value is zero, do not use guess models")
 
-                val helloIp6Task = sendHelloIp6Task(portParam.lastPort)
-                val helloIp4Task = sendHelloIp4Task(portParam.lastPort)
+                sendSimpleHelloPacket(portParam.lastPort)
             } else {
                 when (config.natPortGuessModel) {
                     PeersConfig.Peer.GuessModel.POISSON -> {
-                        while (!isConnected) {
+                        while (!isConnected && isActive) {
                             for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
                                 val now = System.currentTimeMillis() - portParam.testFinishedAt
 
@@ -790,20 +803,50 @@ class NATPeerToPeer(
                                 for (port in ports) {
                                     val helloIp6Task = sendHelloIp6Task(port)
                                     val helloIp4Task = sendHelloIp4Task(port)
+                                    if (isConnected || !isActive) break
                                 }
 
-                                if (isConnected) break
+                                if (isConnected || !isActive) break
                                 delay(AppEnv.PeerFloodingDelay)
                             }
                         }
                     }
 
                     PeersConfig.Peer.GuessModel.EXPONENTIAL -> {
+                        while (!isConnected && isActive) {
+                            for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
+                                val now = System.currentTimeMillis() - portParam.testFinishedAt
 
+                                val ports = expectedValuePortGuess(now, portParam, guessPortNum = concurrentGuessNum)
+                                logger.debug("connectPeerAsync: ${peerInfo.clientId} / model ExpectedValue / PORTs $ports")
+                                for (port in ports) {
+                                    val helloIp6Task = sendHelloIp6Task(port)
+                                    val helloIp4Task = sendHelloIp4Task(port)
+                                    if (isConnected || !isActive) break
+                                }
+
+                                if (isConnected || !isActive) break
+                                delay(AppEnv.PeerFloodingDelay)
+                            }
+                        }
                     }
 
                     PeersConfig.Peer.GuessModel.LINEAR -> {
+                        var count = 0
+                        logger.debug("connectPeerAsync: ${peerInfo.clientId} / model Linear / trend: ${portParam.trend}, lastPort: ${portParam.lastPort}")
 
+                        for (port in linearPortGuess(portParam.trend, portParam.lastPort)) {
+                            val helloIp6Task = sendHelloIp6Task(port)
+                            val helloIp4Task = sendHelloIp4Task(port)
+
+                            if (isConnected || !isActive) break
+
+                            count++
+                            if (count == concurrentGuessNum) {
+                                count = 0
+                                delay(AppEnv.PeerFloodingDelay)
+                            }
+                        }
                     }
 
                     else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
