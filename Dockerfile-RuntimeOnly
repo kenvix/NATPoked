@@ -3,8 +3,8 @@ LABEL maintainer="kenvix <i@kenvix.com>"
 LABEL description="NATPoked: A Cross-platform Peer-To-Peer NAT Traversal Toolkit - Official docker image"
 LABEL homepage="https://kenvix.com"
 
-COPY ./build/output /data/app
-COPY ./cmdline-jvm-docker.txt /data/app/cmdline-jvm-docker.txt
+COPY ./build/output /data
+COPY ./cmdline-jvm-docker.txt /data/cmdline-jvm-docker.txt
 
 RUN echo "Begin docker image build ..." \
     && apt-get update \
@@ -17,18 +17,18 @@ RUN echo "Begin docker image build ..." \
     iproute2 \
     net-tools \
     && echo "Cleaning build cache ..." \
-    && (mkdir -p /data/app || true) \
-    && (mkdir -p /data/config || true) \
-    && cd /data/config \
+    && (mkdir -p /data || true) \
+    && (mkdir -p /data/Config || true) \
+    && cd /data/Config \
     && (apt-get clean || true) \
     && (rm -rf /tmp/* || true) \
     && echo "Finishing build ..." \
-    && (mv /data/app/*.jar /data/app/app.jar || true) \
+    && (mv /data/*.jar /data/app.jar || true) \
     && echo "Dockerfile build success"
 
 
-WORKDIR /data/config
+WORKDIR /data
 ENV LANG en_US.UTF-8
 ENV IsRunningInDocker true
 
-CMD ["java", "@/data/app/cmdline-jvm-docker.txt", "-jar", "/data/app/app.jar"]
+CMD ["java", "@/data/cmdline-jvm-docker.txt", "-jar", "/data/app.jar"]

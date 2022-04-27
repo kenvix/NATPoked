@@ -60,7 +60,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PeerMyKey: String by envOf("11154a5as1sd5sdf4514aaaaaa")
 
     @Description("Peer 列表文件")
-    val PeerFile: String by envOf("peers.yml")
+    val PeerFile: String by envOf("./Config/peers.yml")
 
     @Description("我的 PeerID，必须全局唯一。建议随机生成一个64位正整数。不能为空")
     val PeerId: Long by envOf(100000L)

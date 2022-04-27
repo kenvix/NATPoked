@@ -1,9 +1,9 @@
 # 我的配置
 my:
   # 我的 Peer id。留空则从环境变量读取（建议留空并通过环境变量配置）
-  id:
+  id: ""
   # 我的 Peer key。留空则从环境变量读取（建议留空并通过环境变量配置）
-  key:
+  key: ""
   # 不建议修改
   nat:
     # 自动检测配置（推荐）
@@ -12,6 +12,7 @@ my:
     isUpnpSupported: true
     clientInetAddress:
     clientInet6Address:
+    isValueChecked: false
 # 对等端配置
 peers:
   # peer id (64位整数)
@@ -39,19 +40,15 @@ peers:
         dstPort: 443
         # 角色：作为客户端还是服务端 CLIENT | SERVER
         role: SERVER
+        # (仅TCP) QoS设置：DSCP值，-1为禁用
+        dscp: -1
+        # 是否启用NATPoked层加密。对于TCP来说不建议启用。
+        isEncrypted: false
     # WireGuard 配置（可选）
     # 本功能可以让 NATPoked 自动进行简单的 WireGuard 配置，如果需要更高级的 WireGuard 功能，则请使用上面的端口转发功能
     wireGuard:
-      enabled: true
-      # 我的私钥
-      privateKey:
-      # 我的地址（CIDR表示法）
-      address: 172.25.0.2/24
-      # 允许的 IP （CIDR表示法）
-      allowedIPs: 172.25.0.0/24
+      enabled: false
       # 监听的端口
       listenPort: 51000
-      # DNS
-      dns:
-      # MTU
-      mtu: 1400
+      # 角色：作为客户端还是服务端 CLIENT | SERVER
+      role: SERVER

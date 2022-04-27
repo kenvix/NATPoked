@@ -14,11 +14,11 @@ RUN echo "Begin docker image build ..." \
     && rm -rf ./out ./build \
     && chmod +x ./gradlew \
     && ./gradlew --info --stacktrace shadowJar \
-    && mkdir -p /data/app \
-    && mkdir -p /data/config \
-    && mv ./build/output/*.jar /data/app/app.jar \
+    && mkdir -p /data \
+    && mkdir -p /data/Config \
+    && mv ./build/output/*.jar /data/app.jar \
     && echo "Cleaning build cache ..." \
-    && cd /data/config \
+    && cd /data/Config \
     && apt-get clean \
     && rm -rf "/root/.gradle/" \
     && rm -rf /tmp/* \
@@ -33,7 +33,7 @@ LABEL description="NATPoked: A Cross-platform Peer-To-Peer NAT Traversal Toolkit
 LABEL homepage="https://kenvix.com"
 
 COPY --from=intermediate /data /data
-COPY ./cmdline-jvm-docker.txt /data/app/cmdline-jvm-docker.txt
+COPY ./cmdline-jvm-docker.txt /data/cmdline-jvm-docker.txt
 
 RUN echo "Begin docker image build ..." \
     && apt-get update \
@@ -46,18 +46,18 @@ RUN echo "Begin docker image build ..." \
     iproute2 \
     net-tools \
     && echo "Cleaning build cache ..." \
-    && (mkdir -p /data/app || true) \
-    && (mkdir -p /data/config || true) \
-    && cd /data/config \
+    && (mkdir -p /data || true) \
+    && (mkdir -p /data/Config || true) \
+    && cd /data/Config \
     && (apt-get clean || true) \
     && (rm -rf /tmp/* || true) \
     && echo "Finishing build ..." \
-    && (mv /data/app/*.jar /data/app/app.jar || true) \
+    && (mv /data/*.jar /data/app.jar || true) \
     && echo "Dockerfile build success"
 
 
-WORKDIR /data/config
+WORKDIR /data
 ENV LANG en_US.UTF-8
 ENV IsRunningInDocker true
 
-CMD ["java", "@/data/app/cmdline-jvm-docker.txt", "-jar", "/data/app/app.jar"]
+CMD ["java", "@/data/cmdline-jvm-docker.txt", "-jar", "/data/app.jar"]
