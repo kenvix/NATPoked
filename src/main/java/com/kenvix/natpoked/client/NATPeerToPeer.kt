@@ -43,6 +43,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.exists
 import kotlin.io.path.writeText
+import kotlin.math.abs
 
 /**
  * NATPoked Peer
@@ -765,38 +766,48 @@ class NATPeerToPeer(
             result.checkException()
             val portParam = result.data!!
             val concurrentGuessNum = AppEnv.PortGuessMaxConcurrentNum
+            if (debugNetworkTraffic)
+                logger.debug("connectPeer: ${peerInfo.clientId} guess port portParam: $portParam")
 
-            when (config.natPortGuessModel) {
-                PeersConfig.Peer.GuessModel.POISSON -> {
-                    while (!isConnected) {
-                        for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
-                            val now = System.currentTimeMillis() - portParam.testFinishedAt
+            if (abs(portParam.avg) <= 1e-7) { // Average value is zero, do not use guess models
+                if (debugNetworkTraffic)
+                    logger.debug("Average value is zero, do not use guess models")
 
-                            // TODO: CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE
-                            //  CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT
-                            //  STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE
-                            val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
-                            logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
-                            for (port in ports) {
-                                val helloIp6Task = sendHelloIp6Task(port)
-                                val helloIp4Task = sendHelloIp4Task(port)
+                val helloIp6Task = sendHelloIp6Task(portParam.lastPort)
+                val helloIp4Task = sendHelloIp4Task(portParam.lastPort)
+            } else {
+                when (config.natPortGuessModel) {
+                    PeersConfig.Peer.GuessModel.POISSON -> {
+                        while (!isConnected) {
+                            for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
+                                val now = System.currentTimeMillis() - portParam.testFinishedAt
+
+                                // TODO: CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE
+                                //  CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT
+                                //  STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE
+                                val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
+                                logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
+                                for (port in ports) {
+                                    val helloIp6Task = sendHelloIp6Task(port)
+                                    val helloIp4Task = sendHelloIp4Task(port)
+                                }
+
+                                if (isConnected) break
+                                delay(AppEnv.PeerFloodingDelay)
                             }
-
-                            if (isConnected) break
-                            delay(AppEnv.PeerFloodingDelay)
                         }
                     }
+
+                    PeersConfig.Peer.GuessModel.EXPONENTIAL -> {
+
+                    }
+
+                    PeersConfig.Peer.GuessModel.LINEAR -> {
+
+                    }
+
+                    else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
                 }
-
-                PeersConfig.Peer.GuessModel.EXPONENTIAL -> {
-
-                }
-
-                PeersConfig.Peer.GuessModel.LINEAR -> {
-
-                }
-
-                else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
             }
         }
     }
