@@ -33,6 +33,9 @@ object Main : CoroutineScope {
                     "告并试着解决。如果无法解决，请删除 ${AppConstants.workingFolder}.env 以恢复默认设置")
         }
 
+        if (AppEnv.IsRunningInDocker)
+            logger.debug("Running in Docker image")
+
         registerCommands()
         registerShutdownHandler()
         checkFiles()
@@ -125,7 +128,7 @@ object Main : CoroutineScope {
         if (cmd.hasOption("nogui"))
             System.setProperty("nogui", "1")
 
-        AppConstants.appMode = if (cmd.hasOption('s')) AppConstants.AppMode.SERVER else AppConstants.AppMode.CLIENT
+        AppConstants.appMode = if (cmd.hasOption('b')) AppConstants.AppMode.BROKER else AppConstants.AppMode.PEER
 
         //TODO: Log Level
         if (cmd.hasOption('v')) {

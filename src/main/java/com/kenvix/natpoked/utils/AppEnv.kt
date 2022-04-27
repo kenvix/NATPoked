@@ -29,7 +29,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val NATType: String by envOf("AUTO")
 
     val PortGuessMaxConcurrentNum: Int by envOf(20)
-    val PortGuessMaxNum: Int by envOf(1000)
+    val PortGuessMaxNum: Int by envOf(50000)
     val PortGuessSkipLowPorts: Boolean by envOf(true)
 
     @Description("进行端口预测时的发包间隔时间，单位为毫秒")
@@ -145,7 +145,8 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("是否启用 XForwardedHeaders 支持，若没有反向代理务必为 false")
     val XForwardedHeadersSupport by envOf(false)
 
-    val AppMode by envOf("client")
+    val AppMode: String by envOf("client")
+    val IsRunningInDocker: Boolean by envOf(false)
 
     @Description("是否启用压缩")
     val EnableCompression by envOf(false)

@@ -33,6 +33,7 @@ LABEL description="NATPoked: A Cross-platform Peer-To-Peer NAT Traversal Toolkit
 LABEL homepage="https://kenvix.com"
 
 COPY --from=intermediate /data /data
+COPY ./cmdline-jvm-docker.txt /data/app/cmdline-jvm-docker.txt
 
 RUN echo "Begin docker image build ..." \
     && apt-get update \
@@ -59,4 +60,4 @@ WORKDIR /data/config
 ENV LANG en_US.UTF-8
 ENV IsRunningInDocker true
 
-CMD ["java", "-jar", "/data/app/app.jar"]
+CMD ["java", "@/data/app/cmdline-jvm-docker.txt", "-jar", "/data/app/app.jar"]

@@ -1,0 +1,1 @@
+-server -Dfile.encoding=UTF-8 -Djava.lang.Integer.IntegerCache.high=65535 -Dkotlinx.coroutines.debug=off -XX:+IgnoreUnrecognizedVMOptions -XX:+OmitStackTraceInFastThrow -XX:-HeapDumpOnOutOfMemoryError -XX:+UseContainerSupport -XX:MaxRAMPercentage=80

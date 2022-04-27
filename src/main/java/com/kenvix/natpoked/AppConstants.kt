@@ -14,11 +14,11 @@ object AppConstants {
     val workingFolder = File("").absolutePath + File.separatorChar
     val workingPath = Path.of(workingFolder)
     val tempPath = workingPath.resolve("Temp")
-    var appMode: AppMode = AppMode.CLIENT
+    var appMode: AppMode = AppMode.PEER
     val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
 //    var nettyGroup: EventLoopGroup = NioEventLoopGroup()
 
     enum class AppMode {
-        CLIENT, SERVER
+        PEER, BROKER
     }
 }

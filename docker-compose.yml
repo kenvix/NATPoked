@@ -10,7 +10,16 @@ services:
       - DebugMode=true
       - DebugNetworkTraffic=true
       - PeerId=2000001
-      - PeerFile=peer.yml
+      - PeerFile=peers.yml
       - PeerMyKey=dTBY2CcC83Az5J
-      - AppMode=server
+      - AppMode=broker
+      - BrokerUrl=
+      - BrokerMqttUrl=
+      - PortGuessMaxConcurrentNum=100
+      - PortGuessMaxNum=55000
+      - ServerHttpHost=0.0.0.0
+      - ServerKey=bG5Ryqh8ArJico
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
     network_mode: host
