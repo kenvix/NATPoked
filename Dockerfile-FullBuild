@@ -58,7 +58,5 @@ RUN echo "Begin docker image build ..." \
 
 WORKDIR /data
 ENV LANG en_US.UTF-8
-ENV ExtraVMOptions ""
-ENV ExtraAppOptions ""
 
-CMD ["java", "@/data/cmdline-jvm-docker.txt", "$ExtraVMOptions", "-jar", "/data/app.jar", "$ExtraAppOptions"]
+CMD ["java", "@/data/cmdline-jvm-docker.txt", "-jar", "/data/app.jar"]
