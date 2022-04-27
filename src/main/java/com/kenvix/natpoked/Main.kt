@@ -39,15 +39,15 @@ object Main : CoroutineScope {
         launch(Dispatchers.IO) { beginReadSystemConsole() }
 
         launch(Dispatchers.IO) {
-            val mode = AppEnv.Mode.lowercase()
-            if (mode == "server" || cmd.hasOption('s')) {
+            val mode = AppEnv.AppMode.lowercase()
+            if (mode == "broker" || mode == "server" || cmd.hasOption('b')) {
                 runCatching {
-                    logger.info("Starting server ...")
+                    logger.info("Starting NATPoked broker(server) ...")
                     NATServer.start()
-                }.onFailure { showErrorAndExit(it, 2, "Server initialization failed") }
+                }.onFailure { showErrorAndExit(it, 2, "NATPoked broker initialization failed") }
             } else {
                 runCatching {
-                    logger.info("Starting NATPoked client(peer) (PeerId=${AppEnv.PeerId}) ...")
+                    logger.info("Starting NATPoked peer(client) (PeerId=${AppEnv.PeerId}) ...")
 
                     NATClient.registerShutdownHandler()
                     NATClient.start()
@@ -61,7 +61,7 @@ object Main : CoroutineScope {
                         logger.info("Trying to connect all configured peers ...")
                         NATClient.pokeAll()
                     }
-                }.onFailure { showErrorAndExit(it, 2, "Client initialization failed") }
+                }.onFailure { showErrorAndExit(it, 2, "NATPoked client initialization failed") }
             }
         }
     }
@@ -107,7 +107,7 @@ object Main : CoroutineScope {
 
         ops.addOption("x", "no-poke", false, "不要在启动时开始打洞")
 
-        ops.addOption("s", "server", false, "以中介服务器模式运行")
+        ops.addOption("b", "broker", false, "以中介服务器模式运行")
 
         ops.addOption("d", "dump-settings", false, "导出设置参数到文件 ${AppConstants.workingFolder}.env")
 

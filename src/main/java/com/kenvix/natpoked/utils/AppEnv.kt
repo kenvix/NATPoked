@@ -145,7 +145,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     @Description("是否启用 XForwardedHeaders 支持，若没有反向代理务必为 false")
     val XForwardedHeadersSupport by envOf(false)
 
-    val Mode by envOf("")
+    val AppMode by envOf("client")
 
     @Description("是否启用压缩")
     val EnableCompression by envOf(false)

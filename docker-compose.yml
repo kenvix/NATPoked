@@ -1,0 +1,16 @@
+version: '3'
+services:
+  natpoked:
+    image: kenvix/natpoked
+    container_name: natpoked
+    restart: unless-stopped
+    volumes:
+      - /home/config/natpoked:/data/config
+    environment:
+      - DebugMode=true
+      - DebugNetworkTraffic=true
+      - PeerId=2000001
+      - PeerFile=peer.yml
+      - PeerMyKey=dTBY2CcC83Az5J
+      - AppMode=server
+    network_mode: host
