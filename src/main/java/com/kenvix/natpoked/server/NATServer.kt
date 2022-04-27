@@ -5,7 +5,6 @@ import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATPeerToBrokerConnection
 import com.kenvix.natpoked.contacts.PeerId
 import com.kenvix.natpoked.utils.AppEnv
-import com.kenvix.natpoked.utils.PlatformDetection
 import com.kenvix.natpoked.utils.sha256Of
 import com.kenvix.natpoked.utils.toBase58String
 import com.kenvix.web.server.CachedClasses
@@ -14,10 +13,7 @@ import io.ktor.application.*
 import io.ktor.http.cio.websocket.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.File
@@ -65,48 +61,49 @@ object NATServer : Closeable {
         peerConnectionsImpl.remove(peerId)
     }
 
-    val ktorEmbeddedServer = embeddedServer(CIO, port = AppEnv.ServerHttpPort, host = AppEnv.ServerHttpHost, watchPaths = run {
-        if (AppEnv.DebugMode && System.getProperty("hotReloadSupported")?.toBoolean() == true) {
-            listOf( // Substring match rules for classpath
-                "${AppConstants.workingFolder.replace('\\', '/')}out",
-                "${AppConstants.workingFolder.replace('\\', '/')}build/classes",
-                "/out/",
-                "/build/classes/"
-            ).also {
-                logger.debug("Ktor auto reload enabled on: ${it.joinToString(" , ")}")
+    val ktorEmbeddedServer =
+        embeddedServer(CIO, port = AppEnv.ServerHttpPort, host = AppEnv.ServerHttpHost, watchPaths = run {
+            if (AppEnv.DebugMode && System.getProperty("hotReloadSupported")?.toBoolean() == true) {
+                listOf( // Substring match rules for classpath
+                    "${AppConstants.workingFolder.replace('\\', '/')}out",
+                    "${AppConstants.workingFolder.replace('\\', '/')}build/classes",
+                    "/out/",
+                    "/build/classes/"
+                ).also {
+                    logger.debug("Ktor auto reload enabled on: ${it.joinToString(" , ")}")
+                }
+            } else {
+                emptyList()
             }
-        } else {
-            emptyList()
-        }
-    }, configure = {
-        // Size of the event group for accepting connections
-        connectionGroupSize = parallelism * AppEnv.ServerWorkerPoolSizeRate
-        // Size of the event group for processing connections,
-        // parsing messages and doing engine's internal work
-        workerGroupSize = parallelism * AppEnv.ServerWorkerPoolSizeRate
-        // Size of the event group for running application code
-        callGroupSize = parallelism * AppEnv.ServerWorkerPoolSizeRate
+        }, configure = {
+            // Size of the event group for accepting connections
+            connectionGroupSize = parallelism * AppEnv.ServerWorkerPoolSizeRate
+            // Size of the event group for processing connections,
+            // parsing messages and doing engine's internal work
+            workerGroupSize = parallelism * AppEnv.ServerWorkerPoolSizeRate
+            // Size of the event group for running application code
+            callGroupSize = parallelism * AppEnv.ServerWorkerPoolSizeRate
 
-        /** Options for CIO **/
+            /** Options for CIO **/
 
-        /** Options for CIO **/
-        // Number of seconds that the server will keep HTTP IDLE connections open.
-        // A connection is IDLE if there are no active requests running.
-        connectionIdleTimeoutSeconds = AppEnv.ServerMaxIdleSecondsPerHttpConnection
+            /** Options for CIO **/
+            // Number of seconds that the server will keep HTTP IDLE connections open.
+            // A connection is IDLE if there are no active requests running.
+            connectionIdleTimeoutSeconds = AppEnv.ServerMaxIdleSecondsPerHttpConnection
 
-        /** Options for Netty **/
+            /** Options for Netty **/
 
-        /** Options for Netty **/
-        // Size of the queue to store [ApplicationCall] instances that cannot be immediately processed
-        // requestQueueLimit = parallelism * ServerEnv.ServerWorkerPoolSizeRate
-        // Do not create separate call event group and reuse worker group for processing calls
-        // shareWorkGroup = true
-        // Timeout in seconds for sending responses to client
-        // responseWriteTimeoutSeconds = 120
-        // configureBootstrap = {
+            /** Options for Netty **/
+            // Size of the queue to store [ApplicationCall] instances that cannot be immediately processed
+            // requestQueueLimit = parallelism * ServerEnv.ServerWorkerPoolSizeRate
+            // Do not create separate call event group and reuse worker group for processing calls
+            // shareWorkGroup = true
+            // Timeout in seconds for sending responses to client
+            // responseWriteTimeoutSeconds = 120
+            // configureBootstrap = {
 
-        // }
-    }, module = Application::module)
+            // }
+        }, module = Application::module)
 
     suspend fun start() = withContext(Dispatchers.IO) {
         logger.info("Starting NATServer...")
@@ -132,21 +129,32 @@ object NATServer : Closeable {
 
         val mqttConfig = async(Dispatchers.IO) {
             logger.info("Pre-Configuring MQTT broker")
-            val mqttPasswd =  tempPath.resolve("mqtt.passwd")
+            val mqttPasswd = tempPath.resolve("mqtt.passwd")
             mqttPasswd.toFile().writeText(
                 "server:${brokerServer.token}" + "\n" +
-                "broker:${sha256Of(AppEnv.ServerPSK).toBase58String()}"
+                        "broker:${sha256Of(AppEnv.ServerPSK).toBase58String()}"
             )
 
-            ProcessUtils.runProcess("mqtt_passwd", ProcessBuilder().command(
-                "mosquitto_passwd", "-U", "\"${mqttPasswd.toAbsolutePath()}\"",
-            ))
+            while (isActive) {
+                ProcessUtils.runProcess(
+                    "mqtt_passwd", ProcessBuilder().command(
+                        "mosquitto_passwd", "-U", "\"${mqttPasswd.toAbsolutePath()}\"",
+                    )
+                )
 
-            ProcessUtils["mqtt_passwd"]!!.waitFor()
+                val proc = ProcessUtils["mqtt_passwd"]!!
+                proc.waitFor()
+                if (proc.exitValue() != 0)
+                    logger.warn("Failed to configure MQTT broker: mosquitto_passwd failed with exit code ${proc.exitValue()}")
+                else
+                    break
+            }
         }
 
         fun launchMqttBrokerAsync() = async {
-            mqttConfig.await()
+            if (mqttConfig.isActive)
+                mqttConfig.await()
+
             logger.info("Starting MQTT Broker")
             var mqttBrokerConfig = """
 listener ${AppEnv.ServerMqttPort}
@@ -173,7 +181,6 @@ password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
             )
         }
 
-        mqttConfig.await()
         val mqtt = launchMqttBrokerAsync()
         mqtt.await()
 
