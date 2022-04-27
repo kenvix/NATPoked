@@ -78,7 +78,7 @@ class NATPeerToPeer(
         ByteBuffer.allocateDirect(2 + 1 + currentMyIV.size).apply { order(ByteOrder.BIG_ENDIAN) }
     private val keepAliveLock = Mutex()
 
-    private var pingReceiverChannel: Channel<DatagramPacket>? = null
+    @Volatile private var pingReceiverChannel: Channel<DatagramPacket>? = null
 
     @Volatile
     private var isConnected: Boolean = false
@@ -330,8 +330,11 @@ class NATPeerToPeer(
             else
                 sourcePort
         } else if (NATClient.lastSelfClientInfo.clientNatType.levelId >= NATType.RESTRICTED_CONE.levelId) {
-            pingReceiverChannel = Channel(1)
-            NATClient.getOutboundInetSocketAddress(udpChannel, manualReceiver = pingReceiverChannel).port.apply {
+            pingReceiverChannel = Channel(4)
+            try {
+                NATClient.getOutboundInetSocketAddress(udpChannel, manualReceiver = pingReceiverChannel).port
+            } finally {
+                pingReceiverChannel?.close()
                 pingReceiverChannel = null
             }
         } else {
@@ -507,7 +510,7 @@ class NATPeerToPeer(
     private suspend fun dispatchIncomingPacket(addr: InetSocketAddress, buffer: ByteBuffer) {
         // Ping packet is handled by the ping handler
         if (SocketAddrEchoClient.isResponsePacket(buffer)) {
-            pingReceiverChannel?.trySend(buffer.toDatagramPacket(addr))
+            pingReceiverChannel?.send(buffer.toDatagramPacket(addr))
             return
         }
 
@@ -1041,7 +1044,13 @@ class NATPeerToPeer(
             listenUdpSourcePort(sourcePort)
         }
 
-        return NATClient.getPortAllocationPredictionParam(udpChannel)
+        pingReceiverChannel = Channel(4)
+        return try {
+            NATClient.getPortAllocationPredictionParam(udpChannel, manualReceiver = pingReceiverChannel)
+        } finally {
+            pingReceiverChannel?.close()
+            pingReceiverChannel = null
+        }
     }
 
     suspend fun prepareAsServer(info: NATClientItem) {

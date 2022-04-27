@@ -17,6 +17,7 @@ import io.ktor.features.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.io.IOException
@@ -71,15 +72,17 @@ class SocketAddrEchoClient(
                         manualReceiver.receive()
                     } else {
                         val incomingPacket = DatagramPacket(incomingData, 0, incomingData.size)
-                        if (socketBlocking != null)
-                            socketBlocking.receive(incomingPacket)
-                        else
+                        if (socketBlocking != null) {
+                            runInterruptible {
+                                socketBlocking.receive(incomingPacket)
+                            }
+                        } else {
                             channel.aReceive(incomingPacket)
+                        }
 
                         incomingPacket
                     }
 
-                    manualReceiver?.close()
                     return@withContext parseEchoResult(packet)
                 } catch (e: SocketTimeoutException) {
                     logger.info("Echo server $address:$port Socket timeout", e)
@@ -108,10 +111,10 @@ class SocketAddrEchoClient(
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
         ports: Iterable<Int>, address: InetAddress, srcChannel: DatagramChannel? = null,
-        maxTires: Int = 100, delay: Long = 20
+        maxTires: Int = 100, delay: Long = 20, manualReceiver: Channel<DatagramPacket>? = null
     ): List<SocketAddrEchoResult> = withContext(Dispatchers.IO) {
         ports.map { port ->
-            val result = requestEcho(port, address, srcChannel, maxTires)
+            val result = requestEcho(port, address, srcChannel, maxTires, manualReceiver)
             delay(delay)
             result
         }

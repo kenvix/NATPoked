@@ -140,10 +140,12 @@ object NATClient : CoroutineScope, AutoCloseable {
 
         logger.trace(registerPeerToBroker().toString())
 
-        val testPingServerJob = async(Dispatchers.IO) {
-            val r = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost))
-            logger.debug("Ping server test passed: $r")
-        }
+        val testPingServerJob = if (!System.getProperties().containsKey("com.kenvix.natpoked.skipPingTest")) {
+            async(Dispatchers.IO) {
+                val r = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost))
+                logger.debug("Ping server test passed: $r")
+            }
+        } else null
 
         brokerClient.connect()
 
@@ -156,7 +158,7 @@ object NATClient : CoroutineScope, AutoCloseable {
             }
         }
 
-        testPingServerJob.await()
+        testPingServerJob?.await()
 
         peersConfig.peers.forEach {
             if (it.value.autoConnect) {
@@ -245,8 +247,8 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     }
 
-    suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null, echoPortNum: Int = -1): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
-        return@withContext com.kenvix.natpoked.client.traversal.getPortAllocationPredictionParam(echoClient, AppEnv.EchoPortList.asIterable(), srcChannel, echoPortNum)
+    suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null, echoPortNum: Int = -1, manualReceiver: Channel<DatagramPacket>? = null): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
+        return@withContext com.kenvix.natpoked.client.traversal.getPortAllocationPredictionParam(echoClient, AppEnv.EchoPortList.asIterable(), srcChannel, manualReceiver)
     }
 
     override fun close() {

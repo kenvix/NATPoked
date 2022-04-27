@@ -4,9 +4,11 @@ import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.client.SocketAddrEchoClient
 import com.kenvix.natpoked.utils.AppEnv
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.apache.commons.math3.distribution.PoissonDistribution
+import java.net.DatagramPacket
 import java.net.InetAddress
 import java.nio.channels.DatagramChannel
 import kotlin.math.round
@@ -74,13 +76,14 @@ fun expectedValuePortGuess(now: Long, param: PortAllocationPredictionParam, gues
     }
 }
 
-suspend fun getPortAllocationPredictionParam(echoClient: SocketAddrEchoClient, ports: Iterable<Int>, srcChannel: DatagramChannel? = null, echoPortNum: Int = -1): PortAllocationPredictionParam = withContext(
+suspend fun getPortAllocationPredictionParam(echoClient: SocketAddrEchoClient, ports: Iterable<Int>, srcChannel: DatagramChannel? = null, manualReceiver: Channel<DatagramPacket>? = null): PortAllocationPredictionParam = withContext(
     Dispatchers.IO) {
     val startTime = System.currentTimeMillis()
     val result = echoClient.requestEcho(
-        ports,
-        InetAddress.getByName(NATClient.brokerClient.brokerHost),
-        srcChannel
+        ports = ports,
+        address = InetAddress.getByName(NATClient.brokerClient.brokerHost),
+        srcChannel = srcChannel,
+        manualReceiver = manualReceiver,
     )
     val endTime = System.currentTimeMillis()
     val timeElapsed = endTime - startTime
