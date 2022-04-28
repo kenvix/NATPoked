@@ -7,9 +7,7 @@
 
 package com.kenvix.natpoked.test
 
-import com.google.common.primitives.Ints
 import com.google.common.primitives.Longs
-import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.contacts.NATClientItem
 import com.kenvix.natpoked.contacts.NATType
 import com.kenvix.natpoked.contacts.PeersConfig
@@ -23,14 +21,9 @@ import kotlinx.serialization.protobuf.ProtoBuf
 import net.mamoe.yamlkt.Yaml
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import java.net.Inet4Address
-import java.net.Inet6Address
-import java.net.InetAddress
-import java.net.URI
-import java.net.URL
+import java.net.*
 import java.nio.file.Files
 import java.nio.file.Path
-import java.util.*
 
 class SerializationTest {
     @OptIn(ExperimentalSerializationApi::class)

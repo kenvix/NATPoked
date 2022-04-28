@@ -8,7 +8,6 @@ package com.kenvix.natpoked.test
 
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
-import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.util.*
 

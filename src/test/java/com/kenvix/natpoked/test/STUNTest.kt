@@ -7,7 +7,6 @@
 package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.testNatType
-import com.kenvix.natpoked.utils.testNatTypeParallel
 import kotlinx.coroutines.runBlocking
 import java.net.InetAddress
 import java.net.NetworkInterface

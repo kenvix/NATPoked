@@ -3,9 +3,9 @@ import java.util.Properties
 import com.google.protobuf.gradle.*
 
 plugins {
-    kotlin("jvm") version "1.6.20"
+    kotlin("jvm") version "1.6.21"
     java
-    kotlin("plugin.serialization") version "1.6.20"
+    kotlin("plugin.serialization") version "1.6.21"
     id("com.google.protobuf") version "0.8.18"
     id("org.graalvm.buildtools.native") version "0.9.9"
     id("com.github.johnrengelman.shadow") version "6.1.0"
@@ -39,7 +39,7 @@ repositories {
 
 dependencies {
     implementation(fileTree("libs"))
-    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.6.20")
+    implementation(kotlin("stdlib"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutinesVersion")
 
     /* Protobuf & GRPC */
@@ -121,7 +121,7 @@ dependencies {
     implementation("org.apache.commons:commons-math3:3.6.1")
 
     // https://mvnrepository.com/artifact/io.netty/netty-buffer
-    implementation("io.netty:netty-buffer:4.1.75.Final")
+//    implementation("io.netty:netty-buffer:4.1.75.Final")
 
     // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
     implementation("org.apache.commons:commons-lang3:3.12.0")

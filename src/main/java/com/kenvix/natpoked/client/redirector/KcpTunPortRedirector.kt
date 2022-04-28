@@ -7,7 +7,6 @@ import com.kenvix.natpoked.contacts.PeerCommunicationType
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.AppEnv
 import com.kenvix.web.utils.ProcessUtils
-import io.netty.buffer.ByteBuf
 import org.slf4j.LoggerFactory
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions

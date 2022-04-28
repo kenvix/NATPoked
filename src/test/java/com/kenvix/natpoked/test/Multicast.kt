@@ -1,12 +1,9 @@
 package com.kenvix.natpoked.test
 
 import java.net.InetSocketAddress
-
-import java.net.MulticastSocket
 import java.net.StandardSocketOptions
 import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
-import java.nio.channels.MulticastChannel
 
 fun main() {
     val channel = DatagramChannel.open()

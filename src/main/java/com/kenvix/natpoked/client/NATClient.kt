@@ -1,7 +1,6 @@
 package com.kenvix.natpoked.client
 
 import com.kenvix.natpoked.AppConstants
-import com.kenvix.natpoked.Main
 import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
 import com.kenvix.natpoked.client.traversal.PortAllocationPredictionParam
 import com.kenvix.natpoked.contacts.*

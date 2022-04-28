@@ -11,7 +11,10 @@ import com.kenvix.natpoked.client.NATPeerToPeer
 import com.kenvix.natpoked.client.redirector.RawUdpPortRedirector
 import com.kenvix.natpoked.contacts.PeersConfig
 import com.kenvix.natpoked.utils.sha256Of
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import java.net.*

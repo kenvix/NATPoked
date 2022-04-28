@@ -23,7 +23,6 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.channels.DatagramChannel
 
 class SocketAddrEchoClient(

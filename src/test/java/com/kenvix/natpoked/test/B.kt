@@ -3,8 +3,6 @@ package com.kenvix.natpoked.test
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 fun main() {
     runBlocking {

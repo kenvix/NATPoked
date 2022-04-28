@@ -13,7 +13,6 @@ import java.nio.channels.DatagramChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.Selector
 import java.util.*
-import kotlin.ConcurrentModificationException
 
 object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private data class SuspendedEvent(

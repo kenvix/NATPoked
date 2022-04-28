@@ -8,8 +8,6 @@ package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.client.SocketAddrEchoClient
-import com.kenvix.natpoked.client.traversal.poissonPortGuess
-import com.kenvix.natpoked.server.NATServer
 import com.kenvix.natpoked.server.SocketAddrEchoServer
 import com.kenvix.natpoked.utils.AppEnv
 import kotlinx.coroutines.delay

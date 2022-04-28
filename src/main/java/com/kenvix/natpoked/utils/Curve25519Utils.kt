@@ -1,7 +1,5 @@
 package com.kenvix.natpoked.utils
 
-import org.whispersystems.curve25519.Curve25519
-import org.whispersystems.curve25519.Curve25519KeyPair
 import org.whispersystems.curve25519.java.curve_sigs
 
 object Curve25519Utils {

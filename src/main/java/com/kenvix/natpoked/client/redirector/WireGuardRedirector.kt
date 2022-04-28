@@ -16,7 +16,6 @@ import com.kenvix.natpoked.utils.PlatformDetection
 import com.kenvix.web.utils.ProcessUtils
 import okhttp3.internal.toHexString
 import org.slf4j.LoggerFactory
-import java.io.Closeable
 import java.net.InetSocketAddress
 import java.nio.file.Files
 import java.nio.file.Path

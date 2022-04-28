@@ -11,10 +11,7 @@ import de.javawi.jstun.test.DiscoveryTest
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.nio.ByteBuffer
 import java.nio.channels.DatagramChannel
-import kotlin.math.log
 
 fun main() {
     val logger = LoggerFactory.getLogger("UPNPTest")

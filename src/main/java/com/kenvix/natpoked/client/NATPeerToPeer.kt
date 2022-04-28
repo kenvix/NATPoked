@@ -95,32 +95,10 @@ class NATPeerToPeer(
     var targetAddr: InetSocketAddress? = null
         private set
 
-    //    private val receiveBuffer = ByteBuffer.allocateDirect(1472)
     private var ivUseCount = 0 // 无需线程安全
     private val sendLock: Mutex = Mutex()
     private val connectLock: Mutex = Mutex()
-//    val receiveLock: Mutex = Mutex()
 
-    private val controlMessageARQ: KCPARQProvider by lazy {
-        KCPARQProvider(
-            onRawPacketToSendHandler = { buffer: ByteBuf, user: Any? -> handleControlMessageOutgoingPacket(buffer) },
-            user = null,
-            useStreamMode = false,
-        )
-    }
-
-    //    val controlMessageJob: Job = launch(Dispatchers.IO) {
-//        while (isActive) {
-//            val message = controlMessageARQ.receive()
-//            if (message.size < 3) {
-//                logger.warn("Received control message with invalid size ${message.size}")
-//                continue
-//            } else {
-//                val buffer = message.data
-//                val version = buffer.readUnsignedShort()
-//
-//            }
-//        }
     private val portServicesMap: MutableMap<Int, ServiceRedirector> = mutableMapOf()
     private val portServiceOperationLock = Mutex()
 
@@ -449,20 +427,6 @@ class NATPeerToPeer(
         return typeId
     }
 
-    private suspend fun handleControlMessageOutgoingPacket(buffer: ByteBuf) {
-        val typeIdInt = TYPE_DATA_CONTROL.typeId.toInt()
-
-        // TODO: ENCRYPT
-        sendLock.withLock {
-            sendBuffer.clear()
-            sendBuffer.putUnsignedShort(typeIdInt)
-            buffer.readBytes(sendBuffer)
-
-            logger.trace("Send control packet, size ${sendBuffer.position()}.")
-            sendBuffer.flip()
-            writeRawDatagram(sendBuffer)
-        }
-    }
 
     // TODO: ENCRYPT, IV, COMPRESS
     suspend fun handleOutgoingPacket(
