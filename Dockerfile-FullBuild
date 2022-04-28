@@ -39,7 +39,7 @@ RUN echo "Begin docker image build ..." \
     && apt-get update \
     && apt-get install -y \
     ca-certificates \
-    openjdk-17-jre-headless \
+    openjdk-17-jdk-headless \
     mosquitto \
     wireguard \
     kcptun \

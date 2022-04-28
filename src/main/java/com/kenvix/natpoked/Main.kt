@@ -34,7 +34,7 @@ object Main : CoroutineScope {
         }
 
         if (AppEnv.IsRunningInDocker)
-            logger.debug("Running in Docker image")
+            logger.debug("Running in the Docker container")
 
         registerCommands()
         registerShutdownHandler()
