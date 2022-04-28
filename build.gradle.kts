@@ -127,7 +127,7 @@ dependencies {
     implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
 
     // https://mvnrepository.com/artifact/io.netty/netty-buffer
-    compileOnly("io.netty:netty-buffer:4.1.76.Final")
+    implementation("io.netty:netty-buffer:4.1.76.Final")
 }
 
 tasks.getByName<Test>("test") {

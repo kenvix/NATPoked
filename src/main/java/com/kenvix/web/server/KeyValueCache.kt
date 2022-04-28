@@ -25,7 +25,7 @@ object KeyValueCache : Cached {
     operator fun contains(key: String) = cache.asMap().contains(key)
 
     operator fun <T> set(key: String, value: T) {
-        cache.put(key, value)
+        cache.put(key, value!!)
     }
 
     override fun invalidateAll() {

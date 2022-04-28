@@ -36,7 +36,7 @@ object CachedClasses : HashSet<Cached>() {
             logger.info("clean up all expired cache")
         }
 
-        ConsoleCommands["cache"] = { handler ->
+        ConsoleCommands["cache"] = { _ ->
             println("Cache stats (Commit for commit command.)")
             println(getStatsString())
         }

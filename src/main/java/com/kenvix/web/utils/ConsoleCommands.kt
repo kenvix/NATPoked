@@ -6,6 +6,9 @@
 
 package com.kenvix.web.utils
 
+import java.util.*
+import kotlin.collections.HashMap
+
 data class CommandQueryData(val command: String, val arguments: List<String> = listOf()) {
     val firstArgument
         get() = arguments[0]
@@ -64,7 +67,7 @@ object ConsoleCommands : HashMap<String, ((CommandQueryData) -> Unit)>() {
                 listOf(pureMessage.substring(0, spaceIndex), pureMessage.substring(spaceIndex+1).trim())
         }
 
-        command = commandArray[0].toLowerCase()
+        command = commandArray[0].lowercase(Locale.getDefault())
 
         return CommandQueryData(
                 command,

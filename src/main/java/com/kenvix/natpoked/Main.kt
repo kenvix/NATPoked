@@ -195,7 +195,7 @@ object Main : CoroutineScope {
 
         ConsoleCommands["help"] = {
             println("Available commands: ")
-            ConsoleCommands.forEach { t, u -> print("$t ") }
+            ConsoleCommands.forEach { t, _ -> print("$t ") }
             println()
         }
 

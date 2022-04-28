@@ -210,6 +210,7 @@ inline fun <R> String?.ifNotNullOrBlank(then: ((String) -> R?)): R? {
     return null
 }
 
+@Suppress("NOTHING_TO_INLINE")
 inline fun String?.default(defaultValue: String): String {
     return if (this == null || this.isBlank())
         defaultValue

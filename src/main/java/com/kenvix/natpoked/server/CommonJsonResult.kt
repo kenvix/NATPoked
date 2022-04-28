@@ -21,7 +21,7 @@ data class CommonJsonResult<T>(
 ) {
     fun checkException() {
         when (status) {
-            in 200..299 -> null
+            in 200..299 -> {  }
             400 -> throw BadRequestException(info.ifBlank { "Unknown error" })
             401 -> throw InvalidAuthorizationException(info.ifBlank { "Unauthorized" })
             403 -> throw ForbiddenOperationException(info.ifBlank { "Forbidden" })
