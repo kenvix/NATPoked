@@ -78,7 +78,7 @@ exit 0
                 "/D",
                 "/U",
                 "/C",
-                "${path.toAbsolutePath()}"
+                path.toAbsolutePath().toString(),
             )
 
             ProcessUtils.runProcess(processKey, builder, keepAlive = false)
@@ -86,7 +86,7 @@ exit 0
             val builder = ProcessBuilder(
                 "wg-quick",
                 "up",
-                "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
+                wireGuardConfigFilePath.toAbsolutePath().toString(),
             )
 
             ProcessUtils.runProcess(processKey, builder, keepAlive = false)
@@ -109,7 +109,7 @@ exit 0
                 "/D",
                 "/U",
                 "/C",
-                "${path.toAbsolutePath()}"
+                path.toAbsolutePath().toString(),
             )
 
             ProcessUtils.runProcess(processKey, builder, keepAlive = false)
@@ -117,7 +117,7 @@ exit 0
             val builder = ProcessBuilder(
                 "wg-quick",
                 "down",
-                "\"${wireGuardConfigFilePath.toAbsolutePath()}\"",
+                wireGuardConfigFilePath.toAbsolutePath().toString(),
             )
 
             ProcessUtils.runProcess(processKey, builder, keepAlive = false)

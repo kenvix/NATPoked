@@ -21,7 +21,11 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
 
+
 object NATServer : Closeable {
+    private const val mqttPasswdFileName = "mqtt.passwd"
+    private const val mqttConfigFileName = "mqtt.conf"
+
     internal val logger = LoggerFactory.getLogger(javaClass)
     private val peerConnectionsImpl: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
     val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
@@ -129,7 +133,7 @@ object NATServer : Closeable {
 
         val mqttConfig = async(Dispatchers.IO) {
             logger.info("Pre-Configuring MQTT broker")
-            val mqttPasswd = tempPath.resolve("mqtt.passwd")
+            val mqttPasswd = tempPath.resolve(mqttPasswdFileName)
             mqttPasswd.toFile().writeText(
                 "server:${brokerServer.token}" + "\n" +
                         "broker:${sha256Of(AppEnv.ServerPSK).toBase58String()}"
@@ -138,7 +142,7 @@ object NATServer : Closeable {
             while (isActive) {
                 ProcessUtils.runProcess(
                     "mqtt_passwd", ProcessBuilder().command(
-                        "mosquitto_passwd", "-U", "\"${mqttPasswd.toAbsolutePath()}\"",
+                        "mosquitto_passwd", "-U", mqttPasswd.toAbsolutePath().toString(),
                     )
                 )
 
@@ -164,18 +168,18 @@ listener ${AppEnv.ServerMqttPort}
 socket_domain ipv6
 protocol websockets
 allow_anonymous false
-password_file ${tempPath.resolve("mqtt.passwd").toAbsolutePath()}
+password_file ${tempPath.resolve(mqttPasswdFileName).toAbsolutePath()}
     """
 
             mqttBrokerConfig = mqttBrokerConfig.trimIndent()
 
-            val mqttConf = tempPath.resolve("mqtt.conf")
+            val mqttConf = tempPath.resolve(mqttConfigFileName)
             mqttConf.toFile().writeText(mqttBrokerConfig)
 
             ProcessUtils.runProcess(
                 "mqtt", ProcessBuilder().command(
                     "mosquitto",
-                    "-c", "\"${mqttConf.toAbsolutePath()}\"",
+                    "-c", mqttConf.toAbsolutePath().toString(),
 //                    "-v"
                 ), keepAlive = true
             )
