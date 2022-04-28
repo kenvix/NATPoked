@@ -17,6 +17,8 @@ import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.Closeable
 import java.io.File
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.exists
@@ -159,17 +161,23 @@ object NATServer : Closeable {
             if (mqttConfig.isActive)
                 mqttConfig.await()
 
+            val mqttProtocol = if (InetAddress.getByName(AppEnv.ServerHttpHost) is Inet6Address) "ipv6" else "ipv4"
+
             logger.info("Starting MQTT Broker")
             var mqttBrokerConfig = """
 listener ${AppEnv.ServerMqttPort}
-socket_domain ipv4
+socket_domain $mqttProtocol
 protocol websockets
-listener ${AppEnv.ServerMqttPort}
-socket_domain ipv6
-protocol websockets
+
 allow_anonymous false
 password_file ${tempPath.resolve(mqttPasswdFileName).toAbsolutePath()}
     """
+
+            if (AppEnv.IsRunningInDocker) {
+                mqttBrokerConfig += """
+user root
+                """
+            }
 
             mqttBrokerConfig = mqttBrokerConfig.trimIndent()
 

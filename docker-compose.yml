@@ -19,6 +19,9 @@ services:
       - PortGuessMaxNum=55000
       - ServerHttpHost=0.0.0.0
       - ServerKey=bG5Ryqh8ArJico
+      - ServerHttpPort=15700
+      - ServerMqttPort=15701
+      - EchoServerPortRange=15702-15799
       - TZ=Asia/Shanghai
     cap_add:
       - NET_ADMIN

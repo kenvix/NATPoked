@@ -16,6 +16,7 @@ RUN echo "Begin docker image build ..." \
     kcptun \
     iproute2 \
     net-tools \
+    ifupdown iptables iputils-ping net-tools \
     && echo "Cleaning build cache ..." \
     && (mkdir -p /data || true) \
     && (mkdir -p /data/Config || true) \
