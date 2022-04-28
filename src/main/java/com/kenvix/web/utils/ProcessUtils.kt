@@ -125,7 +125,7 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         val processLoggerStdErr = LoggerFactory.getLogger("Process.$key.err")
         // logger.debug("ENV: ${builder.environment()}")
 
-        processLoggerControl.debug("EXEC$ " + builder.command().joinToString(" "))
+        processLoggerControl.debug("EXEC$ " + process.info().commandLine().orElse("<<<UNKNOWN>>>"))
         processLoggerControl.info("Started process $key: PID #${process.pid()}: $process")
 
         launch(Dispatchers.IO) {

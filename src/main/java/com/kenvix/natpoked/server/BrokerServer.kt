@@ -22,24 +22,38 @@ import org.eclipse.paho.mqttv5.common.MqttException
 import org.eclipse.paho.mqttv5.common.MqttMessage
 import org.eclipse.paho.mqttv5.common.packet.MqttProperties
 import org.slf4j.LoggerFactory
+import java.net.Inet6Address
+import java.net.InetAddress
 
 class BrokerServer(
     val token: String,
     val port: Int
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
-    private val mqttClient: MqttAsyncClient = MqttAsyncClient("ws://127.0.0.1:$port/mqtt", "server", MemoryPersistence())
+    private val mqttClient: MqttAsyncClient = MqttAsyncClient(
+        "ws://${if (InetAddress.getByName(AppEnv.ServerHttpHost) is Inet6Address) "[::1]" else "127.0.0.1"}:$port/mqtt",
+        "server",
+        MemoryPersistence()
+    )
 
-    suspend fun sendPeerMessage(peerId: PeerId, topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
-                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
-        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(peerId) + topicSuffix,
-            key, payload, qos, props, retained)
+    suspend fun sendPeerMessage(
+        peerId: PeerId, topicSuffix: String, key: ByteArray, payload: ByteArray, qos: Int = 0,
+        props: MqttProperties = MqttProperties(), retained: Boolean = false
+    ): IMqttToken {
+        return mqttClient.aSendPeerMessage(
+            getMqttChannelBasePath(peerId) + topicSuffix,
+            key, payload, qos, props, retained
+        )
     }
 
-    suspend fun sendPeerMessage(peerId: PeerId, topicSuffix: String, encodedKey: String, payload: ByteArray, qos: Int = 0,
-                                props: MqttProperties = MqttProperties(), retained: Boolean = false): IMqttToken {
-        return mqttClient.aSendPeerMessage(getMqttChannelBasePath(peerId) + topicSuffix,
-            encodedKey, payload, qos, props, retained)
+    suspend fun sendPeerMessage(
+        peerId: PeerId, topicSuffix: String, encodedKey: String, payload: ByteArray, qos: Int = 0,
+        props: MqttProperties = MqttProperties(), retained: Boolean = false
+    ): IMqttToken {
+        return mqttClient.aSendPeerMessage(
+            getMqttChannelBasePath(peerId) + topicSuffix,
+            encodedKey, payload, qos, props, retained
+        )
     }
 
     suspend fun connect() = withContext(Dispatchers.IO) {
