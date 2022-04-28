@@ -120,15 +120,14 @@ dependencies {
     // https://mvnrepository.com/artifact/org.apache.commons/commons-math3
     implementation("org.apache.commons:commons-math3:3.6.1")
 
-    // https://mvnrepository.com/artifact/io.netty/netty-buffer
-//    implementation("io.netty:netty-buffer:4.1.75.Final")
-
     // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3
     implementation("org.apache.commons:commons-lang3:3.12.0")
 
     // https://mvnrepository.com/artifact/org.eclipse.paho/org.eclipse.paho.mqttv5.client
     implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
 
+    // https://mvnrepository.com/artifact/io.netty/netty-buffer
+    compileOnly("io.netty:netty-buffer:4.1.76.Final")
 }
 
 tasks.getByName<Test>("test") {
