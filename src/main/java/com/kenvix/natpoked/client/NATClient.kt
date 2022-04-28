@@ -18,6 +18,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.serialization.decodeFromString
 import net.mamoe.yamlkt.Yaml
+import org.apache.commons.io.IOUtils
 import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.InetAddress
@@ -27,6 +28,7 @@ import java.nio.channels.DatagramChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
+import kotlin.io.path.exists
 import kotlin.random.Random
 
 /**
@@ -116,7 +118,15 @@ object NATClient : CoroutineScope, AutoCloseable {
     suspend fun start() = withContext(Dispatchers.IO) {
         logger.info("NATPoked Client Starting")
 
-        peersConfig = Files.readString(Path.of(AppEnv.PeerFile)).let {
+        val peerFile = Path.of(AppEnv.PeerFile)
+        if (!peerFile.exists()) {
+            logger.info("Peer file $peerFile not found, creating new one")
+            IOUtils.resourceToURL("/peers.yml").openStream().use {
+                Files.copy(it, peerFile)
+            }
+        }
+
+        peersConfig = Files.readString(peerFile).let {
             if (it.isEmpty()) PeersConfig() else Yaml.decodeFromString(it)
         }
 

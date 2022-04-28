@@ -4,6 +4,7 @@ services:
     image: kenvix/natpoked
     container_name: natpoked
     restart: unless-stopped
+    tty: true
     volumes:
       - /home/config/natpoked:/data/Config
     environment:

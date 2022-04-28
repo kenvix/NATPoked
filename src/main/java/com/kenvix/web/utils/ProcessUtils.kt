@@ -125,8 +125,18 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
         val processLoggerStdErr = LoggerFactory.getLogger("Process.$key.err")
         // logger.debug("ENV: ${builder.environment()}")
 
-        processLoggerControl.debug("EXEC$ " + process.info().commandLine().orElse("<<<UNKNOWN>>>"))
-        processLoggerControl.info("Started process $key: PID #${process.pid()}: $process")
+        processLoggerControl.debug("EXEC$ " + process.info().commandLine().orElseGet { builder.command().joinToString(" ") })
+        processLoggerControl.info("Started process $key: PID #${process.pid()}: $process - ${process.info()}")
+
+        process.toHandle().onExit().thenAccept {
+            processLoggerControl.info("Process $key: PID #${process.pid()} exited with code ${process.exitValue()}")
+
+            if (this@ProcessUtils.isActive && keepAlive) {
+                processLoggerControl.error("Process $key exited unexpectedly: PID #${process.pid()} exited with code ${process.exitValue()}")
+                stopProcess(key)
+                runProcess(key, builder, redirectDir, true)
+            }
+        }
 
         launch(Dispatchers.IO) {
             process.inputStream.bufferedReader().use {
@@ -134,15 +144,6 @@ object ProcessUtils : Closeable, CoroutineScope by CoroutineScope(Dispatchers.IO
                     val line = runInterruptible { it.readLine() } ?: break
                     processLoggerStdout.info(line)
                 }
-            }
-
-            process.waitFor()
-            processLoggerControl.info("Process $key: PID #${process.pid()} exited with code ${process.exitValue()}")
-
-            if (this@ProcessUtils.isActive && keepAlive) {
-                processLoggerControl.error("Process $key exited unexpectedly: PID #${process.pid()} exited with code ${process.exitValue()}")
-                stopProcess(key)
-                runProcess(key, builder, redirectDir, true)
             }
         }
 

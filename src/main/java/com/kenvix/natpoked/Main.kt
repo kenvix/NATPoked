@@ -29,8 +29,10 @@ object Main : CoroutineScope {
         try {
             AppEnv
         } catch (e: Throwable) {
-            showErrorAndExit(e, 5, "错误：无法解析环境变量文件，有些配置项格式有误，请尝试阅读下面的错误报" +
-                    "告并试着解决。如果无法解决，请删除 ${AppConstants.workingFolder}.env 以恢复默认设置")
+            showErrorAndExit(
+                e, 5, "错误：无法解析环境变量文件，有些配置项格式有误，请尝试阅读下面的错误报" +
+                        "告并试着解决。如果无法解决，请删除 ${AppConstants.workingFolder}.env 以恢复默认设置"
+            )
         }
 
         if (AppEnv.IsRunningInDocker)
@@ -71,6 +73,7 @@ object Main : CoroutineScope {
 
     private fun checkFiles() {
         IOUtils.resourceToURL("/wireguard_client.conf")
+        IOUtils.resourceToURL("/peers.yml")
         IOUtils.resourceToURL("/wireguard_server.conf")
     }
 
@@ -84,7 +87,12 @@ object Main : CoroutineScope {
     }
 
     @JvmOverloads
-    fun showErrorAndExit(message: String, exitCode: Int = 1, throwable: Throwable? = null, simpleMessage: Boolean = false) {
+    fun showErrorAndExit(
+        message: String,
+        exitCode: Int = 1,
+        throwable: Throwable? = null,
+        simpleMessage: Boolean = false
+    ) {
         val title = "Application Critical Error! Code #$exitCode"
         logger.error(title)
 
@@ -152,7 +160,14 @@ object Main : CoroutineScope {
             exitProcess(0)
         }
 
-        logger.trace("Running at JDK ${System.getProperty("java.version")}")
+        logger.trace(
+            "Running at JDK ${System.getProperty("java.version")} by ${System.getProperty("java.vendor")} on ${
+                System.getProperty("user.name")
+            } @ ${System.getProperty("os.name")} ver.${System.getProperty("os.version")} ${System.getProperty("os.arch")} with timezone ${
+                System.getProperty("user.timezone")
+            } located in ${System.getProperty("user.country")}/${System.getProperty("user.country")}"
+        )
+
         return cmd
     }
 
@@ -191,7 +206,7 @@ object Main : CoroutineScope {
     }
 
     private fun registerShutdownHandler() {
-        Runtime.getRuntime().addShutdownHook(Thread ({
+        Runtime.getRuntime().addShutdownHook(Thread({
             logger.info("Preparing for shutdown ... ( enter 'halt' to discard all unsaved data and force quit )")
             AppConstants.shutdownHandler.forEach {
                 kotlin.runCatching { it(Unit) }.onFailure { e -> logger.warn("Shutdown handler failed", e) }
@@ -211,7 +226,7 @@ object Main : CoroutineScope {
 
                 if (input.isNotBlank()) {
                     launch {
-                        runCatching {  ConsoleCommands.invoke(input) }.onFailure {
+                        runCatching { ConsoleCommands.invoke(input) }.onFailure {
                             error("Command failed", it, logger)
                         }
                     }
