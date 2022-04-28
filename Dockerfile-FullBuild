@@ -39,11 +39,12 @@ RUN echo "Begin docker image build ..." \
     && apt-get update \
     && apt-get install -y \
     ca-certificates \
-    openjdk-17-jdk-headless \
+    openjdk-17-jre-headless \
     mosquitto \
     wireguard \
     kcptun \
     iproute2 \
+    procps \
     net-tools \
     ifupdown iptables iputils-ping net-tools \
     && echo "Cleaning build cache ..." \

@@ -204,8 +204,12 @@ object Main : CoroutineScope {
         while (!Thread.interrupted()) {
             kotlin.runCatching {
                 val input = readLine()
+                if (input == null) {
+                    logger.info("Console is not available, aborting to reading console input...")
+                    return
+                }
 
-                if (input?.isNotBlank() == true) {
+                if (input.isNotBlank()) {
                     launch {
                         runCatching {  ConsoleCommands.invoke(input) }.onFailure {
                             error("Command failed", it, logger)
