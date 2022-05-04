@@ -147,7 +147,7 @@ object NATClient : CoroutineScope, AutoCloseable {
             logger.info("Using manual local peer NAT type config: ${peersConfig.my.nat}")
         }
 
-        logger.trace(registerPeerToBroker().toString())
+//        logger.trace(registerPeerToBroker().toString())
 
         val testPingServerJob = if (!System.getProperties().containsKey("com.kenvix.natpoked.skipPingTest")) {
             async(Dispatchers.IO) {

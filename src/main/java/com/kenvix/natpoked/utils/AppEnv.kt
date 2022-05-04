@@ -158,7 +158,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PublicDirPath by envOf("public")
 
     val PeerToBrokenPingInterval by envOf(25_000)
-    val PeerToBrokenTimeout by envOf(100_000)
+    val PeerToBrokenTimeout by envOf(10_000)
 
     val PeerUseSocketConnect by envOf(false)
 

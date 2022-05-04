@@ -33,6 +33,8 @@ import org.eclipse.paho.mqttv5.common.packet.MqttProperties
 import org.eclipse.paho.mqttv5.common.packet.UserProperty
 import org.slf4j.LoggerFactory
 import ru.gildor.coroutines.okhttp.await
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.Continuation
@@ -317,17 +319,19 @@ class BrokerClient(
         }
 
         val mqttTask = async {
+            @Suppress("BlockingMethodInNonBlockingContext")
             val serverURI =
-                "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://$mqttHost:$mqttPort${brokerPath}/mqtt"
-            logger.debug("Connecting to MQTT server: $serverURI")
+                "${mqttUseSsl.run { if (mqttUseSsl) "wss" else "ws" }}://${if (InetAddress.getByName(mqttHost) is Inet6Address) "[$mqttHost]" else mqttHost}:$mqttPort${brokerPath}/mqtt"
+            logger.debug("Preparing to connect to MQTT server: $serverURI")
 
-            mqttClient = MqttAsyncClient(serverURI, AppEnv.PeerId.toHexString(), MemoryPersistence())
+            mqttClient = MqttAsyncClient(serverURI, "peer_${AppEnv.PeerId.toHexString()}", MemoryPersistence())
             mqttClient.setCallback(MqttEventHandler())
 
             val options = MqttConnectionOptionsBuilder()
                 .automaticReconnectDelay(1000, 2000)
+                .connectionTimeout(AppEnv.PeerToBrokenTimeout / 1000)
                 .keepAliveInterval(AppEnv.PeerToBrokenPingInterval / 1000)
-                .cleanStart(false)
+                .cleanStart(true)
                 .username("broker")
                 .password(sha256Of(AppEnv.ServerPSK).toBase58String().toByteArray())
                 .automaticReconnect(true)
@@ -337,6 +341,7 @@ class BrokerClient(
                 suspendCancellableCoroutine<Unit> {
                     connectCoroutineContinuation = it
                     mqttClient.connect(options)
+                    logger.trace("Connecting to MQTT server: $serverURI")
                 }
             } finally {
                 connectCoroutineContinuation = null
