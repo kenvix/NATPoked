@@ -170,7 +170,7 @@ internal object WebServerBasicRoutes : KtorModule {
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE, NATType.RESTRICTED_CONE -> {
-                                    requestPeerMakeConnection(myPeer, serverRolePeer.client)
+                                    requestPeerMakeConnection(clientRolePeer, serverRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -180,11 +180,11 @@ internal object WebServerBasicRoutes : KtorModule {
 
 
                                 NATType.PORT_RESTRICTED_CONE, NATType.SYMMETRIC -> {
-                                    requestPeerMakeConnection(myPeer, targetPeer.client)
+                                    requestPeerMakeConnection(serverRolePeer, clientRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
-                                    requestPeerMakeConnection(targetPeer, myPeer.client)
+                                    requestPeerMakeConnection(clientRolePeer, serverRolePeer.client)
                                     serverRolePeer.setConnectionStage(clientRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +

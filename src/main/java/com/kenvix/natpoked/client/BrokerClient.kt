@@ -377,8 +377,8 @@ class BrokerClient(
             logger.trace("Delivery complete: ${token?.topics?.contentToString()} - #${token?.messageId}: ${token?.message}")
         }
 
-        override fun connectComplete(reconnect: Boolean, serverURI: String?) {
-            logger.info("Connect completed: [is_reconnect? $reconnect]: $serverURI")
+        override fun connectComplete(isReconnect: Boolean, serverURI: String?) {
+            logger.info("Connect completed: [is_reconnect? $isReconnect]: $serverURI")
 
             while (isActive) {
                 try {
@@ -400,6 +400,10 @@ class BrokerClient(
                 } catch (e: Exception) {
                     logger.error("MQTT Subscription failed, retry ...", e)
                 }
+            }
+
+            if (isReconnect) {
+                launch(Dispatchers.IO) { registerPeer() }
             }
 
             logger.info("MQTT Connected and subscribed to topics. Root topic: ${getMqttChannelBasePath(AppEnv.PeerId)}")
