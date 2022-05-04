@@ -354,6 +354,14 @@ class NATPeerToPeer(
         udpChannel.receive(buffer)
     }
 
+    private fun putHelloPacketToBuffer(buffer: ByteBuffer, stage: Byte = 0) {
+        val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
+        buffer.clear()
+        buffer.putShort(typeIdInt.toShort()) // 2
+        buffer.put(currentMyIV) // 16
+        buffer.put(stage) // 1
+    }
+
     /**
      * 发送握手消息。
      * PeerA发起连接，然后PeerB应答。
@@ -361,13 +369,9 @@ class NATPeerToPeer(
      * 阶段 1：Peer-B 接收握手消息，并应答。
      */
     suspend fun sendHelloPacket(target: InetSocketAddress, stage: Byte = 0, num: Int = 12) {
-        val typeIdInt = TYPE_DATA_CONTROL_HELLO.typeId.toInt() or STATUS_HAS_IV.typeId.toInt()
         keepAliveLock.withLock {
             val buffer = keepAliveBuffer
-            buffer.clear()
-            buffer.putShort(typeIdInt.toShort()) // 2
-            buffer.put(currentMyIV) // 16
-            buffer.put(stage) // 1
+            putHelloPacketToBuffer(buffer, stage)
 
             for (i in 0 until num) {
                 if (isConnected && stage == 0.toByte()) {
@@ -668,7 +672,7 @@ class NATPeerToPeer(
         val prepareAsServerResult: CommonJsonResult<PortReq> = JSON.decodeFromString(prepareAsServerResultJson)
         prepareAsServerResult.checkException()
 
-        suspend fun sendHelloIp4Task(targetPort: Int) =
+        suspend fun sendHelloIp4Async(targetPort: Int) =
             if (peerInfo.clientInetAddress != null) {
                 withContext(Dispatchers.IO) {
                     async {
@@ -680,9 +684,12 @@ class NATPeerToPeer(
                         }
                     }
                 }
-            } else null
+            } else {
+                logger.debug("connectPeer: ${peerInfo.clientId} ipv4 not supported, skipping")
+                null
+            }
 
-        suspend fun sendHelloIp6Task(targetPort: Int) =
+        suspend fun sendHelloIp6Async(targetPort: Int) =
             if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
                 withContext(Dispatchers.IO) {
                     async {
@@ -694,12 +701,15 @@ class NATPeerToPeer(
                         }
                     }
                 }
-            } else null
+            } else {
+                logger.debug("connectPeer: ${peerInfo.clientId} ipv6 not supported, skipping")
+                null
+            }
 
         suspend fun sendSimpleHelloPacket(targetPort: Int) {
             while (!isConnected && isActive) {
-                val helloIp6Task = sendHelloIp6Task(targetPort)
-                val helloIp4Task = sendHelloIp4Task(targetPort)
+                val helloIp6Task = sendHelloIp6Async(targetPort)
+                val helloIp4Task = sendHelloIp4Async(targetPort)
                 helloIp6Task?.await()
                 helloIp4Task?.await()
                 if (isConnected || !isActive) break
@@ -730,6 +740,16 @@ class NATPeerToPeer(
         } else {
             // 如果对方不支持 UPnP，则需要预测参数
             // 如果对方是 < RESTRICTED_CONE 类型的 NAT，则需要预测参数
+
+            if (AppEnv.PeerFloodingAllPorts) { // flood all ports to let NAT gateway open ports for me
+                launch(Dispatchers.IO) {
+                    val buffer = ByteBuffer.allocateDirect(20)
+                    putHelloPacketToBuffer(buffer, 0)
+                    for (port in (if (AppEnv.PortGuessSkipLowPorts) 1025 else 1)..65535) {
+                        writeRawDatagram(buffer, InetSocketAddress(peerInfo.clientInetAddress, port))
+                    }
+                }
+            }
 
             val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
                 "control/getPortAllocationPredictionParam",
@@ -763,8 +783,8 @@ class NATPeerToPeer(
                                 val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
                                 logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
                                 for (port in ports) {
-                                    val helloIp6Task = sendHelloIp6Task(port)
-                                    val helloIp4Task = sendHelloIp4Task(port)
+                                    val helloIp6Task = sendHelloIp6Async(port)
+                                    val helloIp4Task = sendHelloIp4Async(port)
                                     if (isConnected || !isActive) break
                                 }
 
@@ -782,8 +802,8 @@ class NATPeerToPeer(
                                 val ports = expectedValuePortGuess(now, portParam, guessPortNum = concurrentGuessNum)
                                 logger.debug("connectPeerAsync: ${peerInfo.clientId} / model ExpectedValue / PORTs $ports")
                                 for (port in ports) {
-                                    val helloIp6Task = sendHelloIp6Task(port)
-                                    val helloIp4Task = sendHelloIp4Task(port)
+                                    val helloIp6Task = sendHelloIp6Async(port)
+                                    val helloIp4Task = sendHelloIp4Async(port)
                                     if (isConnected || !isActive) break
                                 }
 
@@ -798,8 +818,8 @@ class NATPeerToPeer(
                         logger.debug("connectPeerAsync: ${peerInfo.clientId} / model Linear / trend: ${portParam.trend}, lastPort: ${portParam.lastPort}")
 
                         for (port in linearPortGuess(portParam.trend, portParam.lastPort)) {
-                            val helloIp6Task = sendHelloIp6Task(port)
-                            val helloIp4Task = sendHelloIp4Task(port)
+                            val helloIp6Task = sendHelloIp6Async(port)
+                            val helloIp4Task = sendHelloIp4Async(port)
 
                             if (isConnected || !isActive) break
 
@@ -1072,6 +1092,7 @@ class NATPeerToPeer(
     suspend fun prepareAsServer(info: NATClientItem) {
         if (isConnected) {
             logger.info("prepareAsServer: already connected but received new connect request, clearing old connection")
+
             connectLock.withLock {
                 setSocketDisconnect()
             }

@@ -40,6 +40,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PeerReportToBrokerDelay: Int by envOf(5 * 60)
 
     val PeerFloodingDelay: Long by envOf(32)
+    val PeerFloodingAllPorts: Boolean by envOf(false)
     val PeerFloodingWaitFinished: Boolean by envOf(false)
 
     @Description("是否启用 UPnP 功能")
