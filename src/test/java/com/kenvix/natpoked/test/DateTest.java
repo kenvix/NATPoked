@@ -19,4 +19,9 @@ public class DateTest {
         SimpleDateFormat formatter = new SimpleDateFormat("EEE MMM dd HH:mm:ss Z yyyy", Locale.ENGLISH);
         var d = formatter.parse(test);
     }
+
+    @Test
+    public void mathTest() throws Exception {
+
+    }
 }

@@ -1,5 +1,6 @@
 # NatPoked Resources
 Temp/*
+.run/*
 Config/*
 Library/*
 *.socket
