@@ -673,7 +673,7 @@ class NATPeerToPeer(
 
     private fun sendHelloIp6Async(peerInfo: NATClientItem, targetPort: Int, num: Int = 10): Deferred<Unit>? =
         if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
-            async(coroutineContext) {
+            async(Dispatchers.IO) {
                 val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
                 while (!isConnected && isActive) {
                     logger.debug("connectPeer: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
@@ -738,15 +738,7 @@ class NATPeerToPeer(
             // 如果对方是 < RESTRICTED_CONE 类型的 NAT，则需要预测参数
 
             if (AppEnv.PeerFloodingAllPorts) { // flood all ports to let NAT gateway open ports for me
-                withContext(coroutineContext) {
-                    launch(Dispatchers.IO) {
-                        val buffer = ByteBuffer.allocateDirect(20)
-                        putHelloPacketToBuffer(buffer, 0)
-                        for (port in (if (AppEnv.PortGuessSkipLowPorts) 1025 else 1)..65535) {
-                            writeRawDatagram(buffer, InetSocketAddress(peerInfo.clientInetAddress, port))
-                        }
-                    }
-                }
+                floodAllPorts(peerInfo)
             }
 
             val resultJson: String = NATClient.brokerClient.sendPeerMessageWithResponse(
@@ -832,6 +824,18 @@ class NATPeerToPeer(
                     else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
                 }
             }
+        }
+    }
+
+    private fun floodAllPorts(peerInfo: NATClientItem) = launch(Dispatchers.IO) {
+        val buffer = ByteBuffer.allocateDirect(20)
+        putHelloPacketToBuffer(buffer, 0)
+        for (port in (if (AppEnv.PortGuessSkipLowPorts) 1025 else 1)..65535) {
+            if (!isActive || isConnected) break
+
+            writeRawDatagram(buffer, InetSocketAddress(peerInfo.clientInetAddress, port))
+            if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported)
+                writeRawDatagram(buffer, InetSocketAddress(peerInfo.clientInet6Address, port))
         }
     }
 
