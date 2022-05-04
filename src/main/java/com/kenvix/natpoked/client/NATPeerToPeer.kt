@@ -656,6 +656,36 @@ class NATPeerToPeer(
         }
     }
 
+    private fun sendHelloIp4Async(peerInfo: NATClientItem, targetPort: Int, num: Int = 10): Deferred<Unit>? =
+        if (peerInfo.clientInetAddress != null) {
+            async(Dispatchers.IO) {
+                val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
+                while (!isConnected && isActive) {
+                    logger.debug("connectPeer: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
+                    sendHelloPacket(addr, num = num)
+                    delay(AppEnv.PeerKeepAliveTimeout)
+                }
+            }
+        } else {
+            logger.debug("connectPeer: ${peerInfo.clientId} ipv4 not supported, skipping")
+            null
+        }
+
+    private fun sendHelloIp6Async(peerInfo: NATClientItem, targetPort: Int, num: Int = 10): Deferred<Unit>? =
+        if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
+            async(coroutineContext) {
+                val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
+                while (!isConnected && isActive) {
+                    logger.debug("connectPeer: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
+                    sendHelloPacket(addr, num = num)
+                    delay(AppEnv.PeerKeepAliveTimeout)
+                }
+            }
+        } else {
+            logger.debug("connectPeer: ${peerInfo.clientId} ipv6 not supported, skipping")
+            null
+        }
+
     suspend fun connectPeer(connectReq: NATConnectReq) {
         logger.info("connectPeer: Connecting to peer ${connectReq.targetClientItem.clientId}")
         val peerInfo = connectReq.targetClientItem
@@ -672,42 +702,10 @@ class NATPeerToPeer(
         val prepareAsServerResult: CommonJsonResult<PortReq> = JSON.decodeFromString(prepareAsServerResultJson)
         prepareAsServerResult.checkException()
 
-        @Suppress("SuspendFunctionOnCoroutineScope")
-        fun sendHelloIp4Async(targetPort: Int): Deferred<Unit>? =
-            if (peerInfo.clientInetAddress != null) {
-                async(coroutineContext) {
-                    val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
-                    while (!isConnected && isActive) {
-                        logger.debug("connectPeer: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
-                        sendHelloPacket(addr, num = 10)
-                        delay(AppEnv.PeerKeepAliveTimeout)
-                    }
-                }
-            } else {
-                logger.debug("connectPeer: ${peerInfo.clientId} ipv4 not supported, skipping")
-                null
-            }
-
-        @Suppress("SuspendFunctionOnCoroutineScope")
-        fun sendHelloIp6Async(targetPort: Int): Deferred<Unit>? =
-            if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
-                async(coroutineContext) {
-                    val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
-                    while (!isConnected && isActive) {
-                        logger.debug("connectPeer: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
-                        sendHelloPacket(addr, num = 10)
-                        delay(AppEnv.PeerKeepAliveTimeout)
-                    }
-                }
-            } else {
-                logger.debug("connectPeer: ${peerInfo.clientId} ipv6 not supported, skipping")
-                null
-            }
-
         suspend fun sendSimpleHelloPacket(targetPort: Int) {
             while (!isConnected && isActive) {
-                val helloIp6Task = sendHelloIp6Async(targetPort)
-                val helloIp4Task = sendHelloIp4Async(targetPort)
+                val helloIp4Task = sendHelloIp4Async(peerInfo, targetPort)
+                val helloIp6Task = sendHelloIp6Async(peerInfo, targetPort)
                 helloIp6Task?.await()
                 helloIp4Task?.await()
                 if (isConnected || !isActive) break
@@ -783,8 +781,8 @@ class NATPeerToPeer(
                                 val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
                                 logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
                                 for (port in ports) {
-                                    val helloIp6Task = sendHelloIp6Async(port)
-                                    val helloIp4Task = sendHelloIp4Async(port)
+                                    val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                                    val helloIp6Task = sendHelloIp6Async(peerInfo, port)
                                     if (isConnected || !isActive) break
                                 }
 
@@ -802,8 +800,8 @@ class NATPeerToPeer(
                                 val ports = expectedValuePortGuess(now, portParam, guessPortNum = concurrentGuessNum)
                                 logger.debug("connectPeerAsync: ${peerInfo.clientId} / model ExpectedValue / PORTs $ports")
                                 for (port in ports) {
-                                    val helloIp6Task = sendHelloIp6Async(port)
-                                    val helloIp4Task = sendHelloIp4Async(port)
+                                    val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                                    val helloIp6Task = sendHelloIp6Async(peerInfo, port)
                                     if (isConnected || !isActive) break
                                 }
 
@@ -818,8 +816,8 @@ class NATPeerToPeer(
                         logger.debug("connectPeerAsync: ${peerInfo.clientId} / model Linear / trend: ${portParam.trend}, lastPort: ${portParam.lastPort}")
 
                         for (port in linearPortGuess(portParam.trend, portParam.lastPort)) {
-                            val helloIp6Task = sendHelloIp6Async(port)
-                            val helloIp4Task = sendHelloIp4Async(port)
+                            val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                            val helloIp6Task = sendHelloIp6Async(peerInfo, port)
 
                             if (isConnected || !isActive) break
 
