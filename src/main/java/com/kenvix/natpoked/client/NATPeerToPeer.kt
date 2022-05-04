@@ -672,16 +672,15 @@ class NATPeerToPeer(
         val prepareAsServerResult: CommonJsonResult<PortReq> = JSON.decodeFromString(prepareAsServerResultJson)
         prepareAsServerResult.checkException()
 
-        suspend fun sendHelloIp4Async(targetPort: Int) =
+        @Suppress("SuspendFunctionOnCoroutineScope")
+        fun sendHelloIp4Async(targetPort: Int): Deferred<Unit>? =
             if (peerInfo.clientInetAddress != null) {
-                withContext(Dispatchers.IO) {
-                    async {
-                        val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
-                        while (!isConnected && isActive) {
-                            logger.debug("connectPeer: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
-                            sendHelloPacket(addr, num = 10)
-                            delay(AppEnv.PeerKeepAliveTimeout)
-                        }
+                async(coroutineContext) {
+                    val addr = InetSocketAddress(peerInfo.clientInetAddress, targetPort)
+                    while (!isConnected && isActive) {
+                        logger.debug("connectPeer: ${peerInfo.clientId} ipv4 supported. sending ipv4 packet to $addr")
+                        sendHelloPacket(addr, num = 10)
+                        delay(AppEnv.PeerKeepAliveTimeout)
                     }
                 }
             } else {
@@ -689,16 +688,15 @@ class NATPeerToPeer(
                 null
             }
 
-        suspend fun sendHelloIp6Async(targetPort: Int) =
+        @Suppress("SuspendFunctionOnCoroutineScope")
+        fun sendHelloIp6Async(targetPort: Int): Deferred<Unit>? =
             if (peerInfo.clientInet6Address != null && NATClient.isIp6Supported) {
-                withContext(Dispatchers.IO) {
-                    async {
-                        val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
-                        while (!isConnected && isActive) {
-                            logger.debug("connectPeer: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
-                            sendHelloPacket(addr, num = 10)
-                            delay(AppEnv.PeerKeepAliveTimeout)
-                        }
+                async(coroutineContext) {
+                    val addr = InetSocketAddress(peerInfo.clientInet6Address, targetPort)
+                    while (!isConnected && isActive) {
+                        logger.debug("connectPeer: ${peerInfo.clientId} ipv6 supported. sending ipv6 packet to $addr")
+                        sendHelloPacket(addr, num = 10)
+                        delay(AppEnv.PeerKeepAliveTimeout)
                     }
                 }
             } else {
@@ -742,11 +740,13 @@ class NATPeerToPeer(
             // 如果对方是 < RESTRICTED_CONE 类型的 NAT，则需要预测参数
 
             if (AppEnv.PeerFloodingAllPorts) { // flood all ports to let NAT gateway open ports for me
-                launch(Dispatchers.IO) {
-                    val buffer = ByteBuffer.allocateDirect(20)
-                    putHelloPacketToBuffer(buffer, 0)
-                    for (port in (if (AppEnv.PortGuessSkipLowPorts) 1025 else 1)..65535) {
-                        writeRawDatagram(buffer, InetSocketAddress(peerInfo.clientInetAddress, port))
+                withContext(coroutineContext) {
+                    launch(Dispatchers.IO) {
+                        val buffer = ByteBuffer.allocateDirect(20)
+                        putHelloPacketToBuffer(buffer, 0)
+                        for (port in (if (AppEnv.PortGuessSkipLowPorts) 1025 else 1)..65535) {
+                            writeRawDatagram(buffer, InetSocketAddress(peerInfo.clientInetAddress, port))
+                        }
                     }
                 }
             }
