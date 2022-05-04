@@ -142,25 +142,35 @@ internal object WebServerBasicRoutes : KtorModule {
                             return@post call.respondInfo("Cannot connect to self: got myPeerId == targetPeerId", 400, status = HttpStatusCode.BadRequest)
                         }
 
-                        val my: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
-                        my.addConnection(targetPeerId)
+                        val myPeer: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
+                        myPeer.addConnection(targetPeerId)
 
                         val targetPeer = NATServer.peerConnections[targetPeerId]
                         if (targetPeer != null) {
-                            val serverRolePeer: NATPeerToBrokerConnection
-                            val clientRolePeer: NATPeerToBrokerConnection
+                            var serverRolePeer: NATPeerToBrokerConnection
+                            var clientRolePeer: NATPeerToBrokerConnection
 
-                            if (targetPeer.client.clientNatType == my.client.clientNatType) {
+                            if (targetPeer.client.clientNatType == myPeer.client.clientNatType) {
                                 serverRolePeer = targetPeer
-                                clientRolePeer = my
+                                clientRolePeer = myPeer
                             } else {
-                                serverRolePeer = maxOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
-                                clientRolePeer = minOf(targetPeer, my, NATPeerToBrokerConnection.natTypeComparator)
+                                serverRolePeer = maxOf(targetPeer, myPeer, NATPeerToBrokerConnection.natTypeComparator)
+                                clientRolePeer = minOf(targetPeer, myPeer, NATPeerToBrokerConnection.natTypeComparator)
+                            }
+
+                            if (serverRolePeer.client.clientNatType.levelId <= NATType.RESTRICTED_CONE.levelId) {
+                                if (targetPeer.client.isUpnpSupported) {
+                                    serverRolePeer = targetPeer
+                                    clientRolePeer = myPeer
+                                } else if (myPeer.client.isUpnpSupported) {
+                                    serverRolePeer = myPeer
+                                    clientRolePeer = targetPeer
+                                }
                             }
 
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE, NATType.RESTRICTED_CONE -> {
-                                    requestPeerMakeConnection(my, serverRolePeer.client)
+                                    requestPeerMakeConnection(myPeer, serverRolePeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
 
@@ -170,11 +180,11 @@ internal object WebServerBasicRoutes : KtorModule {
 
 
                                 NATType.PORT_RESTRICTED_CONE, NATType.SYMMETRIC -> {
-                                    requestPeerMakeConnection(my, targetPeer.client)
+                                    requestPeerMakeConnection(myPeer, targetPeer.client)
                                     clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
 
-                                    requestPeerMakeConnection(targetPeer, my.client)
+                                    requestPeerMakeConnection(targetPeer, myPeer.client)
                                     serverRolePeer.setConnectionStage(clientRolePeer.client.clientId,
                                         NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
                                     call.respondSuccess("Requested to connect each other. One of Network type is " +
