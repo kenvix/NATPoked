@@ -830,6 +830,7 @@ class NATPeerToPeer(
     private fun floodAllPorts(peerInfo: NATClientItem) = launch(Dispatchers.IO) {
         val buffer = ByteBuffer.allocateDirect(20)
         putHelloPacketToBuffer(buffer, 0)
+        logger.debug("Flooding all ports for ${peerInfo.clientId}")
         for (port in (if (AppEnv.PortGuessSkipLowPorts) 1025 else 1)..65535) {
             if (!isActive || isConnected) break
 

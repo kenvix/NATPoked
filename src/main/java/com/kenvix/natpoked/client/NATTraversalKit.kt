@@ -122,6 +122,8 @@ object NATTraversalKit {
     }
 
     private suspend fun isPublicUPnPSupported(): Boolean = withContext(Dispatchers.IO) {
+        if (!AppEnv.UPnPEnabled) return@withContext false
+
         if (UPnP.isUPnPAvailable()) {
             val extAddr = UPnP.getExternalIP()
             !InetAddress.getByName(extAddr).isSiteLocalAddress

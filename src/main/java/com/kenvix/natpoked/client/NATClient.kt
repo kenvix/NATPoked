@@ -137,6 +137,9 @@ object NATClient : CoroutineScope, AutoCloseable {
             addPeerIfNotExist(it.key, it.value)
         }
 
+        if (!AppEnv.UPnPEnabled)
+            logger.warn("UPnP is manually disabled by environment variables, you may not be able to connect to peers")
+
         if (AppEnv.DebugMode) {
             logger.trace("Peer to broker key: $peerToBrokerKeyBase64Encoded")
             logger.trace("Peer self key: ${sha256Of(AppEnv.PeerMyPSK).toBase64String()}")
