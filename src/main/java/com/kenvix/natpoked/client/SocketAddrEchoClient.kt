@@ -14,6 +14,7 @@ import com.kenvix.natpoked.utils.network.aSend
 import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.getUnsignedShort
 import io.ktor.features.*
+import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -82,7 +83,7 @@ class SocketAddrEchoClient(
                         incomingPacket
                     }
 
-                    return@withContext parseEchoResult(packet)
+                    return@withContext parseEchoResult(packet, srcChannel?.localAddress?.port ?: -1)
                 } catch (e: SocketTimeoutException) {
                     logger.info("Echo server $address:$port Socket timeout", e)
                 } catch (e: BadRequestException) {
@@ -120,7 +121,7 @@ class SocketAddrEchoClient(
     }
 
     @Suppress("UsePropertyAccessSyntax")
-    private fun parseEchoResult(packet: DatagramPacket): SocketAddrEchoResult {
+    private fun parseEchoResult(packet: DatagramPacket, srcPort: Int = -1): SocketAddrEchoResult {
         val buffer = ByteBuffer.wrap(packet.data, 0, packet.length)
 
         if (buffer.getInt() != SocketAddrEchoServer.PacketPrefixResponse)
@@ -141,7 +142,7 @@ class SocketAddrEchoClient(
         val time = buffer.getLong()
 
         return SocketAddrEchoResult(
-            addr, port, time
+            addr, port, time, srcPort
         )
     }
 

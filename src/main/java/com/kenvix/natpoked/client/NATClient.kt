@@ -152,10 +152,15 @@ object NATClient : CoroutineScope, AutoCloseable {
 
 //        logger.trace(registerPeerToBroker().toString())
 
-        val testPingServerJob = if (!System.getProperties().containsKey("com.kenvix.natpoked.skipPingTest")) {
+        val testPingServerJob = if (!System.getProperties().containsKey("com.kenvix.natpoked.skipEchoServerTest")) {
             async(Dispatchers.IO) {
-                val r = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost))
-                logger.debug("Ping server test passed: $r")
+                val c1 = DatagramChannel.open()
+                val c2 = DatagramChannel.open()
+                val r1 = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), c1)
+                val r2 = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), c2)
+                c1.close()
+                c2.close()
+                logger.debug("Port Echo server test passed: port allocation trend is ${r2.port - r1.port} \n $r1 \n $r2")
             }
         } else null
 

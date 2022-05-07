@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.nio.channels.DatagramChannel
 
 class EchoServerTest {
@@ -27,6 +28,18 @@ class EchoServerTest {
             val client = SocketAddrEchoClient()
             println(client.requestEcho(ports, InetAddress.getByName("127.0.0.1"), delay = 0))
         }
+    }
+
+    @Test
+    fun testRemote() {
+//        val client = SocketAddrEchoClient()
+//        val addr = InetAddress.getByName("--REDACTED")
+//        val channel = DatagramChannel.open()
+//        channel.bind(InetSocketAddress("0.0.0.0", 45000))
+//        runBlocking {
+//            val req1 = client.requestEcho(15702, addr, channel)
+//            println(req1)
+//        }
     }
 
     @Test
