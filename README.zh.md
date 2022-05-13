@@ -28,6 +28,7 @@
 
 ```shell
 docker pull kenvix/natpoked
+docker-compose up -d
 ```
 
 ## 构建

@@ -7,10 +7,20 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import java.net.InetAddress
 
+/**
+ * 客户端/服务器角色标识
+ */
 @Serializable
 enum class ClientServerRole { CLIENT, SERVER }
 
+/**
+ * 对等端之间通信的类型 ID
+ */
 typealias PeerCommunicationTypeId = Short
+
+/**
+ * 对等端之间通信的类型
+ */
 enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
     STATUS_ENCRYPTED          (0b011_0000_0000_0000), // Any encryptor enabled
     STATUS_ENCRYPTED_AES      (0b001_0000_0000_0000), // AES-256-GCM Enabled
@@ -80,6 +90,9 @@ enum class PeerCommunicationType(val typeId: PeerCommunicationTypeId) {
 }
 
 
+/**
+ * 对等端之间通信的数据包
+ */
 @Serializable
 data class PeerCommunicationPacket(
     val type: Byte,
@@ -102,6 +115,9 @@ data class PeerCommunicationPacket(
     }
 }
 
+/**
+ * NAT 类型
+ */
 @Serializable
 enum class NATType(val levelId: Int) : Comparable<NATType> {
     BLOCKED(0),
@@ -117,6 +133,9 @@ enum class NATType(val levelId: Int) : Comparable<NATType> {
     PUBLIC(100),
 }
 
+/**
+ * NAT 穿越解决方案
+ */
 enum class NATTraversalSolution(val levelId: Int) : Comparable<NATTraversalSolution> {
     IMPOSSIBLE(0),
     UNKNOWN(10),
@@ -124,14 +143,27 @@ enum class NATTraversalSolution(val levelId: Int) : Comparable<NATTraversalSolut
     DIRECT_CLIENT_TO_SERVER(100)
 }
 
+/**
+ * 对等端 ID 类型
+ */
 typealias PeerId = Long
 
+/**
+ * 带有对等端 ID 的请求
+ */
 @Serializable
 data class PeerIdReq(val peerId: PeerId)
 
+/**
+ * 带有端口号的请求
+ */
 @Serializable
 data class PortReq(val port: Int)
 
+
+/**
+ * 带有对等端连接信息的请求，通常用于对等端之间请求连接
+ */
 @Serializable
 data class NATConnectReq(
     val targetClientItem: NATClientItem,
@@ -139,6 +171,9 @@ data class NATConnectReq(
     val configForMe: PeersConfig.Peer,
 )
 
+/**
+ * 对等端信息
+ */
 @Serializable
 data class NATClientItem(
     val clientId: PeerId,
@@ -161,6 +196,9 @@ data class NATClientItem(
     }
 }
 
+/**
+ * 打开对等端端口请求
+ */
 @Serializable
 data class OpenPortReq(
     val peerId: PeerId,

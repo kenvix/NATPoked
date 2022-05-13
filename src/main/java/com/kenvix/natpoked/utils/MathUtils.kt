@@ -12,6 +12,30 @@ infix fun ByteArray.xor(other: ByteArray): ByteArray {
     return result
 }
 
+infix fun IntArray.xor(other: IntArray): IntArray {
+    if (this.size != other.size)
+        throw IllegalArgumentException("IntArray size not equal")
+
+    val result = IntArray(this.size)
+    for (i in this.indices) {
+        result[i] = this[i] xor other[i]
+    }
+
+    return result
+}
+
+infix fun LongArray.xor(other: LongArray): LongArray {
+    if (this.size != other.size)
+        throw IllegalArgumentException("LongArray size not equal")
+
+    val result = LongArray(this.size)
+    for (i in this.indices) {
+        result[i] = this[i] xor other[i]
+    }
+
+    return result
+}
+
 infix fun List<Byte>.xor(other: List<Byte>): MutableList<Byte> {
     if (this.size != other.size)
         throw IllegalArgumentException("ByteArray size not equal")

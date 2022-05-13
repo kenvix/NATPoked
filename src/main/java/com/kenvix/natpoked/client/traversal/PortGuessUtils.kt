@@ -122,7 +122,7 @@ fun expectedValuePortGuess(
     skipLowPorts: Boolean = AppEnv.PortGuessSkipLowPorts
 ): List<Int> {
     return (1..guessPortNum).map {
-        Math.floorMod((param.lastPort + it + it * param.avg * (now + param.timeElapsed)).toInt(), 65536).run {
+        Math.floorMod((param.lastPort + it * param.avg * (now + param.timeElapsed)).toInt(), 65536).run {
             if (this < 1024 && skipLowPorts) this + 1024 else this
         }
     }

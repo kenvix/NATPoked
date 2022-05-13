@@ -13,6 +13,9 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * JvmInfo类提供了一组方法用于打印当前正在运行的程序的状态，包括内存使用情况、内存分配情况、垃圾回收站状态、线程状态、运行时状态、操作系统状态等信息。Print()方法打印所有信息并加以格式化。其他方法将文本信息打印到一个PrintStream中。
+ */
 public class JvmInfo {
     static final long MB = 1024 * 1024;
 
