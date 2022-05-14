@@ -158,6 +158,7 @@ suspend fun getPortAllocationPredictionParam(
     val result = echoClient.requestEcho(
         ports = ports,
         address = InetAddress.getByName(NATClient.brokerClient.brokerHost),
+        stunAddresses = if (AppEnv.PortGuessAlsoUseStun) AppEnv.StunServerList else null,
         srcChannel = srcChannel,
         manualReceiver = manualReceiver,
     )

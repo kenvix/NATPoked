@@ -8,6 +8,7 @@ package com.kenvix.natpoked.client
 
 import com.google.common.primitives.Ints
 import com.kenvix.natpoked.contacts.SocketAddrEchoResult
+import com.kenvix.natpoked.contacts.StunServerAddress
 import com.kenvix.natpoked.server.SocketAddrEchoServer
 import com.kenvix.natpoked.utils.network.aReceive
 import com.kenvix.natpoked.utils.network.aSend
@@ -20,11 +21,9 @@ import de.javawi.jstun.header.MessageHeader
 import de.javawi.jstun.header.MessageHeaderInterface
 import io.ktor.features.*
 import io.ktor.util.network.*
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.runInterruptible
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.*
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.net.*
@@ -38,13 +37,16 @@ class SocketAddrEchoClient(
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    enum class Protocol { Echo, Stun }
+    enum class Protocol { Echo, Stun, Both }
 
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
         port: Int, address: InetAddress, srcChannel: DatagramChannel? = null, maxTires: Int = 100,
         manualReceiver: Channel<DatagramPacket>? = null, protocol: Protocol = Protocol.Echo
     ): SocketAddrEchoResult = withContext(Dispatchers.IO) {
+        if (protocol == Protocol.Both)
+            throw IllegalArgumentException("Protocol can't be both for single requestEcho test")
+
         val channel = srcChannel ?: DatagramChannel.open().makeNonBlocking()
         val addr = InetSocketAddress(address, port)
 
@@ -64,7 +66,7 @@ class SocketAddrEchoClient(
 
         //do not connect socket
         //socket.connect(address, port)
-        val incomingData = ByteArray(if (protocol == Protocol.Echo) 32 else 128)
+        val incomingData: ByteArray? = if (manualReceiver == null) ByteArray(if (protocol == Protocol.Echo) 32 else 128) else null
 
         try {
             for (i in 0 until maxTires) {
@@ -94,6 +96,9 @@ class SocketAddrEchoClient(
                     val packet = if (manualReceiver != null) {
                         manualReceiver.receive()
                     } else {
+                        if (incomingData == null)
+                            throw IllegalStateException("both incomingData and manualReceiver are null")
+
                         val incomingPacket = DatagramPacket(incomingData, 0, incomingData.size)
                         if (socketBlocking != null) {
                             runInterruptible {
@@ -137,14 +142,25 @@ class SocketAddrEchoClient(
 
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
-        ports: Iterable<Int>, address: InetAddress, srcChannel: DatagramChannel? = null,
-        maxTires: Int = 100, delay: Long = 20, manualReceiver: Channel<DatagramPacket>? = null
+        ports: Iterable<Int>? = null, address: InetAddress? = null, stunAddresses: Iterable<StunServerAddress>? = null, srcChannel: DatagramChannel? = null,
+        maxTires: Int = 100, delay: Long = 20, manualReceiver: Channel<DatagramPacket>? = null,
     ): List<SocketAddrEchoResult> = withContext(Dispatchers.IO) {
-        ports.map { port ->
-            val result = requestEcho(port, address, srcChannel, maxTires, manualReceiver)
+        val portsResult: Flow<SocketAddrEchoResult> = if (ports != null && address != null) {
+            ports.asFlow().map { port ->
+                val result = requestEcho(port, address, srcChannel, maxTires, manualReceiver, Protocol.Echo)
+                delay(delay)
+                result
+            }
+        } else emptyFlow()
+
+        val stunAddressesResult: Flow<SocketAddrEchoResult> = stunAddresses?.asFlow()?.map { stunAddress ->
+            @Suppress("BlockingMethodInNonBlockingContext")
+            val result = requestEcho(stunAddress.port, InetAddress.getByName(stunAddress.host), srcChannel, maxTires, manualReceiver, Protocol.Stun)
             delay(delay)
             result
-        }
+        } ?: emptyFlow()
+
+        merge(portsResult, stunAddressesResult).toList()
     }
 
     @Suppress("UsePropertyAccessSyntax")
@@ -178,10 +194,6 @@ class SocketAddrEchoClient(
         } else {
             throw BadRequestException("Bad response")
         }
-    }
-
-    fun onPacketIncoming(packet: DatagramPacket): Boolean {
-        return false
     }
 
     companion object {
