@@ -11,6 +11,7 @@
 
 package de.javawi.jstun.header;
 
+import com.google.common.primitives.Ints;
 import de.javawi.jstun.attribute.MessageAttribute;
 import de.javawi.jstun.attribute.MessageAttributeParsingException;
 import de.javawi.jstun.util.Utility;
@@ -22,6 +23,8 @@ import java.util.Iterator;
 import java.util.TreeMap;
 
 public class MessageHeader implements MessageHeaderInterface {
+	public static final byte[] SpecialHeader = { 0x7A, 0x24};
+
 	/*
 	 *  0                   1                   2                   3
      *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -40,26 +43,27 @@ public class MessageHeader implements MessageHeaderInterface {
 	private static final Logger LOGGER = LoggerFactory.getLogger(MessageHeader.class);
 	MessageHeaderType type;
 	byte[] id = new byte[16];
-	
+
 	TreeMap<MessageAttribute.MessageAttributeType, MessageAttribute> ma = new TreeMap<MessageAttribute.MessageAttributeType, MessageAttribute>();
-	
+
+
 	public MessageHeader() {
 		super();
 	}
-	
+
 	public MessageHeader(MessageHeaderType type) {
 		super();
 		setType(type);
 	}
-		
+
     public void setType(MessageHeaderType type) {
 		this.type = type;
     }
-    
+
     public MessageHeaderType getType() {
     	return type;
     }
-	
+
 	public static int typeToInteger(MessageHeaderType type) {
 		if (type == MessageHeaderType.BindingRequest) return BINDINGREQUEST;
 		if (type == MessageHeaderType.BindingResponse) return BINDINGRESPONSE;
@@ -69,13 +73,13 @@ public class MessageHeader implements MessageHeaderInterface {
 		if (type == MessageHeaderType.SharedSecretErrorResponse) return SHAREDSECRETERRORRESPONSE;
 		return -1;
 	}
-	
+
 	public void setTransactionID(byte[] id) {
 		System.arraycopy(id, 0, this.id, 0, 16);
 	}
-	
+
 	public void generateTransactionID() throws UtilityException {
-		System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, id, 0, 2);
+		System.arraycopy(SpecialHeader, 0, id, 0, 2);
 		System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, id, 2, 2);
 		System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, id, 4, 2);
 		System.arraycopy(Utility.integerToTwoBytes((int)(Math.random() * 65536)), 0, id, 6, 2);

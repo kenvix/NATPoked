@@ -13,6 +13,7 @@ import com.kenvix.natpoked.utils.network.aReceive
 import com.kenvix.natpoked.utils.network.aSend
 import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.getUnsignedShort
+import de.javawi.jstun.header.MessageHeader
 import io.ktor.features.*
 import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
@@ -151,7 +152,7 @@ class SocketAddrEchoClient(
     }
 
     companion object {
-        fun isResponsePacket(array: ByteArray): Boolean {
+        fun isEchoResponsePacket(array: ByteArray): Boolean {
             if (array.size < 19) return false
             if (array[0] != 0x7A.toByte() || array[1] != 0x1B.toByte() ||
                 array[2] != 0x4C.toByte() || array[3] != 0xCD.toByte()
@@ -160,11 +161,25 @@ class SocketAddrEchoClient(
             return true
         }
 
-        fun isResponsePacket(buffer: ByteBuffer): Boolean {
+        fun isEchoResponsePacket(buffer: ByteBuffer): Boolean {
             if (buffer.remaining() < 19) return false
             if (buffer[0] != 0x7A.toByte() || buffer[1] != 0x1B.toByte() ||
                 buffer[2] != 0x4C.toByte() || buffer[3] != 0xCD.toByte()
             ) return false
+
+            return true
+        }
+
+        fun isStunResponsePacket(array: ByteArray): Boolean {
+            if (array.size < 60) return false
+            if (array[0] != 0x01.toByte() || array[1] != 0x01.toByte() || array[4] != MessageHeader.SpecialHeader[0] || array[5] != MessageHeader.SpecialHeader[1]) return false
+
+            return true
+        }
+
+        fun isStunResponsePacket(buffer: ByteBuffer): Boolean {
+            if (buffer.remaining() < 60) return false
+            if (buffer[0] != 0x01.toByte() || buffer[1] != 0x01.toByte() || buffer[4] != MessageHeader.SpecialHeader[0] || buffer[5] != MessageHeader.SpecialHeader[1]) return false
 
             return true
         }

@@ -54,7 +54,7 @@ object STUNTest {
         val stunTimeout = 1000
 
         runBlocking {
-            val socket = DatagramSocket()
+            val socket = DatagramSocket(3477)
             val p1 = getExternalAddressByStun(socket, 0)
             logger.debug("External address 1: $p1")
             val p2 = getExternalAddressByStun(socket, 1)

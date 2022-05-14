@@ -152,9 +152,10 @@ fun getDefaultGatewayInterface6(): NetworkInterface? {
     }
 }
 
+@Suppress("BlockingMethodInNonBlockingContext")
 suspend fun getExternalAddressByStun(
     socket: DatagramSocket? = null,
-    stunServer: String = AppEnv.StunServerList.first().host,
+    stunServer: InetAddress = InetAddress.getByName(AppEnv.StunServerList.first().host),
     stunPort: Int = AppEnv.StunServerList.first().port,
     stunTimeout: Int = AppEnv.EchoTimeout + 300,
     manualReceiver: Channel<DatagramPacket>? = null
@@ -182,7 +183,7 @@ suspend fun getExternalAddressByStun(
             sendMH.addMessageAttribute(changeRequest)
 
             val data = sendMH.bytes
-            val send = DatagramPacket(data, data.size)
+            val send = DatagramPacket(data, data.size, (stunServer), stunPort)
 
             runInterruptible {
                 socketTest.send(send)
@@ -225,9 +226,10 @@ suspend fun getExternalAddressByStun(
     stunTimeout: Int = AppEnv.EchoTimeout + 300,
     manualReceiver: Channel<DatagramPacket>? = null
 ): SocketAddrEchoResult {
+    @Suppress("BlockingMethodInNonBlockingContext")
     return getExternalAddressByStun(
         socket,
-        AppEnv.StunServerList[stunServerIndex].host,
+        InetAddress.getByName(AppEnv.StunServerList[stunServerIndex].host),
         AppEnv.StunServerList[stunServerIndex].port,
         stunTimeout,
         manualReceiver

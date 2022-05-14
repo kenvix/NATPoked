@@ -481,7 +481,7 @@ class NATPeerToPeer(
 
     private suspend fun dispatchIncomingPacket(addr: InetSocketAddress, buffer: ByteBuffer) {
         // Ping packet is handled by the ping handler
-        if (SocketAddrEchoClient.isResponsePacket(buffer)) {
+        if (SocketAddrEchoClient.isEchoResponsePacket(buffer) || SocketAddrEchoClient.isStunResponsePacket(buffer)) {
             pingReceiverChannel?.send(buffer.toDatagramPacket(addr))
             return
         }
