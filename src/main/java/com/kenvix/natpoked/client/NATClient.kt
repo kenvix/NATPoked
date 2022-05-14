@@ -80,7 +80,11 @@ object NATClient : CoroutineScope, AutoCloseable {
     private data class UrlParseResult(val host: String, val port: Int, val path: String, val ssl: Boolean)
 
     @Suppress("BlockingMethodInNonBlockingContext")
-    suspend fun getOutboundInetSocketAddress(channel: DatagramChannel, maxTries: Int = 20, manualReceiver: Channel<DatagramPacket>? = null): SocketAddrEchoResult {
+    suspend fun getOutboundInetSocketAddress(
+        channel: DatagramChannel,
+        maxTries: Int = 20,
+        manualReceiver: Channel<DatagramPacket>? = null
+    ): SocketAddrEchoResult {
         return echoClient.requestEcho(
             AppEnv.EchoPortList[0],
             InetAddress.getByName(brokerClient.brokerHost),
@@ -156,8 +160,10 @@ object NATClient : CoroutineScope, AutoCloseable {
             async(Dispatchers.IO) {
                 val c1 = DatagramChannel.open()
                 val c2 = DatagramChannel.open()
-                val r1 = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), c1)
-                val r2 = echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), c2)
+                val r1 =
+                    echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), c1)
+                val r2 =
+                    echoClient.requestEcho(AppEnv.EchoPortList[0], InetAddress.getByName(brokerClient.brokerHost), c2)
                 c1.close()
                 c2.close()
                 logger.debug("Port Echo server test passed: port allocation trend is ${r2.port - r1.port} \n $r1 \n $r2")
@@ -264,8 +270,18 @@ object NATClient : CoroutineScope, AutoCloseable {
 
     }
 
-    suspend fun getPortAllocationPredictionParam(srcChannel: DatagramChannel? = null, echoPortNum: Int = -1, manualReceiver: Channel<DatagramPacket>? = null): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
-        return@withContext com.kenvix.natpoked.client.traversal.getPortAllocationPredictionParam(echoClient, AppEnv.EchoPortList.asIterable(), srcChannel, manualReceiver)
+    suspend fun getPortAllocationPredictionParam(
+        srcChannel: DatagramChannel? = null,
+        echoPortNum: Int = -1,
+        manualReceiver: Channel<DatagramPacket>? = null
+    ): PortAllocationPredictionParam = withContext(Dispatchers.IO) {
+        return@withContext com.kenvix.natpoked.client.traversal.getPortAllocationPredictionParam(
+            echoClient,
+            AppEnv.EchoPortList.asList(),
+            if (AppEnv.PortGuessAlsoUseStun) AppEnv.StunServerList else null,
+            srcChannel,
+            manualReceiver
+        )
     }
 
     override fun close() {

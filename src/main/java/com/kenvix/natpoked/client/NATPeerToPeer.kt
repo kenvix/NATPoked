@@ -326,7 +326,12 @@ class NATPeerToPeer(
 
     fun listenUdpSourcePort(sourcePort: Int = config.pokedPort) {
         val socketAddress = InetSocketAddress(sourcePort)
-        udpChannel.bind(socketAddress)
+        try {
+            udpChannel.bind(socketAddress)
+        } catch (e: Exception) {
+            logger.error("Unable to bind UDP channel to $socketAddress", e)
+            throw e
+        }
         logger.debug("UDP Channel bind to $socketAddress")
     }
 

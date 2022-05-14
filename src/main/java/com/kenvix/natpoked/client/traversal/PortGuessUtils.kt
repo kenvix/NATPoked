@@ -3,6 +3,7 @@ package com.kenvix.natpoked.client.traversal
 
 import com.kenvix.natpoked.client.NATClient
 import com.kenvix.natpoked.client.SocketAddrEchoClient
+import com.kenvix.natpoked.contacts.StunServerAddress
 import com.kenvix.natpoked.utils.AppEnv
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -148,7 +149,8 @@ fun linearPortGuess(trend: Int, lastPort: Int, guessPortNum: Int = 50, skipLowPo
 
 suspend fun getPortAllocationPredictionParam(
     echoClient: SocketAddrEchoClient,
-    ports: Iterable<Int>,
+    ports: List<Int>? = null,
+    stunAddresses: List<StunServerAddress>? = null,
     srcChannel: DatagramChannel? = null,
     manualReceiver: Channel<DatagramPacket>? = null
 ): PortAllocationPredictionParam = withContext(
@@ -158,7 +160,7 @@ suspend fun getPortAllocationPredictionParam(
     val result = echoClient.requestEcho(
         ports = ports,
         address = InetAddress.getByName(NATClient.brokerClient.brokerHost),
-        stunAddresses = if (AppEnv.PortGuessAlsoUseStun) AppEnv.StunServerList else null,
+        stunAddresses = stunAddresses,
         srcChannel = srcChannel,
         manualReceiver = manualReceiver,
     )

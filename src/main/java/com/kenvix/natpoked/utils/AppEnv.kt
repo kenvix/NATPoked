@@ -36,7 +36,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
 
     @Description("进行端口预测时的发包间隔时间，单位为毫秒")
     val EchoDelay: Long by envOf(15)
-    val EchoTimeout: Int by envOf(700)
+    val EchoTimeout: Int by envOf(1400)
 
     @Description("每隔多长时间强制刷新并上报当前网络情况，单位为秒。默认为 5 分钟。-1 表示停用")
     val PeerReportToBrokerDelay: Int by envOf(5 * 60)
@@ -86,7 +86,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val LocalListenAddress: String by envOf("127.0.0.2")
 
     @Description("STUN 服务器列表，每个服务器之间用空格 分隔。可以用冒号:指明端口号，默认端口号为3478")
-    val StunServers: String by envOf("stun.miwifi.com stun.qq.com stun.syncthing.net stun.bige0.com")
+    val StunServers: String by envOf("stun.miwifi.com")
 
     @Description("最多并发查询的 STUN 服务器数量")
     val StunMaxConcurrentQueryNum: Int by envOf(4)

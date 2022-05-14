@@ -35,19 +35,19 @@ class SocketAddrEchoClient(
 ) {
     private val outgoingData = Ints.toByteArray(SocketAddrEchoServer.PacketPrefixRequest)
 
-    private val logger = LoggerFactory.getLogger(this::class.java)
-
     enum class Protocol { Echo, Stun, Both }
 
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
-        port: Int, address: InetAddress, srcChannel: DatagramChannel? = null, maxTires: Int = 100,
+        port: Int, address: InetAddress, srcChannel: DatagramChannel? = null, maxTires: Int = 10,
         manualReceiver: Channel<DatagramPacket>? = null, protocol: Protocol = Protocol.Echo
     ): SocketAddrEchoResult = withContext(Dispatchers.IO) {
         if (protocol == Protocol.Both)
             throw IllegalArgumentException("Protocol can't be both for single requestEcho test")
 
         val channel = srcChannel ?: DatagramChannel.open().makeNonBlocking()
+        logger.debug("Requesting echo from $address:$port (local ${channel.localAddress}) with protocol $protocol")
+
         val addr = InetSocketAddress(address, port)
 
         var oldTimeout = -1
@@ -71,52 +71,56 @@ class SocketAddrEchoClient(
         try {
             for (i in 0 until maxTires) {
                 try {
-                    val outgoingPacket: DatagramPacket = kotlin.run {
-                        if (protocol == Protocol.Echo) {
-                            DatagramPacket(outgoingData, 0, outgoingData.size, addr)
-                        } else {
-                            val sendMH = MessageHeader(MessageHeaderInterface.MessageHeaderType.BindingRequest)
-                            sendMH.generateTransactionID()
+                    return@withContext withTimeout(timeout.toLong()) {
+                        val outgoingPacket: DatagramPacket = kotlin.run {
+                            if (protocol == Protocol.Echo) {
+                                DatagramPacket(outgoingData, 0, outgoingData.size, addr)
+                            } else {
+                                val sendMH = MessageHeader(MessageHeaderInterface.MessageHeaderType.BindingRequest)
+                                sendMH.generateTransactionID()
 
-                            val changeRequest = ChangeRequest()
-                            sendMH.addMessageAttribute(changeRequest)
+                                val changeRequest = ChangeRequest()
+                                sendMH.addMessageAttribute(changeRequest)
 
-                            val data = sendMH.bytes
-                            DatagramPacket(data, data.size, addr)
-                        }
-                    }
-
-                    val beginTime = if (protocol == Protocol.Stun) System.currentTimeMillis() else -1
-
-                    if (socketBlocking != null)
-                        socketBlocking.send(outgoingPacket)
-                    else
-                        channel.aSend(outgoingPacket)
-
-                    val packet = if (manualReceiver != null) {
-                        manualReceiver.receive()
-                    } else {
-                        if (incomingData == null)
-                            throw IllegalStateException("both incomingData and manualReceiver are null")
-
-                        val incomingPacket = DatagramPacket(incomingData, 0, incomingData.size)
-                        if (socketBlocking != null) {
-                            runInterruptible {
-                                socketBlocking.receive(incomingPacket)
+                                val data = sendMH.bytes
+                                DatagramPacket(data, data.size, addr)
                             }
-                        } else {
-                            channel.aReceive(incomingPacket)
                         }
 
-                        incomingPacket
-                    }
+                        val beginTime = if (protocol == Protocol.Stun) System.currentTimeMillis() else -1
 
-                    return@withContext parseEchoResult(packet, srcChannel?.localAddress?.port ?: -1).apply {
-                        if (protocol == Protocol.Stun) {
-                            finishedTime = (finishedTime + beginTime) / 2
+                        if (socketBlocking != null)
+                            socketBlocking.send(outgoingPacket)
+                        else
+                            channel.aSend(outgoingPacket)
+
+                        val packet = if (manualReceiver != null) {
+                            manualReceiver.receive()
+                        } else {
+                            if (incomingData == null)
+                                throw IllegalStateException("both incomingData and manualReceiver are null")
+
+                            val incomingPacket = DatagramPacket(incomingData, 0, incomingData.size)
+                            if (socketBlocking != null) {
+                                runInterruptible {
+                                    socketBlocking.receive(incomingPacket)
+                                }
+                            } else {
+                                channel.aReceive(incomingPacket)
+                            }
+
+                            incomingPacket
+                        }
+
+                        return@withTimeout parseEchoResult(packet, srcChannel?.localAddress?.port ?: -1).apply {
+                            if (protocol == Protocol.Stun) {
+                                finishedTime = (finishedTime + beginTime) / 2
+                            }
                         }
                     }
                 } catch (e: SocketTimeoutException) {
+                    logger.info("Echo server $address:$port Socket timeout", e)
+                } catch (e: TimeoutCancellationException) {
                     logger.info("Echo server $address:$port Socket timeout", e)
                 } catch (e: BadRequestException) {
                     logger.info("Echo server $address:$port Bad response", e)
@@ -142,25 +146,28 @@ class SocketAddrEchoClient(
 
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
-        ports: Iterable<Int>? = null, address: InetAddress? = null, stunAddresses: Iterable<StunServerAddress>? = null, srcChannel: DatagramChannel? = null,
+        ports: List<Int>? = null, address: InetAddress? = null, stunAddresses: List<StunServerAddress>? = null, srcChannel: DatagramChannel? = null,
         maxTires: Int = 100, delay: Long = 20, manualReceiver: Channel<DatagramPacket>? = null,
     ): List<SocketAddrEchoResult> = withContext(Dispatchers.IO) {
-        val portsResult: Flow<SocketAddrEchoResult> = if (ports != null && address != null) {
-            ports.asFlow().map { port ->
+        val results = ArrayList<SocketAddrEchoResult>((ports?.size ?: 0) + (stunAddresses?.size ?: 0))
+        if (ports != null && address != null) {
+            for (port in ports) {
                 val result = requestEcho(port, address, srcChannel, maxTires, manualReceiver, Protocol.Echo)
                 delay(delay)
-                result
+                results.add(result)
             }
-        } else emptyFlow()
+        }
 
-        val stunAddressesResult: Flow<SocketAddrEchoResult> = stunAddresses?.asFlow()?.map { stunAddress ->
-            @Suppress("BlockingMethodInNonBlockingContext")
-            val result = requestEcho(stunAddress.port, InetAddress.getByName(stunAddress.host), srcChannel, maxTires, manualReceiver, Protocol.Stun)
-            delay(delay)
-            result
-        } ?: emptyFlow()
+        if (stunAddresses != null) {
+            for (stunAddress in stunAddresses) {
+                @Suppress("BlockingMethodInNonBlockingContext")
+                val result = requestEcho(stunAddress.port, InetAddress.getByName(stunAddress.host), srcChannel, maxTires, manualReceiver, Protocol.Stun)
+                results.add(result)
+            }
+        }
 
-        merge(portsResult, stunAddressesResult).toList()
+        logger.debug("batch requestEcho from ${srcChannel?.localAddress} finished: $results")
+        results
     }
 
     @Suppress("UsePropertyAccessSyntax")
@@ -197,6 +204,8 @@ class SocketAddrEchoClient(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(SocketAddrEchoClient::class.java)
+
         fun isEchoResponsePacket(array: ByteArray): Boolean {
             if (array.size < 19) return false
             if (array[0] != 0x7A.toByte() || array[1] != 0x1B.toByte() ||
