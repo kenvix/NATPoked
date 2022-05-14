@@ -183,8 +183,9 @@ suspend fun getExternalAddressByStun(
             sendMH.addMessageAttribute(changeRequest)
 
             val data = sendMH.bytes
-            val send = DatagramPacket(data, data.size, (stunServer), stunPort)
+            val send = DatagramPacket(data, data.size, stunServer, stunPort)
 
+            val beginTime = System.currentTimeMillis()
             runInterruptible {
                 socketTest.send(send)
             }
@@ -205,9 +206,11 @@ suspend fun getExternalAddressByStun(
                 receiveMH.parseAttributes(receive.data)
             }
 
+            val endTime = System.currentTimeMillis()
+
             val ma =
                 receiveMH.getMessageAttribute(MessageAttributeInterface.MessageAttributeType.MappedAddress) as MappedAddress
-            return@withTimeout SocketAddrEchoResult(ma.address.inetAddress, ma.port, -1, socketTest.localPort)
+            return@withTimeout SocketAddrEchoResult(ma.address.inetAddress, ma.port, (beginTime + endTime) / 2, socketTest.localPort)
         } catch (e: SocketTimeoutException) {
             throw CancellationException("getExternalAddressByStun: Socket timeout.", e)
         } finally {

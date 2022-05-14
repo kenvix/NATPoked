@@ -13,7 +13,11 @@ import com.kenvix.natpoked.utils.network.aReceive
 import com.kenvix.natpoked.utils.network.aSend
 import com.kenvix.natpoked.utils.network.makeNonBlocking
 import com.kenvix.web.utils.getUnsignedShort
+import de.javawi.jstun.attribute.ChangeRequest
+import de.javawi.jstun.attribute.MappedAddress
+import de.javawi.jstun.attribute.MessageAttributeInterface
 import de.javawi.jstun.header.MessageHeader
+import de.javawi.jstun.header.MessageHeaderInterface
 import io.ktor.features.*
 import io.ktor.util.network.*
 import kotlinx.coroutines.Dispatchers
@@ -34,10 +38,12 @@ class SocketAddrEchoClient(
 
     private val logger = LoggerFactory.getLogger(this::class.java)
 
+    enum class Protocol { Echo, Stun }
+
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
         port: Int, address: InetAddress, srcChannel: DatagramChannel? = null, maxTires: Int = 100,
-        manualReceiver: Channel<DatagramPacket>? = null
+        manualReceiver: Channel<DatagramPacket>? = null, protocol: Protocol = Protocol.Echo
     ): SocketAddrEchoResult = withContext(Dispatchers.IO) {
         val channel = srcChannel ?: DatagramChannel.open().makeNonBlocking()
         val addr = InetSocketAddress(address, port)
@@ -56,14 +62,30 @@ class SocketAddrEchoClient(
             channel.disconnect()
         }
 
-        //todo: it stuck here, but I don't know why
+        //do not connect socket
         //socket.connect(address, port)
-        val incomingData = ByteArray(32)
+        val incomingData = ByteArray(if (protocol == Protocol.Echo) 32 else 128)
 
         try {
             for (i in 0 until maxTires) {
                 try {
-                    val outgoingPacket = DatagramPacket(outgoingData, 0, 4, addr)
+                    val outgoingPacket: DatagramPacket = kotlin.run {
+                        if (protocol == Protocol.Echo) {
+                            DatagramPacket(outgoingData, 0, outgoingData.size, addr)
+                        } else {
+                            val sendMH = MessageHeader(MessageHeaderInterface.MessageHeaderType.BindingRequest)
+                            sendMH.generateTransactionID()
+
+                            val changeRequest = ChangeRequest()
+                            sendMH.addMessageAttribute(changeRequest)
+
+                            val data = sendMH.bytes
+                            DatagramPacket(data, data.size, addr)
+                        }
+                    }
+
+                    val beginTime = if (protocol == Protocol.Stun) System.currentTimeMillis() else -1
+
                     if (socketBlocking != null)
                         socketBlocking.send(outgoingPacket)
                     else
@@ -84,7 +106,11 @@ class SocketAddrEchoClient(
                         incomingPacket
                     }
 
-                    return@withContext parseEchoResult(packet, srcChannel?.localAddress?.port ?: -1)
+                    return@withContext parseEchoResult(packet, srcChannel?.localAddress?.port ?: -1).apply {
+                        if (protocol == Protocol.Stun) {
+                            finishedTime = (finishedTime + beginTime) / 2
+                        }
+                    }
                 } catch (e: SocketTimeoutException) {
                     logger.info("Echo server $address:$port Socket timeout", e)
                 } catch (e: BadRequestException) {
@@ -125,26 +151,33 @@ class SocketAddrEchoClient(
     private fun parseEchoResult(packet: DatagramPacket, srcPort: Int = -1): SocketAddrEchoResult {
         val buffer = ByteBuffer.wrap(packet.data, 0, packet.length)
 
-        if (buffer.getInt() != SocketAddrEchoServer.PacketPrefixResponse)
-            throw BadRequestException("Bad response")
+        if (buffer.getInt() == SocketAddrEchoServer.PacketPrefixResponse) {
+            val port = buffer.getUnsignedShort()
+            val isIpv6 = buffer.get()
+            val addr = if (isIpv6 == 1.toByte()) {
+                val arr = ByteArray(16)
+                buffer.get(arr)
+                Inet6Address.getByAddress(arr)
+            } else {
+                val arr = ByteArray(4)
+                buffer.get(arr)
+                Inet4Address.getByAddress(arr)
+            }
 
-        val port = buffer.getUnsignedShort()
-        val isIpv6 = buffer.get()
-        val addr = if (isIpv6 == 1.toByte()) {
-            val arr = ByteArray(16)
-            buffer.get(arr)
-            Inet6Address.getByAddress(arr)
+            val time = buffer.getLong()
+
+            return SocketAddrEchoResult(
+                addr, port, time, srcPort
+            )
+        } else if (isStunResponsePacket(buffer)) {
+            val receiveMH = MessageHeader.parseHeader(packet.data)
+            receiveMH.parseAttributes(packet.data)
+
+            val ma = receiveMH.getMessageAttribute(MessageAttributeInterface.MessageAttributeType.MappedAddress) as MappedAddress
+            return SocketAddrEchoResult(ma.address.inetAddress, ma.port, System.currentTimeMillis(), srcPort)
         } else {
-            val arr = ByteArray(4)
-            buffer.get(arr)
-            Inet4Address.getByAddress(arr)
+            throw BadRequestException("Bad response")
         }
-
-        val time = buffer.getLong()
-
-        return SocketAddrEchoResult(
-            addr, port, time, srcPort
-        )
     }
 
     fun onPacketIncoming(packet: DatagramPacket): Boolean {

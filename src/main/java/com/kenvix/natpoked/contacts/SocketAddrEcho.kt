@@ -17,6 +17,6 @@ import java.net.InetAddress
 data class SocketAddrEchoResult(
     val ip: InetAddress,
     val port: Int,
-    val finishedTime: Long,
+    var finishedTime: Long,
     val sourcePort: Int = -1
 )
