@@ -156,57 +156,80 @@ suspend fun getExternalAddressByStun(
     socket: DatagramSocket? = null,
     stunServer: String = AppEnv.StunServerList.first().first,
     stunPort: Int = AppEnv.StunServerList.first().second,
-    stunTimeout: Int = AppEnv.EchoTimeout + 300
+    stunTimeout: Int = AppEnv.EchoTimeout + 300,
+    manualReceiver: Channel<DatagramPacket>? = null
 ): SocketAddrEchoResult = withContext(Dispatchers.IO) {
-    // Test 1 including response
-    val socketTest = runInterruptible { socket ?: DatagramSocket() }
-    val oldReuseAddress = socketTest.reuseAddress
-    val oldAddr = socketTest.remoteSocketAddress
-    val oldTimeout = socketTest.soTimeout
+    withTimeout(stunTimeout.toLong()) {
+        // Test 1 including response
+        val socketTest = runInterruptible { socket ?: DatagramSocket() }
+        val oldReuseAddress = socketTest.reuseAddress
+        val oldAddr = socketTest.remoteSocketAddress
+        val oldTimeout = socketTest.soTimeout
 
-    if (socketTest.isConnected)
-        runInterruptible { socketTest.disconnect() }
+        if (socketTest.isConnected)
+            runInterruptible { socketTest.disconnect() }
 
-    try {
-        socketTest.reuseAddress = true
-        socketTest.soTimeout = stunTimeout
+        try {
+            socketTest.reuseAddress = true
+            socketTest.soTimeout = stunTimeout
 
-        logger.debug("getExternalAddressByStun: Socket Local addr: ${socketTest.localSocketAddress}")
+            logger.debug("getExternalAddressByStun: Socket Local addr: ${socketTest.localSocketAddress}")
 
-        val sendMH = MessageHeader(MessageHeaderInterface.MessageHeaderType.BindingRequest)
-        sendMH.generateTransactionID()
+            val sendMH = MessageHeader(MessageHeaderInterface.MessageHeaderType.BindingRequest)
+            sendMH.generateTransactionID()
 
-        val changeRequest = ChangeRequest()
-        sendMH.addMessageAttribute(changeRequest)
+            val changeRequest = ChangeRequest()
+            sendMH.addMessageAttribute(changeRequest)
 
-        val data = sendMH.bytes
-        val send = DatagramPacket(data, data.size)
+            val data = sendMH.bytes
+            val send = DatagramPacket(data, data.size)
 
-        runInterruptible {
-            socketTest.connect(InetAddress.getByName(stunServer), stunPort)
-            socketTest.send(send)
-        }
+            runInterruptible {
+                socketTest.send(send)
+            }
 
-        logger.debug("getExternalAddressByStun: Binding Request sent.")
+            logger.debug("getExternalAddressByStun: Binding Request sent.")
 
-        var receiveMH = MessageHeader()
-        while (!receiveMH.equalTransactionID(sendMH)) {
-            val receive = DatagramPacket(ByteArray(200), 200)
-            runInterruptible { socketTest.receive(receive) }
-            receiveMH = MessageHeader.parseHeader(receive.data)
-            receiveMH.parseAttributes(receive.data)
-        }
+            var receiveMH = MessageHeader()
+            while (!receiveMH.equalTransactionID(sendMH)) {
+                val receive: DatagramPacket
+                if (manualReceiver == null) {
+                    receive = DatagramPacket(ByteArray(200), 200)
+                    runInterruptible { socketTest.receive(receive) }
+                } else {
+                    receive = manualReceiver.receive()
+                }
 
-        val ma = receiveMH.getMessageAttribute(MessageAttributeInterface.MessageAttributeType.MappedAddress) as MappedAddress
-        return@withContext SocketAddrEchoResult(ma.address.inetAddress, ma.port, -1, socketTest.localPort)
-    } finally {
-        socketTest.reuseAddress = oldReuseAddress
-        socketTest.soTimeout = oldTimeout
+                receiveMH = MessageHeader.parseHeader(receive.data)
+                receiveMH.parseAttributes(receive.data)
+            }
 
-        runInterruptible {
-            socketTest.disconnect()
+            val ma =
+                receiveMH.getMessageAttribute(MessageAttributeInterface.MessageAttributeType.MappedAddress) as MappedAddress
+            return@withTimeout SocketAddrEchoResult(ma.address.inetAddress, ma.port, -1, socketTest.localPort)
+        } catch (e: SocketTimeoutException) {
+            throw CancellationException("getExternalAddressByStun: Socket timeout.", e)
+        } finally {
+            socketTest.reuseAddress = oldReuseAddress
+            socketTest.soTimeout = oldTimeout
+
             if (oldAddr != null)
-                socketTest.connect(oldAddr)
+                runInterruptible { socketTest.connect(oldAddr) }
         }
     }
+}
+
+suspend fun getExternalAddressByStun(
+    socket: DatagramSocket? = null,
+    stunServerIndex: Int = 0,
+    stunTimeout: Int = AppEnv.EchoTimeout + 300,
+    manualReceiver: Channel<DatagramPacket>? = null
+): SocketAddrEchoResult {
+    return getExternalAddressByStun(
+        socket,
+        AppEnv.StunServerList[stunServerIndex].first,
+        AppEnv.StunServerList[stunServerIndex].second,
+        stunTimeout,
+        manualReceiver
+    )
 }

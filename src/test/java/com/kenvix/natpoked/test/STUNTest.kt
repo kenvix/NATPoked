@@ -55,8 +55,10 @@ object STUNTest {
 
         runBlocking {
             val socket = DatagramSocket()
-            val p = getExternalAddressByStun(socket)
-            logger.debug("External address: $p")
+            val p1 = getExternalAddressByStun(socket, 0)
+            logger.debug("External address 1: $p1")
+            val p2 = getExternalAddressByStun(socket, 1)
+            logger.debug("External address 2: $p1")
         }
     }
 }
