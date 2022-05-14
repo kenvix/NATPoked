@@ -8,10 +8,7 @@ package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.network.kcp.KCPARQProvider
 import io.netty.buffer.Unpooled
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assertions
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -55,7 +52,7 @@ object KCPTest {
         runBlocking(Dispatchers.IO) {
             launch(Dispatchers.IO) {
                 try {
-                    while (true) {
+                    while (isActive) {
                         val a = ByteArray(1500)
                         val p = DatagramPacket(a, 1500)
                         serverSocket.receive(p)

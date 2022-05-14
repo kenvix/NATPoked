@@ -28,7 +28,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
     private val channels: MutableMap<DatagramChannel, SuspendedEvent> = WeakHashMap()
     private val readSelector = Selector.open()
     private val readSelectorExec = launch(Dispatchers.IO) {
-        while (true) {
+        while (isActive) {
             try {
                 val readyNum = runInterruptible { readSelector.select() }
                 if (readyNum == 0) continue
@@ -72,7 +72,7 @@ object UDPSelector : CoroutineScope by CoroutineScope(Dispatchers.IO) {
 
     private val writeSelector = Selector.open()
     private val writeSelectorExec = launch(Dispatchers.IO) {
-        while (true) {
+        while (isActive) {
             try {
                 val readyNum = runInterruptible { writeSelector.select() }
                 if (readyNum == 0) continue
