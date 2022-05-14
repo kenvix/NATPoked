@@ -214,3 +214,6 @@ data class OpenPortReq(
     val alsoSendHelloPacket: Boolean = false,
     val peerInfo: NATClientItem? = null,
 )
+
+@Serializable
+data class StunServerAddress(val host: String, val port: Int)

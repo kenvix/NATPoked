@@ -2,6 +2,7 @@ package com.kenvix.natpoked.utils
 
 import com.kenvix.natpoked.AppConstants
 import com.kenvix.natpoked.contacts.PeerId
+import com.kenvix.natpoked.contacts.StunServerAddress
 import com.kenvix.utils.annotation.Description
 import com.kenvix.utils.preferences.ManagedEnvFile
 import kotlin.time.DurationUnit
@@ -164,12 +165,12 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PeerUseSocketConnect by envOf(false)
 
     /********* FOR INTERNAL USE ONLY ***********/
-    val StunServerList: List<Pair<String, Int>> = StunServers.split(' ').map {
+    val StunServerList: List<StunServerAddress> = StunServers.split(' ').map {
         if (":" in it) {
             val s = it.split(':')
-            Pair(s[0], s[1].toInt())
+            StunServerAddress(s[0], s[1].toInt())
         } else {
-            Pair(it, 3478)
+            StunServerAddress(it, 3478)
         }
     }
 

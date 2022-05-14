@@ -68,14 +68,14 @@ fun testNatType(inetAddr: InetAddress): StunTestResult {
     var exceptions: Exception? = null
     for (stunServer in AppEnv.StunServerList) {
         try {
-            val test = DiscoveryTest(inetAddr, stunServer.first, stunServer.second)
+            val test = DiscoveryTest(inetAddr, stunServer.host, stunServer.port)
             test.timeoutInitValue = AppEnv.StunQueryTimeout / 2
             val result = test.test().toStunTestResult()
             if (result.natType != NATType.BLOCKED) {
                 return result
             }
         } catch (e: Exception) {
-            logger.warn("Stun test failed with server ${stunServer.first}:${stunServer.second}", e)
+            logger.warn("Stun test failed with server ${stunServer.host}:${stunServer.port}", e)
             if (exceptions == null) {
                 exceptions = e
             } else {
@@ -101,10 +101,10 @@ suspend fun testNatTypeParallel(inetAddr: InetAddress): StunTestResult {
 
     return try {
         withTimeout(Duration.of(AppEnv.StunQueryTimeout.toLong(), ChronoUnit.MILLIS)) {
-            AppEnv.StunServerList.forEach {
+            AppEnv.StunServerList.forEach { stunServer ->
                 withContext(Dispatchers.IO) {
                     launch {
-                        val r = testNatType(inetAddr, it.first, it.second)
+                        val r = testNatType(inetAddr, stunServer.host, stunServer.port)
                         if (r.natType != NATType.UNKNOWN && r.natType != NATType.BLOCKED)
                             resultsChannel.send(r)
                     }
@@ -154,8 +154,8 @@ fun getDefaultGatewayInterface6(): NetworkInterface? {
 
 suspend fun getExternalAddressByStun(
     socket: DatagramSocket? = null,
-    stunServer: String = AppEnv.StunServerList.first().first,
-    stunPort: Int = AppEnv.StunServerList.first().second,
+    stunServer: String = AppEnv.StunServerList.first().host,
+    stunPort: Int = AppEnv.StunServerList.first().port,
     stunTimeout: Int = AppEnv.EchoTimeout + 300,
     manualReceiver: Channel<DatagramPacket>? = null
 ): SocketAddrEchoResult = withContext(Dispatchers.IO) {
@@ -227,8 +227,8 @@ suspend fun getExternalAddressByStun(
 ): SocketAddrEchoResult {
     return getExternalAddressByStun(
         socket,
-        AppEnv.StunServerList[stunServerIndex].first,
-        AppEnv.StunServerList[stunServerIndex].second,
+        AppEnv.StunServerList[stunServerIndex].host,
+        AppEnv.StunServerList[stunServerIndex].port,
         stunTimeout,
         manualReceiver
     )
