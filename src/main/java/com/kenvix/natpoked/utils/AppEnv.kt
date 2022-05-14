@@ -84,7 +84,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val LocalListenAddress: String by envOf("127.0.0.2")
 
     @Description("STUN 服务器列表，每个服务器之间用空格 分隔。可以用冒号:指明端口号，默认端口号为3478")
-    val StunServers: String by envOf("stun.qq.com stun.miwifi.com stun.syncthing.net stun.bige0.com")
+    val StunServers: String by envOf("stun.miwifi.com stun.qq.com stun.syncthing.net stun.bige0.com")
 
     @Description("最多并发查询的 STUN 服务器数量")
     val StunMaxConcurrentQueryNum: Int by envOf(4)

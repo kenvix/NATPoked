@@ -6,15 +6,25 @@
 
 package com.kenvix.natpoked.test
 
+import com.kenvix.natpoked.utils.getExternalAddressByStun
 import com.kenvix.natpoked.utils.testNatType
+import de.javawi.jstun.attribute.*
+import de.javawi.jstun.header.MessageHeader
+import de.javawi.jstun.header.MessageHeaderInterface
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
-import java.net.InetAddress
-import java.net.NetworkInterface
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import java.net.*
+import java.nio.ByteBuffer
+import java.nio.channels.DatagramChannel
 import java.util.*
+import kotlin.math.log
 
 
 object STUNTest {
+    private val logger: Logger = LoggerFactory.getLogger(STUNTest::class.java)
+
     @JvmStatic
     fun main(args: Array<String>) {
         testNatType(InetAddress.getByName("10.0.0.6"))
@@ -40,6 +50,13 @@ object STUNTest {
 
     @Test
     fun testEcho() {
+        val buffer = ByteBuffer.allocateDirect(300)
+        val stunTimeout = 1000
 
+        runBlocking {
+            val socket = DatagramSocket()
+            val p = getExternalAddressByStun(socket)
+            logger.debug("External address: $p")
+        }
     }
 }
