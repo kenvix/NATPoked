@@ -179,7 +179,7 @@ data class NATClientItem(
     val clientId: PeerId,
     val clientInetAddress: InetAddress? = null,
     val clientInet6Address: InetAddress? = null,
-    val clientLastContactTime: Long = 0,
+    var clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
     val isValueChecked: Boolean = false,
     val isUpnpSupported: Boolean = false,
@@ -193,6 +193,15 @@ data class NATClientItem(
 
         @JvmStatic
         val UNKNOWN = NATClientItem(0, null)
+    }
+
+    fun updateClientLastContactTime() {
+        clientLastContactTime = System.currentTimeMillis()
+    }
+
+    fun isClientLastContactTimeExpired(): Boolean {
+        val currentTime = System.currentTimeMillis()
+        return currentTime - clientLastContactTime > (AppEnv.PeerReportToBrokerDelay * 1000L * 2.1)
     }
 }
 

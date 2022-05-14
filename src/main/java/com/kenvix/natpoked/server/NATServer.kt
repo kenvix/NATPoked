@@ -30,8 +30,27 @@ object NATServer : Closeable {
 
     internal val logger = LoggerFactory.getLogger(javaClass)
     private val peerConnectionsImpl: MutableMap<PeerId, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
-    val peerConnections: Map<PeerId, NATPeerToBrokerConnection>
-        get() = peerConnectionsImpl
+    val peerConnections: Map<PeerId, NATPeerToBrokerConnection> = object : Map<PeerId, NATPeerToBrokerConnection> by peerConnectionsImpl {
+        override fun containsKey(key: PeerId): Boolean {
+            val v = peerConnectionsImpl[key] ?: return false
+            if (v.client.isClientLastContactTimeExpired()) {
+                peerConnectionsImpl.remove(key)
+                return false
+            }
+
+            return true
+        }
+
+        override fun get(key: PeerId): NATPeerToBrokerConnection? {
+            val v = peerConnectionsImpl[key] ?: return null
+            if (v.client.isClientLastContactTimeExpired()) {
+                peerConnectionsImpl.remove(key)
+                return null
+            }
+
+            return v
+        }
+    }
 
     lateinit var brokerServer: BrokerServer
         private set
@@ -48,6 +67,7 @@ object NATServer : Closeable {
     val peerWebsocketSessionMap: MutableMap<DefaultWebSocketSession, NATPeerToBrokerConnection> = ConcurrentHashMap(64)
 
     fun addPeerConnection(peerId: PeerId, connection: NATPeerToBrokerConnection) {
+        connection.client.updateClientLastContactTime()
         peerConnectionsImpl[peerId] = connection
     }
 

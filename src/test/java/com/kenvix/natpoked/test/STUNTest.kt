@@ -8,6 +8,7 @@ package com.kenvix.natpoked.test
 
 import com.kenvix.natpoked.utils.testNatType
 import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.Test
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.util.*
@@ -35,5 +36,10 @@ object STUNTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun testEcho() {
+
     }
 }
