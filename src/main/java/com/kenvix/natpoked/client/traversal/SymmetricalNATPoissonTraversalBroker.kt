@@ -16,6 +16,7 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import kotlin.math.abs
 
+@Deprecated("Use PortGuessUtils instead")
 class SymmetricalNATPoissonTraversalBroker {
 
     companion object {
@@ -24,6 +25,7 @@ class SymmetricalNATPoissonTraversalBroker {
     }
 }
 
+@Deprecated("Use PortGuessUtils instead")
 fun main() {
     val logger = SymmetricalNATPoissonTraversalBroker.logger
     val sockAddr = InetSocketAddress("127.0.0.1", 4001)

@@ -13,7 +13,7 @@ import java.net.*
 /**
  * **Reference**: Jiayu Huang,Bailing Wang,Chunle Fu,Xuehuai Zhang,Qinggang He,Yang Liu. Study of A Novel Predictable Poisson Method for Traversing Symmetric NAT[C]//Proceedings of the 3rd International Conference on Computer Engineering, Information Science & Application Technology(ICCIA 2019).,2019:333-338.DOI:10.26914/c.cnkihy.2019.055836.
  */
-
+@Deprecated("Use PortGuessUtils instead")
 class SymmetricalNATPoissonTraversalKit(
     val brokerAddr: InetSocketAddress
 ) : NATTraversalKit() {
@@ -79,6 +79,7 @@ class SymmetricalNATPoissonTraversalKit(
     }
 }
 
+@Deprecated("Use PortGuessUtils instead")
 fun main() {
     val kit = SymmetricalNATPoissonTraversalKit(InetSocketAddress("127.0.0.1", 4001))
     runBlocking {

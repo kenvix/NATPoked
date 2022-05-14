@@ -6,14 +6,5 @@
 
 package com.kenvix.natpoked.client.traversal
 
-abstract class NATTraversalKit {
-
-}
-
-class PublicNATTraversalKit : NATTraversalKit() {
-
-}
-
-class FullConeNATTraversalKit : NATTraversalKit() {
-
-}
+@Deprecated("Use PortGuessUtils instead")
+abstract class NATTraversalKit

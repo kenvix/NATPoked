@@ -181,7 +181,7 @@ data class NATClientItem(
     val clientInet6Address: InetAddress? = null,
     var clientLastContactTime: Long = 0,
     val clientNatType: NATType = NATType.UNKNOWN,
-    val isValueChecked: Boolean = false,
+    var isValueChecked: Boolean = false,
     val isUpnpSupported: Boolean = false,
     var peersConfig: PeersConfig? = null
 ) {

@@ -1,3 +1,4 @@
+@file:JvmName("PortGuessUtils")
 package com.kenvix.natpoked.client.traversal
 
 import com.kenvix.natpoked.client.NATClient
