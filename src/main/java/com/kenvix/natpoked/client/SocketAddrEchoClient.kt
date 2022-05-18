@@ -147,7 +147,7 @@ class SocketAddrEchoClient(
     @Throws(IOException::class, SocketTimeoutException::class)
     suspend fun requestEcho(
         ports: List<Int>? = null, address: InetAddress? = null, stunAddresses: List<StunServerAddress>? = null, srcChannel: DatagramChannel? = null,
-        maxTires: Int = 100, delay: Long = 20, manualReceiver: Channel<DatagramPacket>? = null,
+        maxTires: Int = 100, delay: Long = 10, manualReceiver: Channel<DatagramPacket>? = null,
     ): List<SocketAddrEchoResult> = withContext(Dispatchers.IO) {
         val results = ArrayList<SocketAddrEchoResult>((ports?.size ?: 0) + (stunAddresses?.size ?: 0))
         if (ports != null && address != null) {
