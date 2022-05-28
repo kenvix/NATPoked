@@ -139,7 +139,7 @@ fun expectedValuePortGuess(
 
 fun linearPortGuess(trend: Int, lastPort: Int, guessPortNum: Int = 50, skipLowPorts: Boolean = AppEnv.PortGuessSkipLowPorts): Iterator<Int> {
     return object : Iterator<Int> {
-        private var i: Int = 1
+        private var i: Int = 0
 
         override fun hasNext(): Boolean {
             if (guessPortNum == -1) return true

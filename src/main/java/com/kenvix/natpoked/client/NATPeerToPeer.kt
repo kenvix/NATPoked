@@ -123,7 +123,7 @@ class NATPeerToPeer(
 
     private val udpChannel: DatagramChannel =
         DatagramChannel.open().apply {
-            setOption(StandardSocketOptions.SO_REUSEADDR, true)
+//            setOption(StandardSocketOptions.SO_REUSEADDR, true)
             setOption(StandardSocketOptions.SO_SNDBUF, AppEnv.PeerSendBufferSize)
             setOption(StandardSocketOptions.SO_RCVBUF, AppEnv.PeerReceiveBufferSize)
             configureBlocking(true) // TODO: Async implement with kotlin coroutine flows
@@ -145,6 +145,9 @@ class NATPeerToPeer(
                     udpChannel.makeNonBlocking()
                     val selector = Selector.open()
                     udpChannel.register(selector, SelectionKey.OP_READ)
+
+                    if (debugNetworkTraffic)
+                        logger.info("Started UDP receive job $it model NIO")
 
                     while (isActive) {
                         selector.select()
@@ -171,6 +174,9 @@ class NATPeerToPeer(
                         keys.clear()
                     }
                 } else {
+                    if (debugNetworkTraffic)
+                        logger.info("Started UDP receive job $it model BlockingIO")
+
                     while (isActive) {
                         try {
                             val buffer = receiveBuffers[it]
@@ -332,16 +338,24 @@ class NATPeerToPeer(
             logger.error("Unable to bind UDP channel to $socketAddress", e)
             throw e
         }
-        logger.debug("UDP Channel bind to $socketAddress")
+        logger.debug("UDP Channel bind to ${udpChannel.localAddress}")
     }
 
     suspend fun writeRawDatagram(buffer: ByteBuffer, target: InetSocketAddress) = withContext(Dispatchers.IO) {
+        val size = buffer.remaining()
+        if (size <= 0) {
+            if (debugNetworkTraffic)
+                logger.warn("\"$targetPeerId: writeRawDatagram to $target but Buffer size is 0, ignore it")
+
+            return@withContext
+        }
+
         udpChannel.send(buffer, target)
         if (debugNetworkTrafficVerbose) {
             if (!buffer.isDirect)
-                logger.debugArray("$targetPeerId: writeRawDatagram to ${target}", buffer.array())
+                logger.debugArray("$targetPeerId: writeRawDatagram to $target size $size", buffer.array())
             else
-                logger.debug("$targetPeerId: writeRawDatagram to ${target}")
+                logger.debug("$targetPeerId: writeRawDatagram to $target size $size")
         }
     }
 
@@ -385,6 +399,9 @@ class NATPeerToPeer(
                 }
 
                 buffer.flip()
+                if (debugNetworkTrafficVerbose)
+                    logger.debug("$targetPeerId: sendHelloPacket to $target stage $stage")
+
                 writeRawDatagram(buffer, target)
             }
         }
@@ -839,6 +856,7 @@ class NATPeerToPeer(
                                 delay(AppEnv.PeerFloodingDelay)
                             }
                         }
+                        delay(AppEnv.PeerFloodingDelay)
                     }
                 }
 
