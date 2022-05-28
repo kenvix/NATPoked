@@ -820,16 +820,23 @@ class NATPeerToPeer(
                         1
                     } else portParam.trend
 
-                    for (port in linearPortGuess(trend, portParam.lastPort)) {
-                        val helloIp4Task = sendHelloIp4Async(peerInfo, port)
-                        val helloIp6Task = sendHelloIp6Async(peerInfo, port)
+                    while (!isConnected && isActive) {
+                        var portCount = 0
+                        for (port in linearPortGuess(trend, portParam.lastPort)) {
+                            if (portParam.trend == 0 && portCount > AppEnv.PortGuessExtendedLinearMaxRange) {
+                                break
+                            }
 
-                        if (isConnected || !isActive) break
+                            val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                            val helloIp6Task = sendHelloIp6Async(peerInfo, port)
 
-                        count++
-                        if (count == concurrentGuessNum) {
-                            count = 0
-                            delay(AppEnv.PeerFloodingDelay)
+                            if (isConnected || !isActive) break
+
+                            count++
+                            if (count == concurrentGuessNum) {
+                                count = 0
+                                delay(AppEnv.PeerFloodingDelay)
+                            }
                         }
                     }
                 }

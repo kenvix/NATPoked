@@ -33,6 +33,7 @@ object AppEnv : ManagedEnvFile(AppConstants.workingPath.resolve(".env")) {
     val PortGuessMaxNum: Int by envOf(50000)
     val PortGuessAlsoUseStun: Boolean by envOf(true)
     val PortGuessSkipLowPorts: Boolean by envOf(true)
+    val PortGuessExtendedLinearMaxRange: Int by envOf(30)
 
     @Description("进行端口预测时的发包间隔时间，单位为毫秒")
     val EchoDelay: Long by envOf(15)
