@@ -833,6 +833,7 @@ class NATPeerToPeer(
                             if (isConnected || !isActive) break
 
                             count++
+                            portCount++
                             if (count == concurrentGuessNum) {
                                 count = 0
                                 delay(AppEnv.PeerFloodingDelay)
