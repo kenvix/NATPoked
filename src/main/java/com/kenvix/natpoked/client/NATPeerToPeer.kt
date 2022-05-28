@@ -760,74 +760,81 @@ class NATPeerToPeer(
             if (debugNetworkTraffic)
                 logger.debug("connectPeer: ${peerInfo.clientId} guess port portParam: $portParam")
 
-            if (abs(portParam.avg) <= 1e-7) { // Average value is zero, do not use guess models
+            val guessModel = if (portParam.trend == 0) { // Average value is zero, do not use guess models
                 if (debugNetworkTraffic)
-                    logger.debug("Average value is zero, do not use guess models")
+                    logger.debug("Average value is zero, force to use linear method")
 
-                sendSimpleHelloPacket(portParam.lastPort)
+                PeersConfig.Peer.GuessModel.LINEAR
             } else {
-                when (config.natPortGuessModel) {
-                    PeersConfig.Peer.GuessModel.POISSON -> {
-                        while (!isConnected && isActive) {
-                            for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
-                                val now = System.currentTimeMillis() - portParam.testFinishedAt
+                config.natPortGuessModel
+            }
 
-                                // TODO: CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE
-                                //  CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT
-                                //  STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE
-                                val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
-                                logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
-                                for (port in ports) {
-                                    val helloIp4Task = sendHelloIp4Async(peerInfo, port)
-                                    val helloIp6Task = sendHelloIp6Async(peerInfo, port)
-                                    if (isConnected || !isActive) break
-                                }
+            when (guessModel) {
+                PeersConfig.Peer.GuessModel.POISSON -> {
+                    while (!isConnected && isActive) {
+                        for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
+                            val now = System.currentTimeMillis() - portParam.testFinishedAt
 
+                            // TODO: CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE
+                            //  CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT
+                            //  STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE UPDATE CLIENT STATE
+                            val ports = poissonPortGuess(now, portParam, guessPortNum = concurrentGuessNum)
+                            logger.debug("connectPeerAsync: ${peerInfo.clientId} / model POISSON / PORTs $ports")
+                            for (port in ports) {
+                                val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                                val helloIp6Task = sendHelloIp6Async(peerInfo, port)
                                 if (isConnected || !isActive) break
-                                delay(AppEnv.PeerFloodingDelay)
                             }
-                        }
-                    }
-
-                    PeersConfig.Peer.GuessModel.EXPONENTIAL -> {
-                        while (!isConnected && isActive) {
-                            for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
-                                val now = System.currentTimeMillis() - portParam.testFinishedAt
-
-                                val ports = expectedValuePortGuess(now, portParam, guessPortNum = concurrentGuessNum)
-                                logger.debug("connectPeerAsync: ${peerInfo.clientId} / model ExpectedValue / PORTs $ports")
-                                for (port in ports) {
-                                    val helloIp4Task = sendHelloIp4Async(peerInfo, port)
-                                    val helloIp6Task = sendHelloIp6Async(peerInfo, port)
-                                    if (isConnected || !isActive) break
-                                }
-
-                                if (isConnected || !isActive) break
-                                delay(AppEnv.PeerFloodingDelay)
-                            }
-                        }
-                    }
-
-                    PeersConfig.Peer.GuessModel.LINEAR -> {
-                        var count = 0
-                        logger.debug("connectPeerAsync: ${peerInfo.clientId} / model Linear / trend: ${portParam.trend}, lastPort: ${portParam.lastPort}")
-
-                        for (port in linearPortGuess(portParam.trend, portParam.lastPort)) {
-                            val helloIp4Task = sendHelloIp4Async(peerInfo, port)
-                            val helloIp6Task = sendHelloIp6Async(peerInfo, port)
 
                             if (isConnected || !isActive) break
-
-                            count++
-                            if (count == concurrentGuessNum) {
-                                count = 0
-                                delay(AppEnv.PeerFloodingDelay)
-                            }
+                            delay(AppEnv.PeerFloodingDelay)
                         }
                     }
-
-                    else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
                 }
+
+                PeersConfig.Peer.GuessModel.EXPONENTIAL -> {
+                    while (!isConnected && isActive) {
+                        for (i in 0 until (AppEnv.PortGuessMaxNum / concurrentGuessNum)) {
+                            val now = System.currentTimeMillis() - portParam.testFinishedAt
+
+                            val ports = expectedValuePortGuess(now, portParam, guessPortNum = concurrentGuessNum)
+                            logger.debug("connectPeerAsync: ${peerInfo.clientId} / model ExpectedValue / PORTs $ports")
+                            for (port in ports) {
+                                val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                                val helloIp6Task = sendHelloIp6Async(peerInfo, port)
+                                if (isConnected || !isActive) break
+                            }
+
+                            if (isConnected || !isActive) break
+                            delay(AppEnv.PeerFloodingDelay)
+                        }
+                    }
+                }
+
+                PeersConfig.Peer.GuessModel.LINEAR -> {
+                    var count = 0
+                    logger.debug("connectPeerAsync: ${peerInfo.clientId} / model Linear / trend: ${portParam.trend}, lastPort: ${portParam.lastPort}")
+
+                    val trend = if (portParam.trend == 0) {
+                        logger.debug("connectPeerAsync: trend is 0, assuming that trend is 1")
+                        1
+                    } else portParam.trend
+
+                    for (port in linearPortGuess(trend, portParam.lastPort)) {
+                        val helloIp4Task = sendHelloIp4Async(peerInfo, port)
+                        val helloIp6Task = sendHelloIp6Async(peerInfo, port)
+
+                        if (isConnected || !isActive) break
+
+                        count++
+                        if (count == concurrentGuessNum) {
+                            count = 0
+                            delay(AppEnv.PeerFloodingDelay)
+                        }
+                    }
+                }
+
+                else -> throw IllegalArgumentException("Unknown guess model: ${config.natPortGuessModel}")
             }
         }
     }

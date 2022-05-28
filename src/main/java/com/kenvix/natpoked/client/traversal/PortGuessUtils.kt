@@ -13,6 +13,7 @@ import org.apache.commons.math3.distribution.PoissonDistribution
 import java.net.DatagramPacket
 import java.net.InetAddress
 import java.nio.channels.DatagramChannel
+import kotlin.math.abs
 import kotlin.math.round
 
 @Serializable
@@ -24,7 +25,13 @@ data class PortAllocationPredictionParam(
     val firstPort: Int = -1,
 ) {
     val trend: Int
-        get() = if (avg > 0) 1 else if (avg < 0) -1 else 0
+        get() {
+            return if (abs(avg) <= 1e-5) {
+                0
+            } else {
+                if (avg > 0) 1 else if (avg < 0) -1 else 0
+            }
+        }
 }
 
 fun poissonSampling(avg: Double, timeSpan: Long): Int {
