@@ -167,15 +167,15 @@ sourceSets {
 
 tasks {
     withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "21"
+        kotlinOptions.jvmTarget = "17"
         kotlinOptions.freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
         kotlinOptions.freeCompilerArgs += "-Xinline-classes"
     }
 
     withType<JavaCompile> {
         options.encoding = "utf-8"
-        sourceCompatibility = "21"
-        targetCompatibility = "21"
+        sourceCompatibility = "17"
+        targetCompatibility = "17"
     }
 
     withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
@@ -188,10 +188,6 @@ tasks {
 //            exclude(dependency("commons-logging:commons-logging:.*"))
 //        }
 
-        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
-
-    withType<ProcessResources> {
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
 
@@ -208,18 +204,23 @@ tasks {
         }
     }
 
-    register("jarWithDepends", Jar::class.java) {
-        dependsOn("copyJarLibs")
-        destinationDir = file("${buildDir}/output")
-        baseName = applicationName
-    }
 
-    register("copyJarLibs", Copy::class.java) {
-        doLast {
-            into("${buildDir}/output/$libDirName")
-            from(configurations.runtime)
-        }
+    withType<ProcessResources> {
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
+//
+//    register("jarWithDepends", Jar::class.java) {
+//        dependsOn("copyJarLibs")
+//        destinationDir = file("${buildDir}/output")
+//        baseName = applicationName
+//    }
+//
+//    register("copyJarLibs", Copy::class.java) {
+//        doLast {
+//            into("${buildDir}/output/$libDirName")
+//            from(configurations.runtime)
+//        }
+//    }
 }
 
 // apply(from = "enableProGuard.gradle")
