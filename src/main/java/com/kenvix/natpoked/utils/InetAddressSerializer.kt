@@ -62,6 +62,7 @@ object Inet6AddressSerializer : KSerializer<Inet6Address> {
     }
 }
 
+@Suppress("DEPRECATION")
 object URLSerializer : KSerializer<URL> {
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("URL") {}
 

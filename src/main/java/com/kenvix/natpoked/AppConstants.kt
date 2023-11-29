@@ -16,6 +16,7 @@ object AppConstants {
     val tempPath = workingPath.resolve("Temp")
     var appMode: AppMode = AppMode.PEER
     val rootLogger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
+    val isJavaLoomSupported = System.getProperty("java.version").startsWith("21")
 //    var nettyGroup: EventLoopGroup = NioEventLoopGroup()
 
     enum class AppMode {

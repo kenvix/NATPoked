@@ -22,7 +22,6 @@ import org.slf4j.LoggerFactory
 import java.net.DatagramPacket
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.URL
 import java.nio.channels.DatagramChannel
 import java.nio.file.Files
 import java.nio.file.Path
@@ -99,15 +98,15 @@ object NATClient : CoroutineScope, AutoCloseable {
     }
 
     private fun parseUrl(it: String): UrlParseResult {
-        val url = URL(it)
+        val url = java.net.URI(it)
         val port = url.port.run {
             if (this == -1)
-                if (url.protocol == "https") 443 else 80
+                if (url.scheme == "https") 443 else 80
             else
                 this
         }
         val path = url.path.default("/")
-        val ssl = url.protocol == "https"
+        val ssl = url.scheme == "https"
         return UrlParseResult(url.host, port, path, ssl)
     }
 

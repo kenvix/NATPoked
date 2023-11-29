@@ -54,6 +54,7 @@ class SerializationTest {
         val uri: URI,
     )
 
+    @Suppress("DEPRECATION")
     @Test
     fun testInetAddressSerialization() {
         val obj = TestInetAddressSerialization(
