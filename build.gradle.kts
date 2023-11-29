@@ -3,9 +3,9 @@ import java.util.Properties
 import com.google.protobuf.gradle.*
 
 plugins {
-    kotlin("jvm") version "1.6.21"
+    kotlin("jvm") version "1.9.21"
     java
-    kotlin("plugin.serialization") version "1.6.21"
+    kotlin("plugin.serialization") version "1.9.21"
     id("com.google.protobuf") version "0.8.18"
     id("org.graalvm.buildtools.native") version "0.9.9"
     id("com.github.johnrengelman.shadow") version "6.1.0"
@@ -35,6 +35,7 @@ val appMainClass = "${fullPackageName}.Main"
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://maven.pkg.jetbrains.space/public/p/ktor/eap/") }
 }
 
 dependencies {
@@ -73,8 +74,8 @@ dependencies {
 
 
     /* Ktor server things */
-    implementation("io.ktor:ktor-server-cio:$ktorVersion")
     implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-server-cio:$ktorVersion")
     implementation("io.ktor:ktor-websockets:$ktorVersion")
     implementation("io.ktor:ktor-server-host-common:$ktorVersion")
     implementation("io.ktor:ktor-locations:$ktorVersion")
@@ -103,7 +104,7 @@ dependencies {
     implementation("org.apache.commons:commons-lang3:3.12.0")
     implementation(group = "commons-cli", name = "commons-cli", version = "1.5.0")
     implementation("commons-io:commons-io:2.11.0")
-    implementation("org.apache.commons:commons-text:1.9")
+    implementation("org.apache.commons:commons-text:1.10.0")
 
 
     // https://mvnrepository.com/artifact/io.netty/netty-all
@@ -127,7 +128,7 @@ dependencies {
     implementation("org.eclipse.paho:org.eclipse.paho.mqttv5.client:1.2.5")
 
     // https://mvnrepository.com/artifact/io.netty/netty-buffer
-    implementation("io.netty:netty-buffer:4.1.76.Final")
+    implementation("io.netty:netty-buffer:4.1.101.Final")
 }
 
 tasks.getByName<Test>("test") {
@@ -166,15 +167,15 @@ sourceSets {
 
 tasks {
     withType<KotlinCompile> {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = "21"
         kotlinOptions.freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
         kotlinOptions.freeCompilerArgs += "-Xinline-classes"
     }
 
     withType<JavaCompile> {
         options.encoding = "utf-8"
-        sourceCompatibility = "11"
-        targetCompatibility = "11"
+        sourceCompatibility = "21"
+        targetCompatibility = "21"
     }
 
     withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {

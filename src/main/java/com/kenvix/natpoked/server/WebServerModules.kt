@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import javax.crypto.BadPaddingException
 import kotlin.time.toJavaDuration
+import com.kenvix.web.utils.JSON
 
 @Suppress("unused", "DuplicatedCode") // Referenced in application.conf
 fun Application.module() {
@@ -104,10 +105,7 @@ fun Application.module() {
     }
 
     install(ContentNegotiation) {
-        json(Json {
-            prettyPrint = true
-            isLenient = true
-        })
+        json(JSON)
     }
 
     install(StatusPages) {

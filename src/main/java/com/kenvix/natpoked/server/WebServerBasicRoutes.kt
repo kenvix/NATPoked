@@ -139,7 +139,11 @@ internal object WebServerBasicRoutes : KtorModule {
                     post("/connect") {
                         val (myPeerId, targetPeerId) = call.receiveInternalData<PeerConnectRequest>()
                         if (myPeerId == targetPeerId) {
-                            return@post call.respondInfo("Cannot connect to self: got myPeerId == targetPeerId", 400, status = HttpStatusCode.BadRequest)
+                            return@post call.respondInfo(
+                                "Cannot connect to self: got myPeerId == targetPeerId",
+                                400,
+                                status = HttpStatusCode.BadRequest
+                            )
                         }
 
                         val myPeer: NATPeerToBrokerConnection = NATServer.peerConnections.getOrFail(myPeerId)
@@ -171,30 +175,43 @@ internal object WebServerBasicRoutes : KtorModule {
                             when (serverRolePeer.client.clientNatType) {
                                 NATType.PUBLIC, NATType.FULL_CONE, NATType.RESTRICTED_CONE -> {
                                     requestPeerMakeConnection(clientRolePeer, serverRolePeer.client)
-                                    clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
-                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
+                                    clientRolePeer.setConnectionStage(
+                                        serverRolePeer.client.clientId,
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
+                                    )
 
-                                    call.respondSuccess("Requested to connect. One of Network type is " +
-                                            "FullCone/Public. Server is ${serverRolePeer.client.clientId} , client is ${clientRolePeer.client.clientId}")
+                                    call.respondSuccess(
+                                        "Requested to connect. One of Network type is " +
+                                                "FullCone/Public. Server is ${serverRolePeer.client.clientId} , client is ${clientRolePeer.client.clientId}"
+                                    )
                                 }
 
 
                                 NATType.PORT_RESTRICTED_CONE, NATType.SYMMETRIC -> {
                                     requestPeerMakeConnection(serverRolePeer, clientRolePeer.client)
-                                    clientRolePeer.setConnectionStage(serverRolePeer.client.clientId,
-                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER)
+                                    clientRolePeer.setConnectionStage(
+                                        serverRolePeer.client.clientId,
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_CLIENT_PEER
+                                    )
 
                                     requestPeerMakeConnection(clientRolePeer, serverRolePeer.client)
-                                    serverRolePeer.setConnectionStage(clientRolePeer.client.clientId,
-                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER)
-                                    call.respondSuccess("Requested to connect each other. One of Network type is " +
-                                            "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId} , client is ${clientRolePeer.client.clientId}")
+                                    serverRolePeer.setConnectionStage(
+                                        clientRolePeer.client.clientId,
+                                        NATPeerToPeerConnectionStage.REQUESTED_TO_CONNECT_SERVER_PEER
+                                    )
+                                    call.respondSuccess(
+                                        "Requested to connect each other. One of Network type is " +
+                                                "RESTRICTED_CONE. Server is ${serverRolePeer.client.clientId} , client is ${clientRolePeer.client.clientId}"
+                                    )
                                 }
 
                                 else -> TODO("其他类型的 NAT")
                             }
                         } else {
-                            call.respondInfo(code = 30001, info = "Target offline. Wait target peer online and try again")
+                            call.respondInfo(
+                                code = 30001,
+                                info = "Target offline. Wait target peer online and try again"
+                            )
                         }
                     }
 
@@ -272,10 +289,18 @@ internal object WebServerBasicRoutes : KtorModule {
                     logger.error("Unable to unregister", e)
                 }
             }
+
+            is Frame.Text -> TODO()
+            is Frame.Ping -> TODO()
+            is Frame.Pong -> TODO()
         }
     }
 
-    private suspend fun requestPeerMakeConnection(myPeer: NATPeerToBrokerConnection, targetPeerClientInfo: NATClientItem, targetPorts: List<Int>? = null) {
+    private suspend fun requestPeerMakeConnection(
+        myPeer: NATPeerToBrokerConnection,
+        targetPeerClientInfo: NATClientItem,
+        targetPorts: List<Int>? = null
+    ) {
         if (targetPeerClientInfo.clientId == myPeer.client.clientId) {
             throw BadRequestException("Cannot connect to self: targetPeerClientInfo.clientId == myPeer.client.clientId")
         }
@@ -284,19 +309,22 @@ internal object WebServerBasicRoutes : KtorModule {
         infoCopy.peersConfig = null
         val myPeerId = myPeer.client.clientId
 
-        val peerConfigCopy: PeersConfig.Peer = targetPeerClientInfo.peersConfig?.peers?.get(myPeerId)?.copy() ?: throw NotFoundException("Peer ${targetPeerClientInfo.clientId}->$myPeerId config not found")
+        val peerConfigCopy: PeersConfig.Peer = targetPeerClientInfo.peersConfig?.peers?.get(myPeerId)?.copy()
+            ?: throw NotFoundException("Peer ${targetPeerClientInfo.clientId}->$myPeerId config not found")
         peerConfigCopy.key = ""
         peerConfigCopy.keySha = emptyByteArray()
 
-        val json = JSON.encodeToString(BrokerMessage(
-            ACTION_CONNECT_PEER.typeId,
-            targetPeerClientInfo.clientId,
-            NATConnectReq(
-                targetClientItem = infoCopy,
-                ports = targetPorts,
-                configForMe = peerConfigCopy,
+        val json = JSON.encodeToString(
+            BrokerMessage(
+                ACTION_CONNECT_PEER.typeId,
+                targetPeerClientInfo.clientId,
+                NATConnectReq(
+                    targetClientItem = infoCopy,
+                    ports = targetPorts,
+                    configForMe = peerConfigCopy,
+                )
             )
-        ))
+        )
 
         NATServer.brokerServer.sendPeerMessage(myPeerId, "control/connect", myPeer.encodedKey, json.toByteArray(), 2)
     }

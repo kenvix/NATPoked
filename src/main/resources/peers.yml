@@ -9,8 +9,8 @@ peers:
     # # 自动连接到此 peer 并保持连接
     # autoConnect: true
 
-   # 端口服务转发配置（可选）
-   # ports:
+   # 端口服务转发配置
+   ports:
    #   # "https" 为服务名称（名称任取），具有相同服务名称的服务将被连接在一起
    #   # 不要使用双下划线 __ 开头的服务名称，这些名称由系统保留使用。
    #   https:
@@ -40,16 +40,17 @@ peers:
    #   role: SERVER
 # 我的配置
 my:
-  # 我的 Peer id。留空则从环境变量读取（建议留空并通过环境变量配置）
+  # （已废弃）我的 Peer id。留空则从环境变量读取（建议留空并通过环境变量配置）
   id: ""
-  # 我的 Peer key。留空则从环境变量读取（建议留空并通过环境变量配置）
+  # （已废弃）我的 Peer key。留空则从环境变量读取（建议留空并通过环境变量配置）
   key: ""
   # 不建议修改
   nat:
     # 自动检测配置（推荐）
     auto: true
-    # clientNatType: FULLCONE
-    # isUpnpSupported: true
-    # clientInetAddress:
-    # clientInet6Address:
-    # isValueChecked: false
+    # 以下设置用于手动指定网络类型。不建议修改
+    clientNatType: FULLCONE
+    isUpnpSupported: true
+    clientInetAddress:
+    clientInet6Address:
+    isValueChecked: false

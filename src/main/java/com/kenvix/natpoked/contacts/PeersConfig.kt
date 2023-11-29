@@ -64,7 +64,7 @@ data class PeersConfig(
             var dstPort: Int,
             var role: ClientServerRole,
             var dscp: Int = -1,
-            var isEncrypted: Boolean = false,
+            var isEncrypted: Boolean = true,
         ) {
             @Serializable
             enum class Protocol { TCP, UDP }
