@@ -3,9 +3,9 @@ import java.util.Properties
 import com.google.protobuf.gradle.*
 
 plugins {
-    kotlin("jvm") version "1.9.21"
+    kotlin("jvm") version "2.1.+"
     java
-    kotlin("plugin.serialization") version "1.9.21"
+    kotlin("plugin.serialization") version "2.1.+"
     id("com.google.protobuf") version "0.8.18"
     id("org.graalvm.buildtools.native") version "0.9.9"
     id("com.github.johnrengelman.shadow") version "6.1.0"
