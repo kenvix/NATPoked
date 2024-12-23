@@ -99,6 +99,7 @@ class NATPeerToPeer(
 
     private val portServicesMap: MutableMap<Int, ServiceRedirector> = mutableMapOf()
     private val portServiceOperationLock = Mutex()
+    private val peerCommunicationModel = AppEnv.PeerCommunicationModel.lowercase()
 
     companion object {
         private const val ivSize = 16
@@ -134,9 +135,13 @@ class NATPeerToPeer(
     }
 
     private val receiveJob: Array<Job> =
-        Array(if (AppEnv.PeerCommunicationModel.lowercase() == "nio") 1 else receiveBufferNum) {
-            launch(Dispatchers.IO) {
-                if (AppEnv.PeerCommunicationModel.lowercase() == "nio") {
+        Array(if (peerCommunicationModel == "bio") receiveBufferNum else if (peerCommunicationModel == "aio") 0 else 1) {
+            if (peerCommunicationModel == "aio") {
+                launch(Dispatchers.IO) {
+
+                }
+            } else if (peerCommunicationModel == "nio") {
+                launch(Dispatchers.IO) {
                     val buffersChannel = Channel<ByteBuffer>(AppEnv.PeerReceiveBufferNum)
                     for (i in 0 until 10) {
                         buffersChannel.send(receiveBuffers[i])
@@ -160,7 +165,11 @@ class NATPeerToPeer(
                                 val addr = udpChannel.receive(buffer) as InetSocketAddress?
                                 if (addr != null) {
                                     if (debugNetworkTrafficVerbose) {
-                                        logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                                        logger.trace(
+                                            "Received peer packet from {} size {}",
+                                            addr,
+                                            buffer.position()
+                                        )
                                     }
                                     buffer.flip()
                                     launch(Dispatchers.IO) {
@@ -173,7 +182,9 @@ class NATPeerToPeer(
 
                         keys.clear()
                     }
-                } else {
+                }
+            } else {
+                launch(Dispatchers.IO) {
                     if (debugNetworkTraffic)
                         logger.info("Started UDP receive job $it model BlockingIO")
 
@@ -184,14 +195,14 @@ class NATPeerToPeer(
 
                             val addr = udpChannel.receive(buffer) as InetSocketAddress
                             if (debugNetworkTrafficVerbose) {
-                                logger.trace("Received peer packet from $addr size ${buffer.position()}")
+                                logger.trace("Received peer packet from {} size {}", addr, buffer.position())
                             }
 
                             buffer.flip()
                             dispatchIncomingPacket(addr, buffer)
                         } catch (_: ClosedChannelException) {
                             if (debugNetworkTraffic)
-                                logger.trace("Closing UDP channel: Peer $targetPeerId")
+                                logger.trace("Closing UDP channel: Peer {}", targetPeerId)
                         } catch (e: Exception) {
                             if (debugNetworkTraffic)
                                 logger.error("Unable to handle incoming packet!!!", e)
